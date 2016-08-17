@@ -187,18 +187,12 @@ class MessageDeserializer(object):
     def receive_bytes(self, data):
         self._buffer += data
 
-        while True:
+        while self._buffer:
             result = self._process_frame()
             if result is not None:
                 break
 
-        if result is not NO_MESSAGE:
-            return result
-
     def _process_frame(self):
-        if not self._buffer:
-            return NO_MESSAGE
-
         if self._buffer and self._opcode is None:
             flags_opcode = self._buffer[0]
             opcode = flags_opcode & 0x0f
