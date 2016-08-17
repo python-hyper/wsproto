@@ -76,6 +76,7 @@ LOCAL_ONLY_CLOSE_REASONS = (
 
 PROTOCOL_ERROR = object()
 INVALID_FRAME_PAYLOAD_DATA = object()
+NO_MESSAGE = object()
 
 
 class Message(object):
@@ -191,12 +192,12 @@ class MessageDeserializer(object):
             if result is not None:
                 break
 
-        if result is not False:
+        if result is not NO_MESSAGE:
             return result
 
     def _process_frame(self):
         if not self._buffer:
-            return False
+            return NO_MESSAGE
 
         if self._buffer and self._opcode is None:
             flags_opcode = self._buffer[0]
@@ -206,7 +207,7 @@ class MessageDeserializer(object):
                 self._opcode = Opcode(opcode)
             except:
                 self._messages.append(CloseReason.PROTOCOL_ERROR)
-                return False
+                return NO_MESSAGE
 
             self._control = bool(opcode & 0x08)
 
@@ -215,10 +216,10 @@ class MessageDeserializer(object):
                     self._message_opcode = self._opcode
                 else:
                     self._messages.append(CloseReason.PROTOCOL_ERROR)
-                    return False
+                    return NO_MESSAGE
             elif self._opcode is Opcode.CONTINUATION and self._message_opcode is None:
                 self._messages.append(CloseReason.PROTOCOL_ERROR)
-                return False
+                return NO_MESSAGE
 
             self._fin = bool(flags_opcode & 0x80)
             self._rsv = (
@@ -231,10 +232,10 @@ class MessageDeserializer(object):
 
         if self._control and not self._fin:
             self._messages.append(CloseReason.PROTOCOL_ERROR)
-            return False
+            return NO_MESSAGE
         if True in self._rsv:
             self._messages.append(CloseReason.PROTOCOL_ERROR)
-            return False
+            return NO_MESSAGE
 
         if self._buffer and self._payload_length is None:
             self._payload_length = self._buffer[0]
@@ -242,11 +243,11 @@ class MessageDeserializer(object):
             self._payload_length = self._payload_length & 0x7f
             self._buffer = self._buffer[1:]
         elif not self._buffer:
-            return False
+            return NO_MESSAGE
 
         if self._control and self._payload_length > 125:
             self._messages.append(CloseReason.PROTOCOL_ERROR)
-            return False
+            return NO_MESSAGE
         elif len(self._buffer) >= 2 and self._payload_length == 126:
             self._payload_length = struct.unpack('!H', self._buffer[:2])[0]
             self._buffer = self._buffer[2:]
@@ -255,7 +256,7 @@ class MessageDeserializer(object):
             self._buffer = self._buffer[8:]
 
         if self._payload_length is None:
-            return False
+            return NO_MESSAGE
 
         if len(self._buffer) >= 4 and self._masked and self._masking_key is None:
             self._masking_key = itertools.cycle(self._buffer[:4])
@@ -269,7 +270,7 @@ class MessageDeserializer(object):
             self._buffer = b''
 
         if not payload and self._payload_length > 0:
-            return False
+            return NO_MESSAGE
 
         self._payload_length -= len(payload)
 
@@ -284,7 +285,7 @@ class MessageDeserializer(object):
                 self._message_payload += self._decoder.decode(payload)
             except UnicodeDecodeError:
                 self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-                return False
+                return NO_MESSAGE
         elif not self._control and self._message_opcode is Opcode.BINARY:
             if self._message_payload is None:
                 self._message_payload = b''
@@ -298,27 +299,27 @@ class MessageDeserializer(object):
                     self._payload = (CloseReason.NORMAL_CLOSURE, None)
                 elif len(self._payload) == 1:
                     self._messages.append(CloseReason.PROTOCOL_ERROR)
-                    return False
+                    return NO_MESSAGE
                 else:
                     code = struct.unpack('!H', self._payload[:2])[0]
                     if code < 1000:
                         self._messages.append(CloseReason.PROTOCOL_ERROR)
-                        return False
+                        return NO_MESSAGE
                     try:
                         code = CloseReason(code)
                     except:
                         pass
                     if code in LOCAL_ONLY_CLOSE_REASONS:
                         self._messages.append(CloseReason.PROTOCOL_ERROR)
-                        return False
+                        return NO_MESSAGE
                     if not isinstance(code, CloseReason) and code < 3000:
                         self._messages.append(CloseReason.PROTOCOL_ERROR)
-                        return False
+                        return NO_MESSAGE
                     try:
                         reason = self._payload[2:].decode('utf-8')
                     except UnicodeDecodeError:
                         self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-                        return False
+                        return NO_MESSAGE
                     self._payload = (code, reason)
 
             opcode = self._opcode
@@ -331,7 +332,7 @@ class MessageDeserializer(object):
                     payload += self._decoder.decode(b'', True)
                 except UnicodeDecodeError:
                     self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-                    return False
+                    return NO_MESSAGE
             elif opcode is Opcode.BINARY:
                 payload = self._message_payload
 
