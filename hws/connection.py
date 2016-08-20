@@ -90,14 +90,17 @@ class Extension(object):
     def accept(self, connection, offer):
         return None
 
-    def frame_inbound_header(self, deserializer, opcode, rsv, payload_length):
+    def frame_inbound_header(self, proto, opcode, rsv, payload_length):
         pass
 
-    def frame_inbound_payload_data(self, deserializer, data):
+    def frame_inbound_payload_data(self, proto, data):
         return data
 
-    def frame_inbound_complete(self, deserializer, fin):
+    def frame_inbound_complete(self, proto, fin):
         pass
+
+    def frame_outbound(self, proto, opcode, rsv, data):
+        return (opcode, rsv, data)
 
 
 class PerMessageDeflate(Extension):
@@ -113,7 +116,7 @@ class PerMessageDeflate(Extension):
 
         self._compressor = None
         self._decompressor = None
-        self._message_compressed = None
+        self._inbound_compressed = None
 
         self._enabled = False
 
@@ -152,7 +155,7 @@ class PerMessageDeflate(Extension):
 
         self._enabled = True
 
-    def frame_inbound_header(self, deserializer, opcode, rsv, payload_length):
+    def frame_inbound_header(self, proto, opcode, rsv, payload_length):
         if True in rsv[1:]:
             return CloseReason.PROTOCOL_ERROR
         elif rsv[0] and opcode.iscontrol():
@@ -160,40 +163,39 @@ class PerMessageDeflate(Extension):
         elif rsv[0] and opcode is Opcode.CONTINUATION:
             return CloseReason.PROTOCOL_ERROR
 
-        if self._message_compressed is None:
-            self._message_compressed = rsv[0]
+        if self._inbound_compressed is None:
+            self._inbound_compressed = rsv[0]
+            if self._inbound_compressed:
+                if proto.client:
+                    bits = self.server_max_window_bits
+                else:
+                    bits = self.client_max_window_bits
+                if self._decompressor is None:
+                    self._decompressor = zlib.decompressobj(-bits)
 
-    def frame_inbound_payload_data(self, deserializer, data):
-        if not self._message_compressed:
+    def frame_inbound_payload_data(self, proto, data):
+        if not self._inbound_compressed:
             return data
-
-        if self._decompressor is None:
-            if deserializer.client:
-                bits = self.server_max_window_bits
-            else:
-                bits = self.client_max_window_bits
-            self._decompressor = zlib.decompressobj(-bits)
 
         try:
             return self._decompressor.decompress(data)
-        except:
+        except zlib.error:
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
-    def frame_inbound_complete(self, deserializer, fin):
-        if not fin or not self._message_compressed:
+    def frame_inbound_complete(self, proto, fin):
+        if not fin or not self._inbound_compressed:
             return
 
         try:
-            data = self.frame_inbound_payload_data(deserializer,
-                                                   b'\x00\x00\xff\xff')
+            data = self._decompressor.decompress(b'\x00\x00\xff\xff')
             data += self._decompressor.flush()
             if isinstance(data, CloseReason):
                 return result
-        except:
+        except zlib.error:
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
         if fin:
-            if deserializer.client:
+            if proto.client:
                 no_context_takeover = self.server_no_context_takeover
             else:
                 no_context_takeover = self.client_no_context_takeover
@@ -201,9 +203,37 @@ class PerMessageDeflate(Extension):
             if no_context_takeover:
                 self._decompressor = None
 
-            self._message_compressed = None
+            self._inbound_compressed = None
 
         return data
+
+    def frame_outbound(self, proto, opcode, rsv, data):
+        if opcode not in (Opcode.TEXT, Opcode.BINARY):
+            return (opcode, rsv, data)
+
+        if self._compressor is None:
+            if proto.client:
+                bits = self.client_max_window_bits
+            else:
+                bits = self.server_max_window_bits
+            self._compressor = zlib.compressobj(wbits=-bits)
+
+        data = self._compressor.compress(data)
+        data += self._compressor.flush(zlib.Z_SYNC_FLUSH)
+        data = data[:-4]
+
+        rsv = list(rsv)
+        rsv[0] = True
+
+        if proto.client:
+            no_context_takeover = self.client_no_context_takeover
+        else:
+            no_context_takeover = self.server_no_context_takeover
+
+        if no_context_takeover:
+            self._compressor = None
+
+        return (opcode, rsv, data)
 
     def __repr__(self):
         descr = ['client_max_window_bits=%d' % self.client_max_window_bits]
@@ -237,8 +267,8 @@ class Message(object):
     def serialize(self):
         rsv = 0
         for bit in self.rsv:
-            rsv |= int(bit)
             rsv <<= 1
+            rsv |= int(bit)
         fin_rsv = (int(self.fin) << 3) | rsv
         fin_rsv_opcode = fin_rsv << 4 | self.opcode
 
@@ -249,8 +279,6 @@ class Message(object):
             else:
                 reason = b''
             self.payload = struct.pack('!H', code) + reason
-        elif self.opcode is Opcode.TEXT:
-            self.payload = self.payload.encode('utf-8')
 
         payload_length = len(self.payload)
         quad_payload = False
@@ -560,7 +588,7 @@ class WSConnection(object):
         self._nonce = None
         self._outgoing = b''
         self._events = []
-        self._deserializer = MessageDeserializer(self.client, self.extensions)
+        self._proto = MessageDeserializer(self.client, self.extensions)
 
         self._upgrade_connection = h11.Connection(h11.CLIENT)
 
@@ -624,7 +652,7 @@ class WSConnection(object):
                 self._events.append(event)
 
         if self._state is ConnectionState.OPEN:
-            self._deserializer.receive_bytes(data)
+            self._proto.receive_bytes(data)
 
     def _process_upgrade(self, data):
         self._upgrade_connection.receive_data(data)
@@ -640,7 +668,7 @@ class WSConnection(object):
         while self._events:
             yield self._events.pop(0)
 
-        for message in self._deserializer.messages():
+        for message in self._proto.messages():
             if isinstance(message, CloseReason):
                 reason = message
                 self.close(reason)
@@ -667,8 +695,19 @@ class WSConnection(object):
 
     def _enqueue_message(self, *frames):
         for f in frames:
+            if f.opcode is Opcode.TEXT:
+                f.payload = f.payload.encode('utf-8')
+            for extension in self.extensions:
+                if not extension.enabled():
+                    continue
+
+                opcode, rsv, data = \
+                    extension.frame_outbound(self, f.opcode, f.rsv, f.payload)
+                f.opcode = opcode
+                f.rsv = rsv
+                f.payload = data
+
             f.mask()
-            print("SENDING: %r" % f)
         self._outgoing += b''.join(f.serialize() for f in frames)
 
     def _establish_connection(self, event):

@@ -55,13 +55,10 @@ def run_case(server, case, agent):
         connection.receive_bytes(data or None)
         for event in connection.events():
             if isinstance(event, TextMessageReceived):
-                print("Echoing text message.")
                 connection.send_text(event.message)
             elif isinstance(event, BinaryMessageReceived):
                 connection.send_binary(event.message)
-                print("Echoing binary message.")
             elif isinstance(event, ConnectionClosed):
-                print("Connection closed: %r" % event.code)
                 closed = True
             if data is None:
                 break
