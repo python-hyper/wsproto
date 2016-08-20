@@ -12,6 +12,7 @@ import hashlib
 import itertools
 import random
 import struct
+import zlib
 
 from enum import Enum, IntEnum
 
@@ -46,6 +47,9 @@ class Opcode(IntEnum):
     PING = 0x9
     PONG = 0xA
 
+    def iscontrol(self):
+        return bool(self & 0x08)
+
 class CloseReason(IntEnum):
     """
     RFC 6455, Section 7.4.1 - Defined Status Codes
@@ -73,6 +77,145 @@ LOCAL_ONLY_CLOSE_REASONS = (
     CloseReason.TLS_HANDHSAKE_FAILED,
     )
 
+
+class Extension(object):
+    name = None
+
+    def enabled(self):
+        return False
+
+    def offer(self, connection):
+        return None
+
+    def accept(self, connection, offer):
+        return None
+
+    def frame_inbound_header(self, deserializer, opcode, rsv, payload_length):
+        pass
+
+    def frame_inbound_payload_data(self, deserializer, data):
+        return data
+
+    def frame_inbound_complete(self, deserializer, fin):
+        pass
+
+
+class PerMessageDeflate(Extension):
+    name = 'permessage-deflate'
+
+    def __init__(self, client_no_context_takeover=False,
+                 client_max_window_bits=15, server_no_context_takeover=False,
+                 server_max_window_bits=15):
+        self.client_no_context_takeover = client_no_context_takeover
+        self.client_max_window_bits = client_max_window_bits
+        self.server_no_context_takeover = server_no_context_takeover
+        self.server_max_window_bits = server_max_window_bits
+
+        self._compressor = None
+        self._decompressor = None
+        self._message_compressed = None
+
+        self._enabled = False
+
+    def enabled(self):
+        return self._enabled
+
+    def offer(self, connection):
+        parameters = {
+            'client_max_window_bits': self.client_max_window_bits,
+            'server_max_window_bits': self.server_max_window_bits,
+        }
+
+        parameters = [
+            'client_max_window_bits=%d' % self.client_max_window_bits,
+            'server_max_window_bits=%d' % self.server_max_window_bits,
+            ]
+
+        if self.client_no_context_takeover:
+            parameters.append('client_no_context_takeover')
+        if self.server_no_context_takeover:
+            parameters.append('server_no_context_takeover')
+
+        return '; '.join(['permessage-deflate'] + parameters)
+
+    def accept(self, connection, offer):
+        bits = [b.strip() for b in offer.split(';')]
+        for bit in bits[1:]:
+            if bit.startswith('client_no_context_takeover'):
+                self.client_no_context_takeover = True
+            elif bit.startswith('server_no_context_takeover'):
+                self.server_no_context_takeover = True
+            elif bit.startswith('client_max_window_bits'):
+                self.client_max_window_bits = int(bit.split('=', 1)[1].strip())
+            elif bit.startswith('server_max_window_bits'):
+                self.server_max_window_bits = int(bit.split('=', 1)[1].strip())
+
+        self._enabled = True
+
+    def frame_inbound_header(self, deserializer, opcode, rsv, payload_length):
+        if True in rsv[1:]:
+            return CloseReason.PROTOCOL_ERROR
+        elif rsv[0] and opcode.iscontrol():
+            return CloseReason.PROTOCOL_ERROR
+        elif rsv[0] and opcode is Opcode.CONTINUATION:
+            return CloseReason.PROTOCOL_ERROR
+
+        if self._message_compressed is None:
+            self._message_compressed = rsv[0]
+
+    def frame_inbound_payload_data(self, deserializer, data):
+        if not self._message_compressed:
+            return data
+
+        if self._decompressor is None:
+            if deserializer.client:
+                bits = self.server_max_window_bits
+            else:
+                bits = self.client_max_window_bits
+            self._decompressor = zlib.decompressobj(-bits)
+
+        try:
+            return self._decompressor.decompress(data)
+        except:
+            return CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
+    def frame_inbound_complete(self, deserializer, fin):
+        if not fin or not self._message_compressed:
+            return
+
+        try:
+            data = self.frame_inbound_payload_data(deserializer,
+                                                   b'\x00\x00\xff\xff')
+            data += self._decompressor.flush()
+            if isinstance(data, CloseReason):
+                return result
+        except:
+            return CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
+        if fin:
+            if deserializer.client:
+                no_context_takeover = self.server_no_context_takeover
+            else:
+                no_context_takeover = self.client_no_context_takeover
+
+            if no_context_takeover:
+                self._decompressor = None
+
+            self._message_compressed = None
+
+        return data
+
+    def __repr__(self):
+        descr = ['client_max_window_bits=%d' % self.client_max_window_bits]
+        if self.client_no_context_takeover:
+            descr.append('client_no_context_takeover')
+        descr.append('server_max_window_bits=%d' % self.server_max_window_bits)
+        if self.server_no_context_takeover:
+            descr.append('server_no_context_takeover')
+
+        descr = '; '.join(descr)
+
+        return '<%s %s>' % (self.__class__.__name__, descr)
 
 class Message(object):
     def __init__(self, opcode, fin=True, rsv=None, payload=None,
@@ -157,7 +300,10 @@ class MessageDeserializer(object):
         FRAME_COMPLETE = 3
         FAILED = 4
 
-    def __init__(self):
+    def __init__(self, client, extensions):
+        self.client = client
+        self.extensions = extensions
+
         # Global state
         self._buffer = b''
         self._messages = []
@@ -173,7 +319,6 @@ class MessageDeserializer(object):
         self._payload_length = None
         self._payload = b''
         self._masked = False
-        self._control = False
 
     def reset_message(self):
         self.reset_frame()
@@ -184,6 +329,21 @@ class MessageDeserializer(object):
     def messages(self):
         while self._messages:
             yield self._messages.pop(0)
+
+    def add_message_payload(self, payload, fin=False):
+        if self._message_opcode is Opcode.TEXT:
+            if self._message_payload is None:
+                self._message_payload = ''
+                self._decoder = codecs.getincrementaldecoder('utf-8')()
+            try:
+                self._message_payload += self._decoder.decode(payload, fin)
+            except UnicodeDecodeError:
+                self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
+                return self.State.FAILED
+        elif self._message_opcode is Opcode.BINARY:
+            if self._message_payload is None:
+                self._message_payload = b''
+            self._message_payload += payload
 
     def receive_bytes(self, data):
         self._buffer += data
@@ -217,9 +377,7 @@ class MessageDeserializer(object):
                 self._messages.append(CloseReason.PROTOCOL_ERROR)
                 return self.State.FAILED
 
-            self._control = bool(opcode & 0x08)
-
-            if not self._control and self._opcode is not Opcode.CONTINUATION:
+            if not self._opcode.iscontrol() and self._opcode is not Opcode.CONTINUATION:
                 if self._message_opcode is None:
                     self._message_opcode = self._opcode
                 else:
@@ -238,10 +396,7 @@ class MessageDeserializer(object):
 
             self._buffer = self._buffer[1:]
 
-        if self._control and not self._fin:
-            self._messages.append(CloseReason.PROTOCOL_ERROR)
-            return self.State.FAILED
-        if True in self._rsv:
+        if self._opcode.iscontrol() and not self._fin:
             self._messages.append(CloseReason.PROTOCOL_ERROR)
             return self.State.FAILED
 
@@ -253,7 +408,7 @@ class MessageDeserializer(object):
         elif not self._buffer:
             return self.State.HEADER
 
-        if self._control and self._payload_length > 125:
+        if self._opcode.iscontrol() and self._payload_length > 125:
             self._messages.append(CloseReason.PROTOCOL_ERROR)
             return self.State.FAILED
         elif len(self._buffer) >= 2 and self._payload_length == 126:
@@ -264,6 +419,20 @@ class MessageDeserializer(object):
             self._buffer = self._buffer[8:]
 
         if self._payload_length is not None:
+            extension_ran = False
+            for extension in self.extensions:
+                if not extension.enabled():
+                    continue
+                extension_ran = True
+                result = extension.frame_inbound_header(self, self._opcode,
+                                                        self._rsv,
+                                                        self._payload_length)
+                if result is not None:
+                    return result
+            if not extension_ran:
+                if True in self._rsv:
+                    self._messages.append(CloseReason.PROTOCOL_ERROR)
+                    return self.State.FAILED
             return self.State.PAYLOAD
 
         return self.State.HEADER
@@ -288,19 +457,18 @@ class MessageDeserializer(object):
         if self._masked:
             payload = bytes(b ^ next(self._masking_key) for b in payload)
 
-        if not self._control and self._message_opcode is Opcode.TEXT:
-            if self._message_payload is None:
-                self._message_payload = ''
-                self._decoder = codecs.getincrementaldecoder('utf-8')()
-            try:
-                self._message_payload += self._decoder.decode(payload)
-            except UnicodeDecodeError:
-                self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
+        for extension in self.extensions:
+            if not extension.enabled():
+                continue
+            payload = extension.frame_inbound_payload_data(self, payload)
+            if isinstance(payload, CloseReason):
+                self._messages.append(payload)
                 return self.State.FAILED
-        elif not self._control and self._message_opcode is Opcode.BINARY:
-            if self._message_payload is None:
-                self._message_payload = b''
-            self._message_payload += payload
+
+        if not self._opcode.iscontrol():
+            result = self.add_message_payload(payload)
+            if result is not None:
+                return result
 
         self._payload += payload
 
@@ -339,24 +507,33 @@ class MessageDeserializer(object):
                         return self.State.FAILED
                     self._payload = (code, reason)
 
+            final = b''
+
+            for extension in self.extensions:
+                if not extension.enabled():
+                    continue
+                result = extension.frame_inbound_complete(self, self._fin)
+                if isinstance(result, CloseReason):
+                    self._messages.append(result)
+                    return self.State.FAILED
+                if result is not None:
+                    final += result
+
+            result = self.add_message_payload(final, self._fin)
+            if result is not None:
+                return result
+
             opcode = self._opcode
             if opcode is Opcode.CONTINUATION:
                 opcode = self._message_opcode
             payload = self._payload
-            if opcode is Opcode.TEXT:
-                payload = self._message_payload
-                try:
-                    payload += self._decoder.decode(b'', True)
-                except UnicodeDecodeError:
-                    self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-                    return self.State.FAILED
-            elif opcode is Opcode.BINARY:
+            if not opcode.iscontrol():
                 payload = self._message_payload
 
             message = Message(opcode, rsv=self._rsv, payload=payload)
             self._messages.append(message)
 
-            if not self._control:
+            if not self._opcode.iscontrol():
                 self.reset_message()
             else:
                 self.reset_frame()
@@ -366,12 +543,14 @@ class MessageDeserializer(object):
         return self.State.HEADER
 
 class WSConnection(object):
-    def __init__(self, host, resource, protocols=None, extensions=None):
+    def __init__(self, host, resource, client=True, extensions=None,
+                 protocols=None):
         self.host = host
         self.resource = resource
+        self.client = client
 
-        self.protocols = []
-        self.extensions = []
+        self.protocols = protocols or []
+        self.extensions = extensions or []
 
         self.version = b'13'
 
@@ -381,7 +560,7 @@ class WSConnection(object):
         self._nonce = None
         self._outgoing = b''
         self._events = []
-        self._deserializer = MessageDeserializer()
+        self._deserializer = MessageDeserializer(self.client, self.extensions)
 
         self._upgrade_connection = h11.Connection(h11.CLIENT)
 
@@ -395,6 +574,10 @@ class WSConnection(object):
             b"Sec-WebSocket-Key": self._nonce,
             b"Sec-WebSocket-Version": self.version,
         }
+        if self.extensions:
+            offers = [e.offer(self).encode('ascii') for e in self.extensions]
+            headers[b'Sec-WebSocket-Extensions'] = b', '.join(offers)
+
         upgrade = h11.Request(method=b'GET', target=self.resource,
                               headers=headers.items())
         self._outgoing += self._upgrade_connection.send(upgrade)
@@ -509,9 +692,16 @@ class WSConnection(object):
                                     "Bad accept token")
 
         subprotocol = headers.get(b'sec-websocket-protocol', None)
-        extensions = headers.get(b'sec-websocket-exceptions', None)
+        extensions = headers.get(b'sec-websocket-extensions', None)
         if extensions:
-            extensions = [e.strip() for e in extensions.split(b',')]
+            accepts = [e.strip() for e in extensions.split(b',')]
+
+            for accept in accepts:
+                accept = accept.decode('ascii')
+                name = accept.split(';', 1)[0].strip()
+                for extension in self.extensions:
+                    if extension.name == name:
+                        extension.accept(self, accept)
 
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)

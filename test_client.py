@@ -2,7 +2,9 @@ import asyncio
 import json
 from urllib.parse import urlparse
 
-from hws.connection import WSConnection, ConnectionEstablished, BinaryMessageReceived, TextMessageReceived, ConnectionClosed
+from hws.connection import WSConnection, ConnectionEstablished, \
+                           BinaryMessageReceived, TextMessageReceived, \
+                           ConnectionClosed, PerMessageDeflate
 
 SERVER = 'ws://127.0.0.1:8642'
 AGENT = 'hws'
@@ -37,7 +39,8 @@ def get_case_count(server):
 @asyncio.coroutine
 def run_case(server, case, agent):
     uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
-    connection = WSConnection(uri.netloc, '%s?%s' % (uri.path, uri.query))
+    connection = WSConnection(uri.netloc, '%s?%s' % (uri.path, uri.query),
+                              extensions=[PerMessageDeflate()])
     reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
 
     connection.initiate_connection()
@@ -96,6 +99,14 @@ def update_reports(server, agent):
                     closed = True
 
 CASE = None
+# 1.1.1 = 1
+# 2.1 = 17
+# 3.1 = 28
+# 4.1.1 = 34
+# 5.1 = 44
+# 6.1.1 = 64
+# 12.1.1 = 304
+# 13.1.1 = 394
 
 @asyncio.coroutine
 def run_tests(server, agent):
