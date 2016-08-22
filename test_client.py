@@ -2,7 +2,7 @@ import asyncio
 import json
 from urllib.parse import urlparse
 
-from hws.connection import WSConnection, ConnectionEstablished, \
+from hws.connection import WSClient, ConnectionEstablished, \
                            BinaryMessageReceived, TextMessageReceived, \
                            ConnectionClosed, PerMessageDeflate
 
@@ -12,10 +12,9 @@ AGENT = 'hws'
 @asyncio.coroutine
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')
-    connection = WSConnection(uri.netloc, uri.path)
+    connection = WSClient(uri.netloc, uri.path)
     reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
 
-    connection.initiate_connection()
     writer.write(connection.bytes_to_send())
 
     case_count = None
@@ -23,9 +22,7 @@ def get_case_count(server):
         data = yield from reader.read(65535)
         connection.receive_bytes(data)
         for event in connection.events():
-            print(repr(event))
             if isinstance(event, TextMessageReceived):
-                print(repr(event.message))
                 case_count = json.loads(event.message)
                 connection.close()
             try:
@@ -39,11 +36,10 @@ def get_case_count(server):
 @asyncio.coroutine
 def run_case(server, case, agent):
     uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
-    connection = WSConnection(uri.netloc, '%s?%s' % (uri.path, uri.query),
-                              extensions=[PerMessageDeflate()])
+    connection = WSClient(uri.netloc, '%s?%s' % (uri.path, uri.query),
+                          extensions=[PerMessageDeflate()])
     reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
 
-    connection.initiate_connection()
     writer.write(connection.bytes_to_send())
     closed = False
 
@@ -73,10 +69,9 @@ def run_case(server, case, agent):
 @asyncio.coroutine
 def update_reports(server, agent):
     uri = urlparse(server + '/updateReports?agent=%s' % agent)
-    connection = WSConnection(uri.netloc, '%s?%s' % (uri.path, uri.query))
+    connection = WSClient(uri.netloc, '%s?%s' % (uri.path, uri.query))
     reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
 
-    connection.initiate_connection()
     writer.write(connection.bytes_to_send())
     closed = False
 

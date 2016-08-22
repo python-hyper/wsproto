@@ -439,10 +439,14 @@ class MessageDeserializer(object):
         if self._opcode.iscontrol() and self._payload_length > 125:
             self._messages.append(CloseReason.PROTOCOL_ERROR)
             return self.State.FAILED
-        elif len(self._buffer) >= 2 and self._payload_length == 126:
+        elif self._payload_length == 126:
+            if len(self._buffer) < 2:
+                return self.State.HEADER
             self._payload_length = struct.unpack('!H', self._buffer[:2])[0]
             self._buffer = self._buffer[2:]
-        elif len(self._buffer) >= 8 and self._payload_length == 127:
+        elif self._payload_length == 127:
+            if len(self._buffer) < 8:
+                return self.State.HEADER
             self._payload_length = struct.unpack('!Q', self._buffer[:8])[0]
             self._buffer = self._buffer[8:]
 
@@ -469,6 +473,9 @@ class MessageDeserializer(object):
         if len(self._buffer) >= 4 and self._masked and self._masking_key is None:
             self._masking_key = itertools.cycle(self._buffer[:4])
             self._buffer = self._buffer[4:]
+
+        if self._masked and not self._masking_key:
+            return self.State.PAYLOAD
 
         if len(self._buffer) > self._payload_length:
             payload = self._buffer[:self._payload_length]
@@ -571,11 +578,12 @@ class MessageDeserializer(object):
         return self.State.HEADER
 
 class WSConnection(object):
-    def __init__(self, host, resource, client=True, extensions=None,
+    def __init__(self, client, host=None, resource=None, extensions=None,
                  protocols=None):
+        self.client = client
+
         self.host = host
         self.resource = resource
-        self.client = client
 
         self.protocols = protocols or []
         self.extensions = extensions or []
@@ -590,7 +598,13 @@ class WSConnection(object):
         self._events = []
         self._proto = MessageDeserializer(self.client, self.extensions)
 
-        self._upgrade_connection = h11.Connection(h11.CLIENT)
+        if self.client:
+            self._upgrade_connection = h11.Connection(h11.CLIENT)
+        else:
+            self._upgrade_connection = h11.Connection(h11.SERVER)
+
+        if self.client:
+            self.initiate_connection()
 
     def initiate_connection(self):
         self._generate_nonce()
@@ -659,10 +673,13 @@ class WSConnection(object):
         event = self._upgrade_connection.next_event()
         if event is h11.NEED_DATA:
             self._incoming = b''
-            return
-        elif isinstance(event, h11.InformationalResponse):
+        elif self.client and isinstance(event, h11.InformationalResponse):
             data = self._upgrade_connection.trailing_data[0]
-            return self._establish_connection(event), data
+            return self._establish_client_connection(event), data
+        elif not self.client and isinstance(event, h11.Request):
+            return self._process_connection_request(event), None
+
+        return None, None
 
     def events(self):
         while self._events:
@@ -688,7 +705,6 @@ class WSConnection(object):
             elif message.opcode is Opcode.BINARY:
                 yield BinaryMessageReceived(message.payload)
 
-
     def _generate_nonce(self):
         nonce = [random.getrandbits(8) for x in range(0, 16)]
         self._nonce = base64.b64encode(bytes(nonce))
@@ -707,10 +723,19 @@ class WSConnection(object):
                 f.rsv = rsv
                 f.payload = data
 
-            f.mask()
+            if self.client:
+                f.mask()
+
+            print('SENDING:', repr(f))
+
         self._outgoing += b''.join(f.serialize() for f in frames)
 
-    def _establish_connection(self, event):
+    def _generate_accept_token(self, token):
+        accept_token = token + ACCEPT_GUID
+        accept_token = hashlib.sha1(accept_token).digest()
+        return base64.b64encode(accept_token)
+
+    def _establish_client_connection(self, event):
         if event.status_code != 101:
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Bad status code from server")
@@ -722,10 +747,7 @@ class WSConnection(object):
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Upgrade: WebSocket header")
 
-        accept_token = headers[b'sec-websocket-accept']
-        accept_token = self._nonce + ACCEPT_GUID
-        accept_token = hashlib.sha1(accept_token).digest()
-        accept_token = base64.b64encode(accept_token)
+        accept_token = self._generate_accept_token(self._nonce)
         if headers[b'sec-websocket-accept'] != accept_token:
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Bad accept token")
@@ -744,6 +766,55 @@ class WSConnection(object):
 
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)
+
+    def _process_connection_request(self, event):
+        if event.method != b'GET':
+            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                    "Request method must be GET")
+        headers = dict(event.headers)
+        if headers[b'connection'].lower() != b'upgrade':
+            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                    "Missing Connection: Upgrade header")
+        if headers[b'upgrade'].lower() != b'websocket':
+            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                    "Missing Upgrade: WebSocket header")
+
+        if b'sec-websocket-version' not in headers:
+            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                    "Missing Sec-WebSocket-Version header")
+
+        if b'sec-websocket-key' not in headers:
+            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                    "Missing Sec-WebSocket-Key header")
+
+        return ConnectionRequested(event)
+
+    def accept(self, event):
+        request = event.h11request
+        request_headers = dict(request.headers)
+
+        nonce = request_headers[b'sec-websocket-key']
+        accept_token = self._generate_accept_token(nonce)
+
+        headers = {
+            b"Upgrade": b'WebSocket',
+            b"Connection": b'Upgrade',
+            b"Sec-WebSocket-Accept": accept_token,
+            b"Sec-WebSocket-Version": self.version,
+        }
+
+        response = h11.InformationalResponse(status_code=101,
+                                             headers=headers.items())
+        self._outgoing += self._upgrade_connection.send(response)
+        self._state = ConnectionState.OPEN
+
+class WSClient(WSConnection):
+    def __init__(self, host, resource, extensions=None, protocols=None):
+        super().__init__(True, host, resource, extensions, protocols)
+
+class WSServer(WSConnection):
+    def __init__(self, extensions=None, protocols=None):
+        super().__init__(False, extensions=extensions, protocols=protocols)
 
 if __name__ == '__main__':
     c = WSConnection()
