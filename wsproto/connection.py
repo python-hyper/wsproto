@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-hws/connection
+wsproto/connection
 ~~~~~~~~~~~~~~
 
 An implementation of a WebSocket connection.

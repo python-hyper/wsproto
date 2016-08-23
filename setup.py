@@ -2,12 +2,24 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 import sys
 
 try:
     from setuptools import setup
 except ImportError:
     from distuitls.core import setup
+
+# Get the version
+version_regex = r'__version__ = ["\']([^"\']*)["\']'
+with open('wsproto/__init__.py', 'r') as f:
+    text = f.read()
+    match = re.search(version_regex, text)
+
+    if match:
+        version = match.group(1)
+    else:
+        raise RuntimeError("No version number found!")
 
 # Stealing this from Cory Benfield who stole it from Kenneth Reitz
 if sys.argv[-1] == 'publish':
@@ -20,7 +32,7 @@ packages = [
 
 setup(
     name='wsproto',
-    version='1.0.0',
+    version=version,
     description='WebSockets state-machine based protocol implementation',
     author='Benno Rice',
     author_email='benno@jeamland.net',
