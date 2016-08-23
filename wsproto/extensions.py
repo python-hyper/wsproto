@@ -8,7 +8,7 @@ WebSocket extensions.
 
 import zlib
 
-from .connection import CloseReason, Opcode
+from .frame_protocol import CloseReason, Opcode
 
 
 class Extension(object):
@@ -83,11 +83,11 @@ class PerMessageDeflate(Extension):
 
         self._enabled = True
 
-    def accept(self, connection, offer):
+    def _parse_params(self, params):
         client_max_window_bits = None
         server_max_window_bits = None
 
-        bits = [b.strip() for b in offer.split(';')]
+        bits = [b.strip() for b in params.split(';')]
         for bit in bits[1:]:
             if bit.startswith('client_no_context_takeover'):
                 self.client_no_context_takeover = True
@@ -104,6 +104,12 @@ class PerMessageDeflate(Extension):
                 else:
                     server_max_window_bits = self.server_max_window_bits
 
+        return client_max_window_bits, server_max_window_bits
+
+    def accept(self, connection, offer):
+        client_max_window_bits, server_max_window_bits = \
+            self._parse_params(offer)
+
         self._enabled = True
 
         parameters = []
@@ -111,13 +117,13 @@ class PerMessageDeflate(Extension):
         if self.client_no_context_takeover:
             parameters.append('client_no_context_takeover')
         if client_max_window_bits is not None:
-            parameters.append('client_max_window_bits=%d' % \
+            parameters.append('client_max_window_bits=%d' %
                               client_max_window_bits)
             self.client_max_window_bits = client_max_window_bits
         if self.server_no_context_takeover:
             parameters.append('server_no_context_takeover')
         if server_max_window_bits is not None:
-            parameters.append('server_max_window_bits=%d' % \
+            parameters.append('server_max_window_bits=%d' %
                               server_max_window_bits)
             self.server_max_window_bits = server_max_window_bits
 
@@ -157,8 +163,6 @@ class PerMessageDeflate(Extension):
         try:
             data = self._decompressor.decompress(b'\x00\x00\xff\xff')
             data += self._decompressor.flush()
-            if isinstance(data, CloseReason):
-                return result
         except zlib.error:
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 

@@ -6,6 +6,7 @@ wsproto/events
 Events that result from processing data on a WebSocket connection.
 """
 
+
 class ConnectionRequested(object):
     def __init__(self, h11request):
         self.h11request = h11request
@@ -19,8 +20,10 @@ class ConnectionRequested(object):
         subprotocol = headers.get(b'sec-websocket-protocol', None)
         extensions = []
 
-        return '<ConnectionRequested path=%s version=%s subprotocol=%r extensions=%r>' % \
-            (path, version, subprotocol, extensions)
+        fmt = '<%s host=%s path=%s version=%s subprotocol=%r extensions=%r>'
+        return fmt % (self.__class__.__name__, host, path, version,
+                      subprotocol, extensions)
+
 
 class ConnectionEstablished(object):
     def __init__(self, subprotocol=None, extensions=None):
