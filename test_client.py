@@ -4,7 +4,8 @@ from urllib.parse import urlparse
 
 from wsproto.connection import WSClient, ConnectionEstablished, \
                                BinaryMessageReceived, TextMessageReceived, \
-                               ConnectionClosed, PerMessageDeflate
+                               ConnectionClosed
+from wsproto.extensions import PerMessageDeflate
 
 SERVER = 'ws://127.0.0.1:8642'
 AGENT = 'wsproto'

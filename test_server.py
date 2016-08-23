@@ -2,7 +2,8 @@ import asyncio
 
 from wsproto.connection import WSServer, ConnectionRequested, \
                                BinaryMessageReceived, TextMessageReceived, \
-                               ConnectionClosed, PerMessageDeflate
+                               ConnectionClosed
+from wsproto.extensions import PerMessageDeflate
 
 def new_conn(reader, writer):
     ws = WSServer(extensions=[PerMessageDeflate()])

@@ -20,11 +20,13 @@ import h11
 
 from .events import *
 
+
 # RFC6455, Section 1.3 - Opening Handshake
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 # RFC6455, Section 5.2 - Base Framing Protocol
 MAX_FRAME_PAYLOAD = 2 ** 64
+
 
 class ConnectionState(Enum):
     """
@@ -49,6 +51,7 @@ class Opcode(IntEnum):
 
     def iscontrol(self):
         return bool(self & 0x08)
+
 
 class CloseReason(IntEnum):
     """
