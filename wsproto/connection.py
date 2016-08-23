@@ -7,13 +7,10 @@ An implementation of a WebSocket connection.
 """
 
 import base64
-import codecs
 import hashlib
-import itertools
 import random
-import struct
 
-from enum import Enum, IntEnum
+from enum import Enum
 
 import h11
 

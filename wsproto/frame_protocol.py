@@ -13,13 +13,6 @@ import struct
 
 from enum import Enum, IntEnum
 
-import h11
-
-from .events import (
-    ConnectionRequested, ConnectionEstablished, ConnectionClosed,
-    ConnectionFailed, BinaryMessageReceived, TextMessageReceived
-)
-
 
 # RFC6455, Section 1.3 - Opening Handshake
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -224,38 +217,61 @@ class FrameProtocol(object):
 
     def _process_frame_header(self):
         if self._buffer and self._opcode is None:
-            flags_opcode = self._buffer[0]
-            opcode = flags_opcode & 0x0f
-
-            try:
-                self._opcode = Opcode(opcode)
-            except:
-                self._messages.append(CloseReason.PROTOCOL_ERROR)
-                return self.State.FAILED
-
-            if not self._opcode.iscontrol() and self._opcode is not Opcode.CONTINUATION:
-                if self._message_opcode is None:
-                    self._message_opcode = self._opcode
-                else:
-                    self._messages.append(CloseReason.PROTOCOL_ERROR)
-                    return self.State.FAILED
-            elif self._opcode is Opcode.CONTINUATION and self._message_opcode is None:
-                self._messages.append(CloseReason.PROTOCOL_ERROR)
-                return self.State.FAILED
-
-            self._fin = bool(flags_opcode & 0x80)
-            self._rsv = (
-                bool(flags_opcode & 0x40),
-                bool(flags_opcode & 0x20),
-                bool(flags_opcode & 0x10),
-            )
-
-            self._buffer = self._buffer[1:]
+            self._process_fin_rsv_opcode()
 
         if self._opcode.iscontrol() and not self._fin:
             self._messages.append(CloseReason.PROTOCOL_ERROR)
             return self.State.FAILED
 
+        state = self._process_payload_length()
+        if state is not None:
+            return state
+
+        if self._payload_length is not None:
+            extension_ran = False
+            for extension in self.extensions:
+                if not extension.enabled():
+                    continue
+                extension_ran = True
+                result = extension.frame_inbound_header(self, self._opcode,
+                                                        self._rsv,
+                                                        self._payload_length)
+                if result is not None:
+                    return result
+            if not extension_ran:
+                if True in self._rsv:
+                    self._messages.append(CloseReason.PROTOCOL_ERROR)
+                    return self.State.FAILED
+            return self.State.PAYLOAD
+
+        return self.State.HEADER
+
+    def _process_fin_rsv_opcode(self):
+        flags_opcode = self._buffer[0]
+        opcode = flags_opcode & 0x0f
+
+        try:
+            self._opcode = Opcode(opcode)
+        except:
+            self._messages.append(CloseReason.PROTOCOL_ERROR)
+            return self.State.FAILED
+
+        if self._message_opcode is None and not self._opcode.iscontrol():
+            if self._opcode is Opcode.CONTINUATION:
+                self._messages.append(CloseReason.PROTOCOL_ERROR)
+                return self.State.FAILED
+            self._message_opcode = self._opcode
+
+        self._fin = bool(flags_opcode & 0x80)
+        self._rsv = (
+            bool(flags_opcode & 0x40),
+            bool(flags_opcode & 0x20),
+            bool(flags_opcode & 0x10),
+        )
+
+        self._buffer = self._buffer[1:]
+
+    def _process_payload_length(self):
         if self._buffer and self._payload_length is None:
             self._payload_length = self._buffer[0]
             self._masked = bool(self._payload_length & 0x80)
@@ -278,40 +294,13 @@ class FrameProtocol(object):
             self._payload_length = struct.unpack('!Q', self._buffer[:8])[0]
             self._buffer = self._buffer[8:]
 
-        if self._payload_length is not None:
-            extension_ran = False
-            for extension in self.extensions:
-                if not extension.enabled():
-                    continue
-                extension_ran = True
-                result = extension.frame_inbound_header(self, self._opcode,
-                                                        self._rsv,
-                                                        self._payload_length)
-                if result is not None:
-                    return result
-            if not extension_ran:
-                if True in self._rsv:
-                    self._messages.append(CloseReason.PROTOCOL_ERROR)
-                    return self.State.FAILED
-            return self.State.PAYLOAD
-
-        return self.State.HEADER
-
     def _process_frame_payload(self):
         if self._masked and self._masking_key is None:
-            if len(self._buffer) >= 4:
-                self._masking_key = itertools.cycle(self._buffer[:4])
-                self._buffer = self._buffer[4:]
+            state = self._process_masking_key()
+            if state is not None:
+                return state
 
-        if self._masked and not self._masking_key:
-            return self.State.PAYLOAD
-
-        if len(self._buffer) > self._payload_length:
-            payload = self._buffer[:self._payload_length]
-            self._buffer = self._buffer[self._payload_length:]
-        else:
-            payload = self._buffer
-            self._buffer = b''
+        payload = self._consume_payload()
 
         if not payload and self._payload_length > 0:
             return self.State.PAYLOAD
@@ -321,13 +310,7 @@ class FrameProtocol(object):
         if self._masked:
             payload = bytes(b ^ next(self._masking_key) for b in payload)
 
-        for extension in self.extensions:
-            if not extension.enabled():
-                continue
-            payload = extension.frame_inbound_payload_data(self, payload)
-            if isinstance(payload, CloseReason):
-                self._messages.append(payload)
-                return self.State.FAILED
+        payload = self._process_extensions(payload)
 
         if not self._opcode.iscontrol():
             result = self.add_message_payload(payload)
@@ -341,47 +324,45 @@ class FrameProtocol(object):
 
         return self.State.PAYLOAD
 
+    def _process_masking_key(self):
+        if len(self._buffer) >= 4:
+            self._masking_key = itertools.cycle(self._buffer[:4])
+            self._buffer = self._buffer[4:]
+
+        if self._masked and not self._masking_key:
+            return self.State.PAYLOAD
+
+    def _consume_payload(self):
+        if len(self._buffer) > self._payload_length:
+            payload = self._buffer[:self._payload_length]
+            self._buffer = self._buffer[self._payload_length:]
+        else:
+            payload = self._buffer
+            self._buffer = b''
+
+        return payload
+
+    def _process_extensions(self, payload):
+        for extension in self.extensions:
+            if not extension.enabled():
+                continue
+            payload = extension.frame_inbound_payload_data(self, payload)
+            if isinstance(payload, CloseReason):
+                self._messages.append(payload)
+                return self.State.FAILED
+
+        return payload
+
     def _process_frame(self):
         if self._fin and self._payload_length == 0:
             if self._opcode is Opcode.CLOSE:
-                if len(self._payload) == 0:
-                    self._payload = (CloseReason.NORMAL_CLOSURE, None)
-                elif len(self._payload) == 1:
-                    self._messages.append(CloseReason.PROTOCOL_ERROR)
-                    return self.State.FAILED
-                else:
-                    code = struct.unpack('!H', self._payload[:2])[0]
-                    if code < 1000:
-                        self._messages.append(CloseReason.PROTOCOL_ERROR)
-                        return self.State.FAILED
-                    try:
-                        code = CloseReason(code)
-                    except:
-                        pass
-                    if code in LOCAL_ONLY_CLOSE_REASONS:
-                        self._messages.append(CloseReason.PROTOCOL_ERROR)
-                        return self.State.FAILED
-                    if not isinstance(code, CloseReason) and code < 3000:
-                        self._messages.append(CloseReason.PROTOCOL_ERROR)
-                        return self.State.FAILED
-                    try:
-                        reason = self._payload[2:].decode('utf-8')
-                    except UnicodeDecodeError:
-                        self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-                        return self.State.FAILED
-                    self._payload = (code, reason)
+                state = self._process_close_frame()
+                if state is not None:
+                    return state
 
-            final = b''
-
-            for extension in self.extensions:
-                if not extension.enabled():
-                    continue
-                result = extension.frame_inbound_complete(self, self._fin)
-                if isinstance(result, CloseReason):
-                    self._messages.append(result)
-                    return self.State.FAILED
-                if result is not None:
-                    final += result
+            final = self._process_extensions_final()
+            if final is self.State.FAILED:
+                return final
 
             result = self.add_message_payload(final, self._fin)
             if result is not None:
@@ -406,3 +387,45 @@ class FrameProtocol(object):
 
         return self.State.HEADER
 
+    def _process_close_frame(self):
+        if len(self._payload) == 0:
+            self._payload = (CloseReason.NORMAL_CLOSURE, None)
+        elif len(self._payload) == 1:
+            self._messages.append(CloseReason.PROTOCOL_ERROR)
+            return self.State.FAILED
+        else:
+            code = struct.unpack('!H', self._payload[:2])[0]
+            if code < 1000:
+                self._messages.append(CloseReason.PROTOCOL_ERROR)
+                return self.State.FAILED
+            try:
+                code = CloseReason(code)
+            except:
+                pass
+            if code in LOCAL_ONLY_CLOSE_REASONS:
+                self._messages.append(CloseReason.PROTOCOL_ERROR)
+                return self.State.FAILED
+            if not isinstance(code, CloseReason) and code < 3000:
+                self._messages.append(CloseReason.PROTOCOL_ERROR)
+                return self.State.FAILED
+            try:
+                reason = self._payload[2:].decode('utf-8')
+            except UnicodeDecodeError:
+                self._messages.append(CloseReason.INVALID_FRAME_PAYLOAD_DATA)
+                return self.State.FAILED
+            self._payload = (code, reason)
+
+    def _process_extensions_final(self):
+        final = b''
+
+        for extension in self.extensions:
+            if not extension.enabled():
+                continue
+            result = extension.frame_inbound_complete(self, self._fin)
+            if isinstance(result, CloseReason):
+                self._messages.append(result)
+                return self.State.FAILED
+            if result is not None:
+                final += result
+
+        return final
