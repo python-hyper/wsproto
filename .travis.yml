@@ -1,0 +1,12 @@
+language: python
+python:
+  - "3.5"
+sudo: false
+install:
+  - "pip install -U pip setuptools"
+  - "pip install ."
+  - "pip install flake8"
+before_script:
+  - "flake8 --max-complexity 10 wsproto"
+script:
+  - "./.travis/run.sh"
