@@ -2,10 +2,10 @@ import asyncio
 
 from hws.connection import WSServer, ConnectionRequested, \
                            BinaryMessageReceived, TextMessageReceived, \
-                           ConnectionClosed
+                           ConnectionClosed, PerMessageDeflate
 
 def new_conn(reader, writer):
-    ws = WSServer()
+    ws = WSServer(extensions=[PerMessageDeflate()])
     closed = False
     while not closed:
         try:
@@ -16,7 +16,6 @@ def new_conn(reader, writer):
         ws.receive_bytes(data or None)
 
         for event in ws.events():
-            print(repr(event))
             if isinstance(event, ConnectionRequested):
                 ws.accept(event)
             elif isinstance(event, TextMessageReceived):

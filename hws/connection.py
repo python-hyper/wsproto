@@ -124,11 +124,6 @@ class PerMessageDeflate(Extension):
         return self._enabled
 
     def offer(self, connection):
-        parameters = {
-            'client_max_window_bits': self.client_max_window_bits,
-            'server_max_window_bits': self.server_max_window_bits,
-        }
-
         parameters = [
             'client_max_window_bits=%d' % self.client_max_window_bits,
             'server_max_window_bits=%d' % self.server_max_window_bits,
@@ -139,9 +134,9 @@ class PerMessageDeflate(Extension):
         if self.server_no_context_takeover:
             parameters.append('server_no_context_takeover')
 
-        return '; '.join(['permessage-deflate'] + parameters)
+        return '; '.join(parameters)
 
-    def accept(self, connection, offer):
+    def finalize(self, connection, offer):
         bits = [b.strip() for b in offer.split(';')]
         for bit in bits[1:]:
             if bit.startswith('client_no_context_takeover'):
@@ -154,6 +149,46 @@ class PerMessageDeflate(Extension):
                 self.server_max_window_bits = int(bit.split('=', 1)[1].strip())
 
         self._enabled = True
+
+    def accept(self, connection, offer):
+        client_max_window_bits = None
+        server_max_window_bits = None
+
+        bits = [b.strip() for b in offer.split(';')]
+        for bit in bits[1:]:
+            if bit.startswith('client_no_context_takeover'):
+                self.client_no_context_takeover = True
+            elif bit.startswith('server_no_context_takeover'):
+                self.server_no_context_takeover = True
+            elif bit.startswith('client_max_window_bits'):
+                if '=' in bit:
+                    client_max_window_bits = int(bit.split('=', 1)[1].strip())
+                else:
+                    client_max_window_bits = self.client_max_window_bits
+            elif bit.startswith('server_max_window_bits'):
+                if '=' in bit:
+                    server_max_window_bits = int(bit.split('=', 1)[1].strip())
+                else:
+                    server_max_window_bits = self.server_max_window_bits
+
+        self._enabled = True
+
+        parameters = []
+
+        if self.client_no_context_takeover:
+            parameters.append('client_no_context_takeover')
+        if client_max_window_bits is not None:
+            parameters.append('client_max_window_bits=%d' % \
+                              client_max_window_bits)
+            self.client_max_window_bits = client_max_window_bits
+        if self.server_no_context_takeover:
+            parameters.append('server_no_context_takeover')
+        if server_max_window_bits is not None:
+            parameters.append('server_max_window_bits=%d' % \
+                              server_max_window_bits)
+            self.server_max_window_bits = server_max_window_bits
+
+        return '; '.join(parameters)
 
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
         if True in rsv[1:]:
@@ -617,8 +652,17 @@ class WSConnection(object):
             b"Sec-WebSocket-Version": self.version,
         }
         if self.extensions:
-            offers = [e.offer(self).encode('ascii') for e in self.extensions]
-            headers[b'Sec-WebSocket-Extensions'] = b', '.join(offers)
+            offers = {e.name: e.offer(self) for e in self.extensions}
+            extensions = []
+            for name, params in offers.items():
+                name = name.encode('ascii')
+                if params is True:
+                    extensions.append(name)
+                elif params:
+                    params = params.encode('ascii')
+                    extensions.append(b'%s; %s' % (name, params))
+            if extensions:
+                headers[b'Sec-WebSocket-Extensions'] = b', '.join(extensions)
 
         upgrade = h11.Request(method=b'GET', target=self.resource,
                               headers=headers.items())
@@ -726,8 +770,6 @@ class WSConnection(object):
             if self.client:
                 f.mask()
 
-            print('SENDING:', repr(f))
-
         self._outgoing += b''.join(f.serialize() for f in frames)
 
     def _generate_accept_token(self, token):
@@ -762,7 +804,7 @@ class WSConnection(object):
                 name = accept.split(';', 1)[0].strip()
                 for extension in self.extensions:
                     if extension.name == name:
-                        extension.accept(self, accept)
+                        extension.finalize(self, accept)
 
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)
@@ -802,6 +844,32 @@ class WSConnection(object):
             b"Sec-WebSocket-Accept": accept_token,
             b"Sec-WebSocket-Version": self.version,
         }
+
+        extensions = request_headers.get(b'sec-websocket-extensions', None)
+        accepts = {}
+        if extensions:
+            offers = [e.strip() for e in extensions.split(b',')]
+
+            for offer in offers:
+                offer = offer.decode('ascii')
+                name = offer.split(';', 1)[0].strip()
+                for extension in self.extensions:
+                    if extension.name == name:
+                        accept = extension.accept(self, offer)
+                        if accept is True:
+                            accepts[extension.name] = True
+                        elif accept:
+                            accepts[extension.name] = accept.encode('ascii')
+
+        if accepts:
+            extensions = []
+            for name, params in accepts.items():
+                name = name.encode('ascii')
+                if params is True:
+                    extensions.append(name)
+                else:
+                    extensions.append(b'%s; %s' % (name, params))
+            headers[b"Sec-WebSocket-Extensions"] = b', '.join(extensions)
 
         response = h11.InformationalResponse(status_code=101,
                                              headers=headers.items())
