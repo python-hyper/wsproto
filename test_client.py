@@ -2,12 +2,12 @@ import asyncio
 import json
 from urllib.parse import urlparse
 
-from hws.connection import WSClient, ConnectionEstablished, \
-                           BinaryMessageReceived, TextMessageReceived, \
-                           ConnectionClosed, PerMessageDeflate
+from wsproto.connection import WSClient, ConnectionEstablished, \
+                               BinaryMessageReceived, TextMessageReceived, \
+                               ConnectionClosed, PerMessageDeflate
 
 SERVER = 'ws://127.0.0.1:8642'
-AGENT = 'hws'
+AGENT = 'wsproto'
 
 @asyncio.coroutine
 def get_case_count(server):
