@@ -1,6 +1,8 @@
 Prototype sans-io WebSocket implementation
 ==========================================
 
+[![Build Status](https://travis-ci.org/jeamland/wsproto.svg?branch=master)](https://travis-ci.org/jeamland/wsproto)
+
 This needs a pile of cleaning up.
 
 It passes the autobahn test suite completely and strictly in both client and
