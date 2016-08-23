@@ -33,7 +33,7 @@ class Extension(object):
         pass
 
     def frame_outbound(self, proto, opcode, rsv, data):
-        return (opcode, rsv, data)
+        return (rsv, data)
 
 
 class PerMessageDeflate(Extension):
@@ -181,7 +181,7 @@ class PerMessageDeflate(Extension):
 
     def frame_outbound(self, proto, opcode, rsv, data):
         if opcode not in (Opcode.TEXT, Opcode.BINARY):
-            return (opcode, rsv, data)
+            return (rsv, data)
 
         if self._compressor is None:
             if proto.client:
@@ -205,7 +205,7 @@ class PerMessageDeflate(Extension):
         if no_context_takeover:
             self._compressor = None
 
-        return (opcode, rsv, data)
+        return (rsv, data)
 
     def __repr__(self):
         descr = ['client_max_window_bits=%d' % self.client_max_window_bits]

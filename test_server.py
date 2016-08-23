@@ -1,8 +1,8 @@
 import asyncio
 
 from wsproto.connection import WSServer, ConnectionRequested, \
-                               BinaryMessageReceived, TextMessageReceived, \
                                ConnectionClosed
+from wsproto.events import DataReceived
 from wsproto.extensions import PerMessageDeflate
 
 def new_conn(reader, writer):
@@ -19,10 +19,8 @@ def new_conn(reader, writer):
         for event in ws.events():
             if isinstance(event, ConnectionRequested):
                 ws.accept(event)
-            elif isinstance(event, TextMessageReceived):
-                ws.send_text(event.message)
-            elif isinstance(event, BinaryMessageReceived):
-                ws.send_binary(event.message)
+            elif isinstance(event, DataReceived):
+                ws.send_data(event.data, event.final)
             elif isinstance(event, ConnectionClosed):
                 closed = True
             if data is None:

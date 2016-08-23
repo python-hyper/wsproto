@@ -16,9 +16,9 @@ import h11
 
 from .events import (
     ConnectionRequested, ConnectionEstablished, ConnectionClosed,
-    ConnectionFailed, BinaryMessageReceived, TextMessageReceived
+    ConnectionFailed, TextReceived, BytesReceived
 )
-from .frame_protocol import FrameProtocol, Message, CloseReason, Opcode
+from .frame_protocol import FrameProtocol, CloseReason, Opcode
 
 
 # RFC6455, Section 1.3 - Opening Handshake
@@ -91,17 +91,11 @@ class WSConnection(object):
                               headers=headers.items())
         self._outgoing += self._upgrade_connection.send(upgrade)
 
-    def send_binary(self, message):
-        message = Message(Opcode.BINARY, fin=True, payload=message)
-        self._enqueue_message(message)
-
-    def send_text(self, message):
-        message = Message(Opcode.TEXT, fin=True, payload=message)
-        self._enqueue_message(message)
+    def send_data(self, payload=b'', final=True):
+        self._outgoing += self._proto.send_data(payload, final)
 
     def close(self, code=CloseReason.NORMAL_CLOSURE, reason=None):
-        message = Message(Opcode.CLOSE, fin=True, payload=(code, reason))
-        self._enqueue_message(message)
+        self._outgoing += self._proto.close(code, reason)
         self._state = ConnectionState.CLOSING
 
     @property
@@ -151,48 +145,28 @@ class WSConnection(object):
         while self._events:
             yield self._events.pop(0)
 
-        for message in self._proto.messages():
-            if isinstance(message, CloseReason):
-                reason = message
-                self.close(reason)
-                yield ConnectionClosed(reason)
+        for frame in self._proto.received_frames():
+            if isinstance(frame, CloseReason):
+                self.close(frame)
+                yield ConnectionClosed(frame)
                 return
 
-            if message.opcode is Opcode.PING:
-                response = Message(Opcode.PONG, fin=True,
-                                   payload=message.payload)
-                self._enqueue_message(response)
-            elif message.opcode is Opcode.CLOSE:
-                code, reason = message.payload
+            opcode, payload, fin = frame
+
+            if opcode is Opcode.PING:
+                self._outgoing += self._proto.pong(payload)
+            elif opcode is Opcode.CLOSE:
+                code, reason = payload
                 self.close(code, reason)
                 yield ConnectionClosed(code, reason)
-            elif message.opcode is Opcode.TEXT:
-                yield TextMessageReceived(message.payload)
-            elif message.opcode is Opcode.BINARY:
-                yield BinaryMessageReceived(message.payload)
+            elif opcode is Opcode.TEXT:
+                yield TextReceived(payload, fin)
+            elif opcode is Opcode.BINARY:
+                yield BytesReceived(payload, fin)
 
     def _generate_nonce(self):
-        nonce = [random.getrandbits(8) for x in range(0, 16)]
-        self._nonce = base64.b64encode(bytes(nonce))
-
-    def _enqueue_message(self, *frames):
-        for f in frames:
-            if f.opcode is Opcode.TEXT:
-                f.payload = f.payload.encode('utf-8')
-            for extension in self.extensions:
-                if not extension.enabled():
-                    continue
-
-                opcode, rsv, data = \
-                    extension.frame_outbound(self, f.opcode, f.rsv, f.payload)
-                f.opcode = opcode
-                f.rsv = rsv
-                f.payload = data
-
-            if self.client:
-                f.mask()
-
-        self._outgoing += b''.join(f.serialize() for f in frames)
+        nonce = bytes(random.getrandbits(8) for x in range(0, 16))
+        self._nonce = base64.b64encode(nonce)
 
     def _generate_accept_token(self, token):
         accept_token = token + ACCEPT_GUID

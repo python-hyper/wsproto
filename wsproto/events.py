@@ -51,14 +51,15 @@ class ConnectionFailed(ConnectionClosed):
     pass
 
 
-class MessageReceived(object):
-    def __init__(self, message):
-        self.message = message
+class DataReceived(object):
+    def __init__(self, data, final):
+        self.data = data
+        self.final = final
 
 
-class BinaryMessageReceived(MessageReceived):
+class TextReceived(DataReceived):
     pass
 
 
-class TextMessageReceived(MessageReceived):
+class BytesReceived(DataReceived):
     pass

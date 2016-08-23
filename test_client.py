@@ -3,8 +3,8 @@ import json
 from urllib.parse import urlparse
 
 from wsproto.connection import WSClient, ConnectionEstablished, \
-                               BinaryMessageReceived, TextMessageReceived, \
                                ConnectionClosed
+from wsproto.events import TextReceived, DataReceived
 from wsproto.extensions import PerMessageDeflate
 
 SERVER = 'ws://127.0.0.1:8642'
@@ -23,8 +23,8 @@ def get_case_count(server):
         data = yield from reader.read(65535)
         connection.receive_bytes(data)
         for event in connection.events():
-            if isinstance(event, TextMessageReceived):
-                case_count = json.loads(event.message)
+            if isinstance(event, TextReceived):
+                case_count = json.loads(event.data)
                 connection.close()
             try:
                 writer.write(connection.bytes_to_send())
@@ -51,10 +51,8 @@ def run_case(server, case, agent):
             data = None
         connection.receive_bytes(data or None)
         for event in connection.events():
-            if isinstance(event, TextMessageReceived):
-                connection.send_text(event.message)
-            elif isinstance(event, BinaryMessageReceived):
-                connection.send_binary(event.message)
+            if isinstance(event, DataReceived):
+                connection.send_data(event.data, event.final)
             elif isinstance(event, ConnectionClosed):
                 closed = True
             if data is None:
