@@ -13,21 +13,25 @@ If you want to run the compliance tests, go into the compliance directory and
 then to test client mode, in one shell run the Autobahn test server:
 
 .. code-block:: console
+
     $ wstest -m fuzzingserver -s ws-fuzzingserver.json
 
 And in another shell run the test client:
 
 .. code-block:: console
+
     $ python test_client.py
 
 And to test server mode, run the test server:
 
 .. code-block:: console
+
     $ python test_server.py
 
 And in another shell run the Autobahn test client:
 
 .. code-block:: console
+
     $ wstest -m fuzzingclient -s ws-fuzzingclient.json
 
 This was written using Python 3.5. Python 2.7 has not been well tested yet.
