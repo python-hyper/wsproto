@@ -45,6 +45,8 @@ setup(
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Programming Language :: Python',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: python :: Implementation :: CPython',
@@ -52,4 +54,8 @@ setup(
     install_requires=[
         'h11==0.5.0',
     ],
+    extras_require={
+        ':python_version == "2.7" or python_version == "3.3"':
+            ['enum34>=1.0.4, <2'],
+    }
 )

@@ -275,9 +275,11 @@ class WSConnection(object):
 
 class WSClient(WSConnection):
     def __init__(self, host, resource, extensions=None, protocols=None):
-        super().__init__(True, host, resource, extensions, protocols)
+        super(WSClient, self).__init__(True, host, resource, extensions,
+                                       protocols)
 
 
 class WSServer(WSConnection):
     def __init__(self, extensions=None, protocols=None):
-        super().__init__(False, extensions=extensions, protocols=protocols)
+        super(WSServer, self).__init__(False, extensions=extensions,
+                                       protocols=protocols)

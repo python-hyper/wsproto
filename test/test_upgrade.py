@@ -6,11 +6,24 @@ Test the HTTP upgrade phase of connection
 import base64
 import email
 import random
+import sys
 
 from wsproto.connection import WSClient, WSServer
 from wsproto.events import (
     ConnectionEstablished, ConnectionFailed, ConnectionRequested
 )
+
+
+IS_PYTHON3 = sys.version_info >= (3, 0)
+
+
+def parse_headers(headers):
+    if IS_PYTHON3:
+        headers = email.message_from_bytes(headers)
+    else:
+        headers = email.message_from_string(headers)
+
+    return dict(headers.items())
 
 
 class TestClientUpgrade(object):
@@ -20,7 +33,7 @@ class TestClientUpgrade(object):
         data = ws.bytes_to_send()
         request, headers = data.split(b'\r\n', 1)
         method, path, version = request.strip().split()
-        headers = dict(email.message_from_bytes(headers).items())
+        headers = parse_headers(headers)
 
         print(method, path, version)
         print(repr(headers))
@@ -141,7 +154,7 @@ class TestServerUpgrade(object):
         data = ws.bytes_to_send()
         response, headers = data.split(b'\r\n', 1)
         version, code, reason = response.split(b' ')
-        headers = dict(email.message_from_bytes(headers).items())
+        headers = parse_headers(headers)
 
         accept_token = ws._generate_accept_token(nonce)
 
