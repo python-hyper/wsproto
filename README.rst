@@ -4,8 +4,8 @@ Pure Python, pure state-machine WebSocket implementation
 .. image:: https://travis-ci.org/jeamland/wsproto.svg?branch=master
     :target: https://travis-ci.org/jeamland/wsproto
 .. image:: https://readthedocs.org/projects/wsproto/badge/?version=latest
-:target: http://wsproto.readthedocs.io/en/latest/?badge=latest
-:alt: Documentation Status
+    :target: http://wsproto.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
 This needs a pile of cleaning up.
 
