@@ -17,3 +17,9 @@ Connection
 
 .. autoclass:: wsproto.connection.WSConnection
    :members:
+
+Extensions
+----------
+
+.. autoclass:: wsproto.extensions.Extension
+   :members:

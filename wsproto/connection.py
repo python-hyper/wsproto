@@ -66,7 +66,7 @@ class WSConnection(object):
 
     :param extensions: A list of  extensions to use on this connection.
         Extensions should be instances of a subclass of
-        :class:`Extension <wsproto.etensions.Extension>`.
+        :class:`Extension <wsproto.extensions.Extension>`.
 
     :param subprotocol: A nominated subprotocol to request when acting as a
         client. This has no impact on the connection itself.
@@ -128,7 +128,25 @@ class WSConnection(object):
                               headers=headers.items())
         self._outgoing += self._upgrade_connection.send(upgrade)
 
-    def send_data(self, payload=b'', final=True):
+    def send_data(self, payload, final=True):
+        """
+        Send a message or part of a message to the remote peer.
+
+        If ``final`` is ``False`` it indicates that this is part of a longer
+        message. If ``final`` is ``True`` it indicates that this is either a
+        self-contained message or the last part of a longer message.
+
+        If ``payload`` is of type ``bytes`` then the message is flagged as
+        being binary If it is of type ``str`` encoded as UTF-8 and sent as
+        text.
+
+        :param payload: The message body to send.
+        :type payload: ``bytes`` or ``str``
+
+        :param final: Whether there are more parts to this message to be sent.
+        :type final: ``bool``
+        """
+
         self._outgoing += self._proto.send_data(payload, final)
 
     def close(self, code=CloseReason.NORMAL_CLOSURE, reason=None):
@@ -140,6 +158,14 @@ class WSConnection(object):
         return self._state is ConnectionState.CLOSED
 
     def bytes_to_send(self, amount=None):
+        """
+        Return any data that is to be sent to the remote peer.
+
+        :param amount: (optional) The maximum number of bytes to be provided.
+            If ``None`` or not provided it will return all available bytes.
+        :type amount: ``int``
+        """
+
         if amount is None:
             data = self._outgoing
             self._outgoing = b''
@@ -150,6 +176,13 @@ class WSConnection(object):
         return data
 
     def receive_bytes(self, data):
+        """
+        Pass some received bytes to the connection for processing.
+
+        :param data: The data received from the remote peer.
+        :type data: ``bytes``
+        """
+
         if data is None and self._state is ConnectionState.OPEN:
             self._events.append(ConnectionClosed(CloseReason.NORMAL_CLOSURE))
             self._state = ConnectionState.CLOSED
@@ -179,6 +212,13 @@ class WSConnection(object):
         return None, None
 
     def events(self):
+        """
+        Return a generator that provides any events that have been generated
+        by protocol activity.
+
+        :returns: generator
+        """
+
         while self._events:
             yield self._events.pop(0)
 
