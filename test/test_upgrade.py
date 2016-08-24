@@ -12,6 +12,7 @@ from wsproto.events import (
     ConnectionEstablished, ConnectionFailed, ConnectionRequested
 )
 
+
 class TestClientUpgrade(object):
     def initiate(self, host, path):
         ws = WSClient(host, path)
@@ -27,25 +28,25 @@ class TestClientUpgrade(object):
         return ws, method, path, version, headers
 
     def test_initiate_connection(self):
-        test_host = 'frob.nitz'
-        test_path = '/fnord'
+        _host = 'frob.nitz'
+        _path = '/fnord'
 
-        ws, method, path, version, headers = self.initiate(test_host, test_path)
+        ws, method, path, version, headers = self.initiate(_host, _path)
 
         assert method == b'GET'
-        assert path == test_path.encode('ascii')
+        assert path == _path.encode('ascii')
 
-        assert headers['host'] == test_host
+        assert headers['host'] == _host
         assert headers['connection'].lower() == 'upgrade'
         assert headers['upgrade'].lower() == 'websocket'
         assert 'sec-websocket-key' in headers
         assert 'sec-websocket-version' in headers
 
     def test_correct_accept_token(self):
-        test_host = 'frob.nitz'
-        test_path = '/fnord'
+        _host = 'frob.nitz'
+        _path = '/fnord'
 
-        ws, method, path, version, headers = self.initiate(test_host, test_path)
+        ws, method, path, version, headers = self.initiate(_host, _path)
 
         key = headers['sec-websocket-key'].encode('ascii')
         accept_token = ws._generate_accept_token(key)
@@ -60,10 +61,10 @@ class TestClientUpgrade(object):
         assert isinstance(next(ws.events()), ConnectionEstablished)
 
     def test_incorrect_accept_token(self):
-        test_host = 'frob.nitz'
-        test_path = '/fnord'
+        _host = 'frob.nitz'
+        _path = '/fnord'
 
-        ws, method, path, version, headers = self.initiate(test_host, test_path)
+        ws, method, path, version, headers = self.initiate(_host, _path)
 
         key = b'This is wrong token'
         accept_token = ws._generate_accept_token(key)
@@ -78,10 +79,10 @@ class TestClientUpgrade(object):
         assert isinstance(next(ws.events()), ConnectionFailed)
 
     def test_bad_connection_header(self):
-        test_host = 'frob.nitz'
-        test_path = '/fnord'
+        _host = 'frob.nitz'
+        _path = '/fnord'
 
-        ws, method, path, version, headers = self.initiate(test_host, test_path)
+        ws, method, path, version, headers = self.initiate(_host, _path)
 
         key = headers['sec-websocket-key'].encode('ascii')
         accept_token = ws._generate_accept_token(key)
@@ -96,10 +97,10 @@ class TestClientUpgrade(object):
         assert isinstance(next(ws.events()), ConnectionFailed)
 
     def test_bad_upgrade_header(self):
-        test_host = 'frob.nitz'
-        test_path = '/fnord'
+        _host = 'frob.nitz'
+        _path = '/fnord'
 
-        ws, method, path, version, headers = self.initiate(test_host, test_path)
+        ws, method, path, version, headers = self.initiate(_host, _path)
 
         key = headers['sec-websocket-key'].encode('ascii')
         accept_token = ws._generate_accept_token(key)
