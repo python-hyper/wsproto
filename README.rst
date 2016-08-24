@@ -1,5 +1,5 @@
-Prototype sans-io WebSocket implementation
-==========================================
+Pure Python, pure state-machine WebSocket implementation
+========================================================
 
 .. image:: https://travis-ci.org/jeamland/wsproto.svg?branch=master
     :target: https://travis-ci.org/jeamland/wsproto
