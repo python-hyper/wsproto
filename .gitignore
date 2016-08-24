@@ -7,3 +7,5 @@ __pycache__
 *.pyc
 *.pyo
 docs/build
+build
+dist
