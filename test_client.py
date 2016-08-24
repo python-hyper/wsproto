@@ -2,7 +2,7 @@ import asyncio
 import json
 from urllib.parse import urlparse
 
-from wsproto.connection import WSClient, ConnectionEstablished, \
+from wsproto.connection import WSConnection, CLIENT, ConnectionEstablished, \
                                ConnectionClosed
 from wsproto.events import TextReceived, DataReceived
 from wsproto.extensions import PerMessageDeflate
@@ -13,7 +13,7 @@ AGENT = 'wsproto'
 @asyncio.coroutine
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')
-    connection = WSClient(uri.netloc, uri.path)
+    connection = WSConnection(CLIENT, uri.netloc, uri.path)
     reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
 
     writer.write(connection.bytes_to_send())
@@ -37,8 +37,9 @@ def get_case_count(server):
 @asyncio.coroutine
 def run_case(server, case, agent):
     uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
-    connection = WSClient(uri.netloc, '%s?%s' % (uri.path, uri.query),
-                          extensions=[PerMessageDeflate()])
+    connection = WSConnection(CLIENT,
+                              uri.netloc, '%s?%s' % (uri.path, uri.query),
+                              extensions=[PerMessageDeflate()])
     reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
 
     writer.write(connection.bytes_to_send())
@@ -68,7 +69,8 @@ def run_case(server, case, agent):
 @asyncio.coroutine
 def update_reports(server, agent):
     uri = urlparse(server + '/updateReports?agent=%s' % agent)
-    connection = WSClient(uri.netloc, '%s?%s' % (uri.path, uri.query))
+    connection = WSConnection(CLIENT,
+                              uri.netloc, '%s?%s' % (uri.path, uri.query))
     reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
 
     writer.write(connection.bytes_to_send())

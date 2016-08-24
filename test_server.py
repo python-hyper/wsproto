@@ -1,12 +1,12 @@
 import asyncio
 
-from wsproto.connection import WSServer, ConnectionRequested, \
+from wsproto.connection import WSConnection, SERVER, ConnectionRequested, \
                                ConnectionClosed
 from wsproto.events import DataReceived
 from wsproto.extensions import PerMessageDeflate
 
 def new_conn(reader, writer):
-    ws = WSServer(extensions=[PerMessageDeflate()])
+    ws = WSConnection(SERVER, extensions=[PerMessageDeflate()])
     closed = False
     while not closed:
         try:

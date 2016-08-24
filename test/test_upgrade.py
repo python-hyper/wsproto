@@ -8,7 +8,7 @@ import email
 import random
 import sys
 
-from wsproto.connection import WSClient, WSServer
+from wsproto.connection import WSConnection, CLIENT, SERVER
 from wsproto.events import (
     ConnectionEstablished, ConnectionFailed, ConnectionRequested
 )
@@ -28,7 +28,7 @@ def parse_headers(headers):
 
 class TestClientUpgrade(object):
     def initiate(self, host, path):
-        ws = WSClient(host, path)
+        ws = WSConnection(CLIENT, host, path)
 
         data = ws.bytes_to_send()
         request, headers = data.split(b'\r\n', 1)
@@ -133,7 +133,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSServer()
+        ws = WSConnection(SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)

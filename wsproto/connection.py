@@ -35,10 +35,17 @@ class ConnectionState(Enum):
     CLOSED = 3
 
 
+class ConnectionType(Enum):
+    CLIENT = 1
+    SERVER = 2
+
+CLIENT = ConnectionType.CLIENT
+SERVER = ConnectionType.SERVER
+
 class WSConnection(object):
-    def __init__(self, client, host=None, resource=None, extensions=None,
+    def __init__(self, conn_type, host=None, resource=None, extensions=None,
                  protocols=None):
-        self.client = client
+        self.client = conn_type is ConnectionType.CLIENT
 
         self.host = host
         self.resource = resource
@@ -271,15 +278,3 @@ class WSConnection(object):
                                              headers=headers.items())
         self._outgoing += self._upgrade_connection.send(response)
         self._state = ConnectionState.OPEN
-
-
-class WSClient(WSConnection):
-    def __init__(self, host, resource, extensions=None, protocols=None):
-        super(WSClient, self).__init__(True, host, resource, extensions,
-                                       protocols)
-
-
-class WSServer(WSConnection):
-    def __init__(self, extensions=None, protocols=None):
-        super(WSServer, self).__init__(False, extensions=extensions,
-                                       protocols=protocols)
