@@ -45,14 +45,42 @@ SERVER = ConnectionType.SERVER
 
 
 class WSConnection(object):
+    """
+    A low-level WebSocket connection object.
+
+    This wraps two other protocol objects, an HTTP/1.1 protocol object used
+    to do the initial HTTP upgrade handshake and a WebSocket frame protocol
+    object used to exchange messages and other control frames.
+
+    :param conn_type: Whether this object is on the client- or server-side of
+        a connection. To initialise as a client pass ``CLIENT`` otherwise
+        pass ``SERVER``.
+    :type conn_type: ``ConnectionType``
+
+    :param host: The hostname to pass to the server when acting as a client.
+    :type host: ``str``
+
+    :param resource: The resource (aka path) to pass to the server when acting
+        as a client.
+    :type resource: ``str``
+
+    :param extensions: A list of  extensions to use on this connection.
+        Extensions should be instances of a subclass of
+        :class:`Extension <wsproto.etensions.Extension>`.
+
+    :param subprotocol: A nominated subprotocol to request when acting as a
+        client. This has no impact on the connection itself.
+    :type subprotocol: ``str``
+    """
+
     def __init__(self, conn_type, host=None, resource=None, extensions=None,
-                 protocols=None):
+                 subprotocol=None):
         self.client = conn_type is ConnectionType.CLIENT
 
         self.host = host
         self.resource = resource
 
-        self.protocols = protocols or []
+        self.subprotocol = subprotocol
         self.extensions = extensions or []
 
         self.version = b'13'

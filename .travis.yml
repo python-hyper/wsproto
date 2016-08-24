@@ -13,5 +13,6 @@ install:
   - "pip install flake8"
 before_script:
   - "flake8 --max-complexity 10 wsproto"
+  - "sphinx-build -nW -b html -d docs/build/doctrees docs/source docs/build/html"
 script:
   - "./.travis/run.sh"
