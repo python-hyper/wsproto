@@ -39,8 +39,10 @@ class ConnectionType(Enum):
     CLIENT = 1
     SERVER = 2
 
+
 CLIENT = ConnectionType.CLIENT
 SERVER = ConnectionType.SERVER
+
 
 class WSConnection(object):
     def __init__(self, conn_type, host=None, resource=None, extensions=None,
