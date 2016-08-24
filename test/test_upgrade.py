@@ -139,7 +139,7 @@ class TestServerUpgrade(object):
         nonce = base64.b64encode(nonce)
 
         request = b"GET " + test_path.encode('ascii') + b" HTTP/1.1\r\n"
-        request += b'Host: %s\r\n' % test_host.encode('ascii')
+        request += b'Host: ' + test_host.encode('ascii') + b'\r\n'
         request += b'Connection: Upgrade\r\n'
         request += b'Upgrade: WebSocket\r\n'
         request += b'Sec-WebSocket-Version: 13\r\n'
