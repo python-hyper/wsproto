@@ -25,6 +25,7 @@ Contents:
 
    installation
    basic-usage
+   api
 
 .. _RFC 6455: https://tools.ietf.org/html/rfc6455
 .. _RFC 7692: https://tools.ietf.org/html/rfc7692
