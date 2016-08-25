@@ -184,7 +184,8 @@ class FrameProtocol(object):
             if self._opcode is Opcode.CONTINUATION:
                 self._frames.append(CloseReason.PROTOCOL_ERROR)
                 return self.State.FAILED
-            self._message_opcode = self._opcode
+            if not self._opcode.iscontrol():
+                self._message_opcode = self._opcode
         else:
             if self._opcode is not Opcode.CONTINUATION and \
               not self._opcode.iscontrol():
