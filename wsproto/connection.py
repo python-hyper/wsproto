@@ -68,19 +68,20 @@ class WSConnection(object):
         Extensions should be instances of a subclass of
         :class:`Extension <wsproto.extensions.Extension>`.
 
-    :param subprotocol: A nominated subprotocol to request when acting as a
-        client. This has no impact on the connection itself.
-    :type subprotocol: ``str``
+    :param subprotocols: A list of subprotocols to request when acting as a
+        client, ordered by preference. This has no impact on the connection
+        itself.
+    :type subprotocol: ``list`` of ``str``
     """
 
     def __init__(self, conn_type, host=None, resource=None, extensions=None,
-                 subprotocol=None):
+                 subprotocols=[]):
         self.client = conn_type is ConnectionType.CLIENT
 
         self.host = host
         self.resource = resource
 
-        self.subprotocol = subprotocol
+        self.subprotocols = subprotocols
         self.extensions = extensions or []
 
         self.version = b'13'
@@ -110,6 +111,7 @@ class WSConnection(object):
             b"Connection": b'Upgrade',
             b"Sec-WebSocket-Key": self._nonce,
             b"Sec-WebSocket-Version": self.version,
+            b"Sec-WebSocket-Protocol": ", ".join(self.subprotocols),
         }
         if self.extensions:
             offers = {e.name: e.offer(self) for e in self.extensions}

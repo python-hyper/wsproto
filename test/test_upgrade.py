@@ -27,8 +27,8 @@ def parse_headers(headers):
 
 
 class TestClientUpgrade(object):
-    def initiate(self, host, path):
-        ws = WSConnection(CLIENT, host, path)
+    def initiate(self, host, path, **kwargs):
+        ws = WSConnection(CLIENT, host, path, **kwargs)
 
         data = ws.bytes_to_send()
         request, headers = data.split(b'\r\n', 1)
@@ -44,7 +44,8 @@ class TestClientUpgrade(object):
         _host = 'frob.nitz'
         _path = '/fnord'
 
-        ws, method, path, version, headers = self.initiate(_host, _path)
+        ws, method, path, version, headers = self.initiate(
+            _host, _path, subprotocols=["foo", "bar"])
 
         assert method == b'GET'
         assert path == _path.encode('ascii')
@@ -54,6 +55,7 @@ class TestClientUpgrade(object):
         assert headers['upgrade'].lower() == 'websocket'
         assert 'sec-websocket-key' in headers
         assert 'sec-websocket-version' in headers
+        assert headers['sec-websocket-protocol'] == 'foo, bar'
 
     def test_correct_accept_token(self):
         _host = 'frob.nitz'
