@@ -9,7 +9,6 @@ An implementation of a WebSocket connection.
 import os
 import base64
 import hashlib
-import random
 
 from enum import Enum
 

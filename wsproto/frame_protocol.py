@@ -9,7 +9,6 @@ WebSocket frame protocol implementation.
 import os
 import codecs
 import itertools
-import random
 import struct
 
 from enum import Enum, IntEnum
