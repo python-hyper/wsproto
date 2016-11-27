@@ -3,9 +3,10 @@
 set -e
 set -x
 
-if [[ $TRAVIS_PYTHON_VERSION == pypy ]]; then
-    py.test test/
-else
-    coverage run -m py.test test/
-    coverage report
-fi
+mkdir empty
+cd empty
+
+INSTALLDIR=$(python -c "import os, wsproto; print(os.path.dirname(wsproto.__file__))")
+pytest --cov=$INSTALLDIR --cov-config=../.coveragerc ../test/
+
+codecov
