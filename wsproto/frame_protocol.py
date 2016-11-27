@@ -6,9 +6,9 @@ wsproto/frame_protocol
 WebSocket frame protocol implementation.
 """
 
+import os
 import codecs
 import itertools
-import random
 import struct
 
 from enum import Enum, IntEnum
@@ -59,10 +59,6 @@ LOCAL_ONLY_CLOSE_REASONS = (
     CloseReason.ABNORMAL_CLOSURE,
     CloseReason.TLS_HANDHSAKE_FAILED,
 )
-
-
-def random_byte():
-    return random.getrandbits(8)
 
 
 class FrameProtocol(object):
@@ -434,7 +430,18 @@ class FrameProtocol(object):
                 header += struct.pack('!H', second_payload)
 
         if self.client:
-            masking_key = bytes(random_byte() for x in range(0, 4))
+            # "The masking key is a 32-bit value chosen at random by the
+            # client.  When preparing a masked frame, the client MUST pick a
+            # fresh masking key from the set of allowed 32-bit values.  The
+            # masking key needs to be unpredictable; thus, the masking key
+            # MUST be derived from a strong source of entropy, and the masking
+            # key for a given frame MUST NOT make it simple for a server/proxy
+            # to predict the masking key for a subsequent frame.  The
+            # unpredictability of the masking key is essential to prevent
+            # authors of malicious applications from selecting the bytes that
+            # appear on the wire."
+            #   -- https://tools.ietf.org/html/rfc6455#section-5.3
+            masking_key = os.urandom(4)
             maskbytes = itertools.cycle(masking_key)
             return header + masking_key + \
                 bytes(b ^ next(maskbytes) for b in payload)

@@ -6,9 +6,9 @@ wsproto/connection
 An implementation of a WebSocket connection.
 """
 
+import os
 import base64
 import hashlib
-import random
 
 from enum import Enum
 
@@ -247,8 +247,9 @@ class WSConnection(object):
                 yield BytesReceived(payload, fin)
 
     def _generate_nonce(self):
-        nonce = bytes(random.getrandbits(8) for x in range(0, 16))
-        self._nonce = base64.b64encode(nonce)
+        # os.urandom may be overkill for this use case, but I don't think this
+        # is a bottleneck, and better safe than sorry...
+        self._nonce = base64.b64encode(os.urandom(16))
 
     def _generate_accept_token(self, token):
         accept_token = token + ACCEPT_GUID
