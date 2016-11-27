@@ -200,9 +200,12 @@ class WSConnection(object):
             self._proto.receive_bytes(data)
 
     def _process_upgrade(self, data):
-        events = self._upgrade_connection.receive_data(data)
-        for event in events:
-            if self.client and isinstance(event, h11.InformationalResponse):
+        self._upgrade_connection.receive_data(data)
+        while True:
+            event = self._upgrade_connection.next_event()
+            if event is h11.NEED_DATA:
+                break
+            elif self.client and isinstance(event, h11.InformationalResponse):
                 data = self._upgrade_connection.trailing_data[0]
                 return self._establish_client_connection(event), data
             elif not self.client and isinstance(event, h11.Request):
