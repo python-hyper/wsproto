@@ -57,6 +57,10 @@ class TestClientUpgrade(object):
         assert 'sec-websocket-version' in headers
         assert headers['sec-websocket-protocol'] == 'foo, bar'
 
+    def test_no_subprotocols(self):
+        ws, method, path, version, headers = self.initiate("foo", "/bar")
+        assert 'sec-websocket-protocol' not in headers
+
     def test_correct_accept_token(self):
         _host = 'frob.nitz'
         _path = '/fnord'
