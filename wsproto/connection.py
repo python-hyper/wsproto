@@ -138,12 +138,12 @@ class WSConnection(object):
         message. If ``final`` is ``True`` it indicates that this is either a
         self-contained message or the last part of a longer message.
 
-        If ``payload`` is of type ``bytes`` then the message is flagged as
-        being binary If it is of type ``str`` encoded as UTF-8 and sent as
-        text.
+        If ``payload`` is of type ``bytes``, ``bytearray``, or ``memoryview``,
+        then the message is flagged as being binary. If it is of type ``str``
+        encoded as UTF-8 and sent as text.
 
         :param payload: The message body to send.
-        :type payload: ``bytes`` or ``str``
+        :type payload: ``bytes``, ``bytearray``, ``memoryview``, or ``str``
 
         :param final: Whether there are more parts to this message to be sent.
         :type final: ``bool``

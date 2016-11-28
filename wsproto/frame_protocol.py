@@ -373,11 +373,15 @@ class FrameProtocol(object):
         return self._serialize_frame(Opcode.PONG, payload)
 
     def send_data(self, payload=b'', fin=True):
-        if isinstance(payload, bytes):
+        if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
         elif isinstance(payload, str):
             opcode = Opcode.TEXT
             payload = payload.encode('utf-8')
+        else:
+            raise ValueError("Unrecognized payload type {!r} (should be "
+                             "bytes-like or str)"
+                             .format(type(payload).__name__))
 
         if self._outbound_opcode is None:
             self._outbound_opcode = opcode
