@@ -20,7 +20,7 @@ def new_conn(reader, writer):
             if isinstance(event, ConnectionRequested):
                 ws.accept(event)
             elif isinstance(event, DataReceived):
-                ws.send_data(event.data, event.final)
+                ws.send_data(event.data, event.message_finished)
             elif isinstance(event, ConnectionClosed):
                 closed = True
             if data is None:

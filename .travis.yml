@@ -1,11 +1,9 @@
 language: python
 sudo: false
 python:
-  - "2.7"
-  - "3.3"
   - "3.4"
   - "3.5"
-  - "pypy-5.3.1"
+
 env:
   - WSACCEL=1
   - WSACCEL=0

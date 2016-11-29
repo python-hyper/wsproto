@@ -9,6 +9,7 @@ An implementation of a WebSocket connection.
 import os
 import base64
 import hashlib
+from collections import deque
 
 from enum import Enum
 
@@ -18,7 +19,7 @@ from .events import (
     ConnectionRequested, ConnectionEstablished, ConnectionClosed,
     ConnectionFailed, TextReceived, BytesReceived
 )
-from .frame_protocol import FrameProtocol, CloseReason, Opcode
+from .frame_protocol import FrameProtocol, ParseFailed, CloseReason, Opcode
 
 
 # RFC6455, Section 1.3 - Opening Handshake
@@ -91,7 +92,7 @@ class WSConnection(object):
 
         self._nonce = None
         self._outgoing = b''
-        self._events = []
+        self._events = deque()
         self._proto = FrameProtocol(self.client, self.extensions)
 
         if self.client:
@@ -186,7 +187,11 @@ class WSConnection(object):
         """
 
         if data is None and self._state is ConnectionState.OPEN:
-            self._events.append(ConnectionClosed(CloseReason.NORMAL_CLOSURE))
+            # "If _The WebSocket Connection is Closed_ and no Close control
+            # frame was received by the endpoint (such as could occur if the
+            # underlying transport connection is lost), _The WebSocket
+            # Connection Close Code_ is considered to be 1006."
+            self._events.append(ConnectionClosed(CloseReason.ABNORMAL_CLOSURE))
             self._state = ConnectionState.CLOSED
             return
         elif data is None:
@@ -225,26 +230,36 @@ class WSConnection(object):
         """
 
         while self._events:
-            yield self._events.pop(0)
+            yield self._events.popleft()
 
-        for frame in self._proto.received_frames():
-            if isinstance(frame, CloseReason):
-                self.close(frame)
-                yield ConnectionClosed(frame)
-                return
+        try:
+            for frame in self._proto.received_frames():
 
-            opcode, payload, fin = frame
+                if frame.opcode is Opcode.PING:
+                    assert frame.frame_finished and frame.message_finished
+                    self._outgoing += self._proto.pong(frame.payload)
 
-            if opcode is Opcode.PING:
-                self._outgoing += self._proto.pong(payload)
-            elif opcode is Opcode.CLOSE:
-                code, reason = payload
-                self.close(code, reason)
-                yield ConnectionClosed(code, reason)
-            elif opcode is Opcode.TEXT:
-                yield TextReceived(payload, fin)
-            elif opcode is Opcode.BINARY:
-                yield BytesReceived(payload, fin)
+                elif frame.opcode is Opcode.CLOSE:
+                    code, reason = frame.payload
+                    self.close(code, reason)
+                    yield ConnectionClosed(code, reason)
+
+                elif frame.opcode is Opcode.TEXT:
+                    yield TextReceived(frame.payload,
+                                       frame.frame_finished,
+                                       frame.message_finished)
+
+                elif frame.opcode is Opcode.BINARY:
+                    yield BytesReceived(frame.payload,
+                                        frame.frame_finished,
+                                        frame.message_finished)
+        except ParseFailed as exc:
+            # XX FIXME: apparently autobahn intentionally deviates from the
+            # spec in that on protocol errors it just closes the connection
+            # rather than trying to send a CLOSE frame. Investigate whether we
+            # should do the same.
+            self.close(code=exc.code, reason=str(exc))
+            yield ConnectionClosed(exc.code, reason=str(exc))
 
     def _generate_nonce(self):
         # os.urandom may be overkill for this use case, but I don't think this
