@@ -93,6 +93,21 @@ Frame = namedtuple("Frame",
                    "opcode payload frame_finished message_finished".split())
 
 
+def _truncate_utf8(data, nbytes):
+    if len(data) <= nbytes:
+        return data
+    else:
+        # Truncate
+        data = data[:nbytes]
+        # But we might have cut a codepoint in half, in which case we want to
+        # discard the partial character so the data is at least
+        # well-formed. This is a little inefficient since it processes the
+        # whole message twice when in theory we could just peek at the last
+        # few characters, but since this is only used for close messages (max
+        # length = 125 bytes) it really doesn't matter.
+        data = data.decode("utf-8", errors="ignore").encode("utf-8")
+        return data
+
 class FrameProtocol(object):
     class State(Enum):
         HEADER = 1
@@ -316,10 +331,12 @@ class FrameProtocol(object):
         payload = bytearray()
         if code is None and reason is not None:
             raise TypeError("cannot specify a reason without a code")
-        if code is not None and code not in LOCAL_ONLY_CLOSE_REASONS:
+        if code in LOCAL_ONLY_CLOSE_REASONS:
+            code = CloseReason.NORMAL_CLOSURE
+        if code is not None:
             payload += struct.pack('!H', code)
             if reason is not None:
-                payload += reason.encode('utf-8')
+                payload += _truncate_utf8(reason.encode('utf-8'), 123)
 
         return self._serialize_frame(Opcode.CLOSE, payload)
 
@@ -379,6 +396,8 @@ class FrameProtocol(object):
 
         header = bytes([fin_rsv_opcode, first_payload])
         if second_payload is not None:
+            if opcode.iscontrol():
+                raise ValueError("payload too long for control frame")
             if quad_payload:
                 header += struct.pack('!Q', second_payload)
             else:
