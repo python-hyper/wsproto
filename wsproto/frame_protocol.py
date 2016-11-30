@@ -69,6 +69,7 @@ class CloseReason(IntEnum):
     TRY_AGAIN_LATER = 1013
     TLS_HANDSHAKE_FAILED = 1015
 
+
 # RFC 6455, Section 7.4.1 - Defined Status Codes
 LOCAL_ONLY_CLOSE_REASONS = (
     CloseReason.NO_STATUS_RCVD,

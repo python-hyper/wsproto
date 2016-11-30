@@ -362,7 +362,8 @@ class WSConnection(object):
                     extensions.append(name.encode('ascii'))
                 else:
                     # py34 annoyance: doesn't support bytestring formatting
-                    extensions.append(('%s; %s' % (name, params.decode("ascii")))
+                    params = params.decode("ascii")
+                    extensions.append(('%s; %s' % (name, params))
                                       .encode("ascii"))
             headers[b"Sec-WebSocket-Extensions"] = b', '.join(extensions)
 
