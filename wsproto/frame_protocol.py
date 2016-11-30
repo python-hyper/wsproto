@@ -82,7 +82,7 @@ NULL_MASK = struct.pack("!I", 0)
 
 class ParseFailed(Exception):
     def __init__(self, msg, code=CloseReason.PROTOCOL_ERROR):
-        super().__init__(self, msg)
+        super().__init__(msg)
         self.code = code
 
 
