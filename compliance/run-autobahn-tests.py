@@ -1,7 +1,5 @@
 # Things that would be nice:
 # - less hard-coding of paths here
-# - ability to run a specific test case, or set of cases
-# - better reporting of what went wrong on failure
 
 import sys
 import os.path
@@ -91,8 +89,8 @@ def coverage(command, coverage_settings):
                  "--rcfile", coverage_settings["coveragerc"]]
                 + command)
 
-def summarize(index_path):
-    with open(index_path) as f:
+def summarize(report_path):
+    with open(os.path.join(report_path, "index.json")) as f:
         result_summary = json.load(f)["wsproto"]
     failed = 0
     total = 0
@@ -101,7 +99,10 @@ def summarize(index_path):
         total += 1
         if (results["behavior"] not in PASS
               or results["behaviorClose"] not in PASS):
-            say("Uh-oh:", test_name, results)
+            say("FAIL:", test_name, results)
+            say("Details:")
+            with open(os.path.join(report_path, results["reportfile"])) as f:
+                print(f.read())
             failed += 1
 
     speed_ordered = sorted(result_summary.items(),
@@ -134,7 +135,7 @@ def run_client_tests(cases, coverage_settings):
         server.terminate()
         server.wait()
 
-    return summarize("reports/clients/index.json")
+    return summarize("reports/clients")
 
 def run_server_tests(cases, coverage_settings):
     say("Starting wsproto test server")
@@ -156,9 +157,10 @@ def run_server_tests(cases, coverage_settings):
         # Connection on this port triggers a shutdown
         with socket.socket() as sock:
             sock.connect(("localhost", PORT + 1))
+            sock.send(b"x")
         server.wait()
 
-    return summarize("reports/servers/index.json")
+    return summarize("reports/servers")
 
 def main():
     if not os.path.exists("test_client.py"):
