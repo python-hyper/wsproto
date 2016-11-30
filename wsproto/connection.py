@@ -118,12 +118,12 @@ class WSConnection(object):
             offers = {e.name: e.offer(self) for e in self.extensions}
             extensions = []
             for name, params in offers.items():
-                name = name.encode('ascii')
                 if params is True:
-                    extensions.append(name)
+                    extensions.append(name.encode('ascii'))
                 elif params:
-                    params = params.encode('ascii')
-                    extensions.append(b'%s; %s' % (name, params))
+                    # py34 annoyance: doesn't support bytestring formatting
+                    extensions.append(('%s; %s' % (name, params))
+                                      .encode("ascii"))
             if extensions:
                 headers[b'Sec-WebSocket-Extensions'] = b', '.join(extensions)
 
@@ -358,11 +358,12 @@ class WSConnection(object):
         if accepts:
             extensions = []
             for name, params in accepts.items():
-                name = name.encode('ascii')
                 if params is True:
-                    extensions.append(name)
+                    extensions.append(name.encode('ascii'))
                 else:
-                    extensions.append(b'%s; %s' % (name, params))
+                    # py34 annoyance: doesn't support bytestring formatting
+                    extensions.append(('%s; %s' % (name, params.decode("ascii")))
+                                      .encode("ascii"))
             headers[b"Sec-WebSocket-Extensions"] = b', '.join(extensions)
 
         response = h11.InformationalResponse(status_code=101,
