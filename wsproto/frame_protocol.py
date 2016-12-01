@@ -157,18 +157,28 @@ class FrameProtocol(object):
         if opcode.iscontrol() and not fin:
             raise ParseFailed("Invalid attempt to fragment control frame")
 
-        (mask_len0,) = yield from self._consume_exactly(1)
-        has_mask = bool(mask_len0 & 0x80)
-        payload_len = mask_len0 & 0x7f
+        (mask_len,) = yield from self._consume_exactly(1)
+        has_mask = bool(mask_len & 0x80)
+        payload_len = mask_len & 0x7f
 
         if opcode.iscontrol() and payload_len > 125:
             raise ParseFailed("Control frame with payload len > 125")
         if payload_len == 126:
             data = yield from self._consume_exactly(2)
             (payload_len,) = struct.unpack("!H", data)
+            if payload_len <= 125:
+                raise ParseFailed(
+                    "Payload length used 2 bytes when 1 would have sufficed")
         elif payload_len == 127:
             data = yield from self._consume_exactly(8)
             (payload_len,) = struct.unpack("!Q", data)
+            if payload_len < 2 ** 16:
+                raise ParseFailed(
+                    "Payload length used 8 bytes when 2 would have sufficed")
+            if payload_len >> 63:
+                # I'm not sure why this is illegal, but that's what the RFC
+                # says, so...
+                raise ParseFailed("8-byte payload length with non-zero MSB")
 
         for extension in self.extensions:
             result = extension.frame_inbound_header(
