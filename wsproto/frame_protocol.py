@@ -267,10 +267,9 @@ class FrameProtocol(object):
                     # Neither CONTINUATION nor control -> starting a new
                     # unfinished message
                     unfinished_message_opcode = header.opcode
-            else:
+            elif not header.opcode.iscontrol():
                 # We're in the middle of an unfinished message
-                if (not header.opcode.iscontrol()
-                      and header.opcode is not Opcode.CONTINUATION):
+                if header.opcode is not Opcode.CONTINUATION:
                     raise ParseFailed("expected CONTINUATION, not {!r}"
                                       .format(header.opcode))
 
@@ -283,8 +282,8 @@ class FrameProtocol(object):
             else:
                 masker = XorMaskerSimple(header.masking_key)
 
-            if (unfinished_message_opcode is Opcode.TEXT
-                  and unfinished_message_decoder is None):
+            if unfinished_message_opcode is Opcode.TEXT and \
+               unfinished_message_decoder is None:
                 unfinished_message_decoder = getincrementaldecoder("utf-8")()
 
             remaining = header.payload_len
