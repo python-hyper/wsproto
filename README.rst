@@ -3,9 +3,13 @@ Pure Python, pure state-machine WebSocket implementation
 
 .. image:: https://travis-ci.org/jeamland/wsproto.svg?branch=master
     :target: https://travis-ci.org/jeamland/wsproto
+    :alt: Build status
 .. image:: https://readthedocs.org/projects/wsproto/badge/?version=latest
     :target: http://wsproto.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+..image:: https://codecov.io/gh/jeamland/wsproto/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/jeamland/wsproto
+    :alt: Code coverage
 
 This needs a pile of cleaning up.
 
