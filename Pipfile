@@ -8,3 +8,6 @@ pytest-cov = "*"
 coverage = "*"
 tox = "*"
 flake8 = "*"
+
+[packages]
+h11 = "*"
