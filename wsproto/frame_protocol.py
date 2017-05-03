@@ -109,6 +109,7 @@ def _truncate_utf8(data, nbytes):
         data = data.decode("utf-8", errors="ignore").encode("utf-8")
         return data
 
+
 class FrameProtocol(object):
     class State(Enum):
         HEADER = 1
