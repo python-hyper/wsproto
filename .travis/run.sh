@@ -3,6 +3,10 @@
 set -e
 set -x
 
+if [ -d empty ]; then
+	rm -fr empty
+fi
+
 mkdir empty
 cd empty
 
