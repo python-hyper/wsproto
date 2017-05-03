@@ -44,4 +44,6 @@ And in another shell run the Autobahn test client:
 
     $ wstest -m fuzzingclient -s ws-fuzzingclient.json
 
-This was written using Python 3.5. Python 2.7 has not been well tested yet.
+This was written using Python 3.5. Python 3.4, 3.5 and 3.6 are being
+actively tested. PyPy3 will be tested once TravisCI gets it working
+again. Python 2.x is not supported.
