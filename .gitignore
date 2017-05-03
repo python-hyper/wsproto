@@ -9,3 +9,8 @@ __pycache__
 docs/build
 build
 dist
+
+compliance/reports
+compliance/auto-tests-server-config.json
+compliance/auto-tests-client-config.json
+compliance/autobahntestsuite-venv/

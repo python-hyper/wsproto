@@ -53,9 +53,14 @@ class ConnectionFailed(ConnectionClosed):
 
 
 class DataReceived(object):
-    def __init__(self, data, final):
+    def __init__(self, data, frame_finished, message_finished):
         self.data = data
-        self.final = final
+        # This has no semantic content, but is provided just in case some
+        # weird edge case user wants to be able to reconstruct the
+        # fragmentation pattern of the original stream. You don't want it:
+        self.frame_finished = frame_finished
+        # This is the field that you almost certainly want:
+        self.message_finished = message_finished
 
 
 class TextReceived(DataReceived):
