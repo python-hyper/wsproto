@@ -1,14 +1,14 @@
 Pure Python, pure state-machine WebSocket implementation
 ========================================================
 
-.. image:: https://travis-ci.org/jeamland/wsproto.svg?branch=master
-    :target: https://travis-ci.org/jeamland/wsproto
+.. image:: https://travis-ci.org/python-hyper/wsproto.svg?branch=master
+    :target: https://travis-ci.org/python-hyper/wsproto
     :alt: Build status
-.. image:: https://readthedocs.org/projects/wsproto/badge/?version=latest
+.. image:: https://readthedocs.org/python-hyper/wsproto/badge/?version=latest
     :target: http://wsproto.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
-..image:: https://codecov.io/gh/jeamland/wsproto/branch/master/graph/badge.svg
-    :target: https://codecov.io/gh/jeamland/wsproto
+.. image:: https://codecov.io/gh/python-hyper/wsproto/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/python-hyper/wsproto
     :alt: Code coverage
 
 This needs a pile of cleaning up.
