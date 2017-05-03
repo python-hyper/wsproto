@@ -135,8 +135,11 @@ class WSConnection(object):
             b"Connection": b'Upgrade',
             b"Sec-WebSocket-Key": self._nonce,
             b"Sec-WebSocket-Version": self.version,
-            b"Sec-WebSocket-Protocol": ", ".join(self.subprotocols),
         }
+
+        if self.subprotocols:
+            headers[b"Sec-WebSocket-Protocol"] = ", ".join(self.subprotocols)
+
         if self.extensions:
             offers = {e.name: e.offer(self) for e in self.extensions}
             extensions = []
