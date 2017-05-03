@@ -8,7 +8,8 @@ Events that result from processing data on a WebSocket connection.
 
 
 class ConnectionRequested(object):
-    def __init__(self, h11request):
+    def __init__(self, proposed_subprotocols, h11request):
+        self.proposed_subprotocols = proposed_subprotocols
         self.h11request = h11request
 
     def __repr__(self):

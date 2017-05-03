@@ -44,6 +44,29 @@ CLIENT = ConnectionType.CLIENT
 SERVER = ConnectionType.SERVER
 
 
+# Some convenience utilities for working with HTTP headers
+def _normed_header_dict(h11_headers):
+    # This mangles Set-Cookie headers. But it happens that we don't care about
+    # any of those, so it's OK. For every other HTTP header, if there are
+    # multiple instances then you're allowed to join them together with
+    # commas.
+    name_to_values = {}
+    for name, value in h11_headers.items():
+        name_to_values.setdefault(name, []).append(value)
+    name_to_normed_value = {}
+    for name, values in name_to_values.items():
+        name_to_normed_value[name] = b", ".join(values)
+
+
+# We use this for parsing the proposed protocol list, and for parsing the
+# proposed and accepted extension lists. For the proposed protocol list it's
+# fine, because the ABNF is just 1#token. But for the extension lists, it's
+# wrong, because those can contain quoted strings, which can in turn contain
+# commas. XX FIXME
+def _split_comma_header(value):
+    return [piece.strip() for piece in value.split(b',')]
+
+
 class WSConnection(object):
     """
     A low-level WebSocket connection object.
@@ -260,7 +283,7 @@ class WSConnection(object):
         if event.status_code != 101:
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Bad status code from server")
-        headers = dict(event.headers)
+        headers = _normed_header_dict(event.headers)
         if headers[b'connection'].lower() != b'upgrade':
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Connection: Upgrade header")
@@ -274,9 +297,15 @@ class WSConnection(object):
                                     "Bad accept token")
 
         subprotocol = headers.get(b'sec-websocket-protocol', None)
+        if subprotocol is not None:
+            if subprotocol not in self.subprotocols:
+                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                        "unrecognized subprotocol {!r}"
+                                        .format(subprotocol))
+
         extensions = headers.get(b'sec-websocket-extensions', None)
         if extensions:
-            accepts = [e.strip() for e in extensions.split(b',')]
+            accepts = _split_comma_header(extensions)
 
             for accept in accepts:
                 accept = accept.decode('ascii')
@@ -284,6 +313,11 @@ class WSConnection(object):
                 for extension in self.extensions:
                     if extension.name == name:
                         extension.finalize(self, accept)
+                        break
+                else:
+                    return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                            "unrecognized extension {!r}"
+                                            .format(name))
 
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)
@@ -292,7 +326,7 @@ class WSConnection(object):
         if event.method != b'GET':
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Request method must be GET")
-        headers = dict(event.headers)
+        headers = _normed_header_dict(event.headers)
         if headers[b'connection'].lower() != b'upgrade':
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Connection: Upgrade header")
@@ -303,16 +337,24 @@ class WSConnection(object):
         if b'sec-websocket-version' not in headers:
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Sec-WebSocket-Version header")
+        # XX FIXME: need to check Sec-Websocket-Version, and respond with a
+        # 400 if it's not what we expect
+
+        if b'sec-websocket-protocol' in headers:
+            proposed_subprotocols = _split_comma_header(
+                headers[b'sec-websocket-protocol'])
+        else:
+            proposed_subprotocols = []
 
         if b'sec-websocket-key' not in headers:
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Sec-WebSocket-Key header")
 
-        return ConnectionRequested(event)
+        return ConnectionRequested(proposed_subprotocols, event)
 
-    def accept(self, event):
+    def accept(self, event, subprotocol=None):
         request = event.h11request
-        request_headers = dict(request.headers)
+        request_headers = _normed_header_dict(request.headers)
 
         nonce = request_headers[b'sec-websocket-key']
         accept_token = self._generate_accept_token(nonce)
@@ -321,13 +363,18 @@ class WSConnection(object):
             b"Upgrade": b'WebSocket',
             b"Connection": b'Upgrade',
             b"Sec-WebSocket-Accept": accept_token,
-            b"Sec-WebSocket-Version": self.version,
         }
+
+        if subprotocol is not None:
+            if subprotocol not in event.proposed_subprotocols:
+                raise ValueError(
+                    "unexpected subprotocol {!r}".format(subprotocol))
+            headers[b'Sec-WebSocket-Protocol'] = subprotocol
 
         extensions = request_headers.get(b'sec-websocket-extensions', None)
         accepts = {}
-        if extensions:
-            offers = [e.strip() for e in extensions.split(b',')]
+        if extensions is not None:
+            offers = _split_comma_header(extensions)
 
             for offer in offers:
                 offer = offer.decode('ascii')
