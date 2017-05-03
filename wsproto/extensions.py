@@ -168,9 +168,11 @@ class PerMessageDeflate(Extension):
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     def frame_inbound_complete(self, proto, fin):
-        if (not fin
-              or not self._inbound_compressed
-              or not self._inbound_is_compressible):
+        if not fin:
+            return
+        elif not self._inbound_compressed:
+            return
+        elif not self._inbound_is_compressible:
             return
 
         try:
