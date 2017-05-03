@@ -13,6 +13,17 @@ import struct
 
 from enum import Enum, IntEnum
 
+try:
+    from wsaccel.xormask import XorMaskerSimple
+except ImportError:
+    class XorMaskerSimple:
+        def __init__(self, masking_key):
+            self._maskbytes = itertools.cycle(masking_key)
+
+        def process(self, data):
+            maskbytes = self._maskbytes
+            return bytes(b ^ next(maskbytes) for b in data)
+
 
 # RFC6455, Section 5.2 - Base Framing Protocol
 MAX_FRAME_PAYLOAD = 2 ** 64
@@ -85,7 +96,7 @@ class FrameProtocol(object):
         self._opcode = None
         self._fin = False
         self._rsv = (False, False, False)
-        self._masking_key = None
+        self._masker = None
         self._payload_length = None
         self._payload = b''
         self._masked = False
@@ -226,7 +237,7 @@ class FrameProtocol(object):
             self._buffer = self._buffer[8:]
 
     def _process_frame_payload(self):
-        if self._masked and self._masking_key is None:
+        if self._masked and self._masker is None:
             state = self._process_masking_key()
             if state is not None:
                 return state
@@ -239,7 +250,7 @@ class FrameProtocol(object):
         self._payload_length -= len(payload)
 
         if self._masked:
-            payload = bytes(b ^ next(self._masking_key) for b in payload)
+            payload = self._masker.process(payload)
 
         payload = self._process_extensions(payload)
 
@@ -257,10 +268,10 @@ class FrameProtocol(object):
 
     def _process_masking_key(self):
         if len(self._buffer) >= 4:
-            self._masking_key = itertools.cycle(self._buffer[:4])
+            self._masker = XorMaskerSimple(self._buffer[:4])
             self._buffer = self._buffer[4:]
 
-        if self._masked and not self._masking_key:
+        if self._masked and not self._masker:
             return self.State.PAYLOAD
 
     def _consume_payload(self):
@@ -442,8 +453,7 @@ class FrameProtocol(object):
             # appear on the wire."
             #   -- https://tools.ietf.org/html/rfc6455#section-5.3
             masking_key = os.urandom(4)
-            maskbytes = itertools.cycle(masking_key)
-            return header + masking_key + \
-                bytes(b ^ next(maskbytes) for b in payload)
+            masker = XorMaskerSimple(masking_key)
+            return header + masking_key + masker.process(payload)
         else:
             return header + payload

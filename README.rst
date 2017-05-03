@@ -12,6 +12,9 @@ This needs a pile of cleaning up.
 It passes the autobahn test suite completely and strictly in both client and
 server modes and using permessage-deflate.
 
+If `wsaccel <https://pypi.python.org/pypi/wsaccel>`_ is installed
+(optional), then it will be used to speed things up.
+
 If you want to run the compliance tests, go into the compliance directory and
 then to test client mode, in one shell run the Autobahn test server:
 
