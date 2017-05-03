@@ -51,11 +51,12 @@ def _normed_header_dict(h11_headers):
     # multiple instances then you're allowed to join them together with
     # commas.
     name_to_values = {}
-    for name, value in h11_headers.items():
+    for name, value in h11_headers:
         name_to_values.setdefault(name, []).append(value)
     name_to_normed_value = {}
     for name, values in name_to_values.items():
         name_to_normed_value[name] = b", ".join(values)
+    return name_to_normed_value
 
 
 # We use this for parsing the proposed protocol list, and for parsing the
