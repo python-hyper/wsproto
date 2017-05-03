@@ -3,13 +3,6 @@
 set -e
 set -x
 
-if [ -d empty ]; then
-	rm -fr empty
-fi
-
-mkdir empty
-cd empty
-
 install_wsproto() {
     pip install -U pip setuptools
     python setup.py sdist
