@@ -32,7 +32,7 @@ class Extension(object):
     def frame_inbound_complete(self, proto, fin):
         pass
 
-    def frame_outbound(self, proto, opcode, rsv, data):
+    def frame_outbound(self, proto, opcode, rsv, data, fin):
         return (rsv, data)
 
 
@@ -49,9 +49,17 @@ class PerMessageDeflate(Extension):
 
         self._compressor = None
         self._decompressor = None
+        # This refers to the current frame
+        self._inbound_is_compressible = None
+        # This refers to the ongoing message (which might span multiple
+        # frames). Only the first frame in a fragmented message is flagged for
+        # compression, so this carries that bit forward.
         self._inbound_compressed = None
 
         self._enabled = False
+
+    def _compressible_opcode(self, opcode):
+        return opcode in (Opcode.TEXT, Opcode.BINARY, Opcode.CONTINUATION)
 
     def enabled(self):
         return self._enabled
@@ -137,9 +145,12 @@ class PerMessageDeflate(Extension):
         elif rsv[0] and opcode is Opcode.CONTINUATION:
             return CloseReason.PROTOCOL_ERROR
 
+        self._inbound_is_compressible = self._compressible_opcode(opcode)
+
         if self._inbound_compressed is None:
             self._inbound_compressed = rsv[0]
             if self._inbound_compressed:
+                assert self._inbound_is_compressible
                 if proto.client:
                     bits = self.server_max_window_bits
                 else:
@@ -148,7 +159,7 @@ class PerMessageDeflate(Extension):
                     self._decompressor = zlib.decompressobj(-bits)
 
     def frame_inbound_payload_data(self, proto, data):
-        if not self._inbound_compressed:
+        if not self._inbound_compressed or not self._inbound_is_compressible:
             return data
 
         try:
@@ -157,7 +168,9 @@ class PerMessageDeflate(Extension):
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     def frame_inbound_complete(self, proto, fin):
-        if not fin or not self._inbound_compressed:
+        if (not fin
+              or not self._inbound_compressed
+              or not self._inbound_is_compressible):
             return
 
         try:
@@ -166,24 +179,28 @@ class PerMessageDeflate(Extension):
         except zlib.error:
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
-        if fin:
-            if proto.client:
-                no_context_takeover = self.server_no_context_takeover
-            else:
-                no_context_takeover = self.client_no_context_takeover
+        if proto.client:
+            no_context_takeover = self.server_no_context_takeover
+        else:
+            no_context_takeover = self.client_no_context_takeover
 
-            if no_context_takeover:
-                self._decompressor = None
+        if no_context_takeover:
+            self._decompressor = None
 
-            self._inbound_compressed = None
+        self._inbound_compressed = None
 
         return data
 
-    def frame_outbound(self, proto, opcode, rsv, data):
-        if opcode not in (Opcode.TEXT, Opcode.BINARY):
+    def frame_outbound(self, proto, opcode, rsv, data, fin):
+        if not self._compressible_opcode(opcode):
             return (rsv, data)
 
+        if opcode is not Opcode.CONTINUATION:
+            rsv = list(rsv)
+            rsv[0] = True
+
         if self._compressor is None:
+            assert opcode is not Opcode.CONTINUATION
             if proto.client:
                 bits = self.client_max_window_bits
             else:
@@ -191,19 +208,18 @@ class PerMessageDeflate(Extension):
             self._compressor = zlib.compressobj(wbits=-bits)
 
         data = self._compressor.compress(data)
-        data += self._compressor.flush(zlib.Z_SYNC_FLUSH)
-        data = data[:-4]
 
-        rsv = list(rsv)
-        rsv[0] = True
+        if fin:
+            data += self._compressor.flush(zlib.Z_SYNC_FLUSH)
+            data = data[:-4]
 
-        if proto.client:
-            no_context_takeover = self.client_no_context_takeover
-        else:
-            no_context_takeover = self.server_no_context_takeover
+            if proto.client:
+                no_context_takeover = self.client_no_context_takeover
+            else:
+                no_context_takeover = self.server_no_context_takeover
 
-        if no_context_takeover:
-            self._compressor = None
+            if no_context_takeover:
+                self._compressor = None
 
         return (rsv, data)
 

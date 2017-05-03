@@ -5,19 +5,36 @@ python:
   - "3.5"
   - "3.6"
 sudo: false
+
 env:
-  - WSACCEL=1
-  - WSACCEL=0
-install:
-  - "pip install -U pip setuptools"
-  - "pip install ."
-  - "pip install -r test_requirements.txt"
-  - "pip install flake8"
-  - "pip install sphinx"
-  - "pip install codecov"
-  - "if [ $WSACCEL -eq 1 ]; then pip install wsaccel; fi"
-before_script:
-  - "flake8 --max-complexity 12 wsproto"
-  - "sphinx-build -nW -b html -d docs/build/doctrees docs/source docs/build/html"
+  - MODE=pytest
+    WSACCEL=1
+
+  - MODE=pytest
+    WSACCEL=0
+
+  - MODE=autobahn
+    SIDE=client
+    WSACCEL=1
+
+  - MODE=autobahn
+    SIDE=client
+    WSACCEL=0
+
+  - MODE=autobahn
+    SIDE=server
+    WSACCEL=1
+
+  - MODE=autobahn
+    SIDE=server
+    WSACCEL=0
+
+matrix:
+  include:
+  - python: 3.5
+    env: MODE=docs
+  - python: 3.5
+    env: MODE=flake8
+
 script:
   - "./.travis/run.sh"

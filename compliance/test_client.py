@@ -22,10 +22,13 @@ def get_case_count(server):
     while case_count is None:
         data = yield from reader.read(65535)
         connection.receive_bytes(data)
+        data = ""
         for event in connection.events():
             if isinstance(event, TextReceived):
-                case_count = json.loads(event.data)
-                connection.close()
+                data += event.data
+                if event.message_finished:
+                    case_count = json.loads(data)
+                    connection.close()
             try:
                 writer.write(connection.bytes_to_send())
                 yield from writer.drain()
@@ -53,18 +56,20 @@ def run_case(server, case, agent):
         connection.receive_bytes(data or None)
         for event in connection.events():
             if isinstance(event, DataReceived):
-                connection.send_data(event.data, event.final)
+                connection.send_data(event.data, event.message_finished)
             elif isinstance(event, ConnectionClosed):
                 closed = True
-            if data is None:
-                break
-            try:
-                data = connection.bytes_to_send()
-                writer.write(data)
-                yield from writer.drain()
-            except (ConnectionError, OSError):
-                closed = True
-                break
+            # else:
+            #     print("??", event)
+        if data is None:
+            break
+        try:
+            data = connection.bytes_to_send()
+            writer.write(data)
+            yield from writer.drain()
+        except (ConnectionError, OSError):
+            closed = True
+            break
 
 @asyncio.coroutine
 def update_reports(server, agent):
