@@ -54,7 +54,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'wsproto'
-copyright = '2016, Benno Rice'
+copyright = '2017, Benno Rice and contributors'
 author = 'Benno Rice'
 
 # The version info for the project you're documenting, acts as replacement for
