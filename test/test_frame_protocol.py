@@ -3,6 +3,7 @@ from binascii import unhexlify
 import struct
 import wsproto.frame_protocol as fp
 
+
 def test_close_with_long_reason():
     # Long close reasons get silently truncated
     proto = fp.FrameProtocol(client=False, extensions=[])
