@@ -247,6 +247,46 @@ class FrameProtocol(object):
                     CloseReason.INVALID_FRAME_PAYLOAD_DATA)
             return (code, reason)
 
+    def _parse_frame_payload(self,
+                             opcode,
+                             remaining,
+                             message_decoder,
+                             masker,
+                             fin_flag):
+        frame_finished = False
+        message_finished = False
+        while not frame_finished:
+            # For control frames, we collect all the data and return it as
+            # a single lump. For message frames, we stream out chunks as
+            # they arrive, to minimize buffering.
+            if opcode.iscontrol():
+                data = yield from self._consume_exactly(remaining)
+            else:
+                data = yield from self._consume_at_most(remaining)
+            remaining -= len(data)
+            frame_finished = (remaining == 0)
+            message_finished = (frame_finished and fin_flag)
+
+            data = self._process_payload_chunk(masker, data)
+            if frame_finished:
+                data += self._process_payload_complete(fin_flag)
+
+            if opcode is Opcode.CLOSE:
+                data = self._process_CLOSE_payload(data)
+
+            if not opcode.iscontrol():
+                if message_decoder is not None:
+                    try:
+                        data = message_decoder.decode(data, message_finished)
+                    except UnicodeDecodeError as exc:
+                        raise ParseFailed(
+                            str(exc),
+                            CloseReason.INVALID_FRAME_PAYLOAD_DATA)
+
+            yield Frame(opcode, data, frame_finished, message_finished)
+
+        return message_finished
+
     def parse_more_gen(self):
         # Consume as much as we can from self._buffer, yielding events, and
         # then yield None when we need more data. Or raise ParseFailed.
@@ -257,7 +297,8 @@ class FrameProtocol(object):
 
         unfinished_message_opcode = None
         unfinished_message_decoder = None
-        while True:
+        effective_opcode = None
+        while effective_opcode is not Opcode.CLOSE:
             header = yield from self._parse_header()
 
             if unfinished_message_opcode is None:
@@ -286,47 +327,19 @@ class FrameProtocol(object):
                unfinished_message_decoder is None:
                 unfinished_message_decoder = getincrementaldecoder("utf-8")()
 
-            remaining = header.payload_len
-            frame_finished = False
-            while not frame_finished:
-                # For control frames, we collect all the data and return it as
-                # a single lump. For message frames, we stream out chunks as
-                # they arrive, to minimize buffering.
-                if effective_opcode.iscontrol():
-                    data = yield from self._consume_exactly(remaining)
-                else:
-                    data = yield from self._consume_at_most(remaining)
-                remaining -= len(data)
-                frame_finished = (remaining == 0)
-                message_finished = (frame_finished and header.fin)
+            message_finished = yield from self._parse_frame_payload(
+                opcode=effective_opcode,
+                remaining=header.payload_len,
+                message_decoder=unfinished_message_decoder,
+                masker=masker,
+                fin_flag=header.fin
+            )
 
-                data = self._process_payload_chunk(masker, data)
-                if frame_finished:
-                    data += self._process_payload_complete(header.fin)
-
-                if effective_opcode is Opcode.CLOSE:
-                    data = self._process_CLOSE_payload(data)
-
-                if not effective_opcode.iscontrol():
-                    if unfinished_message_decoder is not None:
-                        try:
-                            data = unfinished_message_decoder.decode(
-                                data, message_finished)
-                        except UnicodeDecodeError as exc:
-                            raise ParseFailed(
-                                str(exc),
-                                CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-                    # This isn't a control, so if this message is finished
-                    # then the unfinished message is also finished.
-                    if message_finished:
-                        unfinished_message_opcode = None
-                        unfinished_message_decoder = None
-
-                yield Frame(
-                     effective_opcode, data, frame_finished, message_finished)
-
-            if effective_opcode is Opcode.CLOSE:
-                break
+            if message_finished and not effective_opcode.iscontrol():
+                # This isn't a control, so if this message is finished
+                # then the unfinished message is also finished.
+                unfinished_message_opcode = None
+                unfinished_message_decoder = None
 
     def receive_bytes(self, data):
         self._buffer += data
