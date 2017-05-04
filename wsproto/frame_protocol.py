@@ -262,7 +262,7 @@ class FrameProtocol(object):
             raise ParseFailed("CLOSE with 1 byte payload")
         else:
             (code,) = struct.unpack("!H", data[:2])
-            if code < MIN_CLOSE_REASON or close > MAX_CLOSE_REASON:
+            if code < MIN_CLOSE_REASON or code > MAX_CLOSE_REASON:
                 raise ParseFailed("CLOSE with invalid code")
             try:
                 code = CloseReason(code)
