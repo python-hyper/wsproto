@@ -1,14 +1,10 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 import os
 import re
 import sys
 
-try:
-    from setuptools import setup
-except ImportError:
-    from distuitls.core import setup
+from setuptools import setup, find_packages
 
 # Get the version
 version_regex = r'__version__ = ["\']([^"\']*)["\']'
@@ -26,24 +22,21 @@ if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload')
     sys.exit()
 
-packages = [
-    'wsproto',
-]
-
 setup(
     name='wsproto',
     version=version,
     description='WebSockets state-machine based protocol implementation',
     author='Benno Rice',
     author_email='benno@jeamland.net',
-    packages=packages,
+    packages=find_packages(),
     package_data={'': ['LICENSE', 'README.md']},
     package_dir={'wsproto': 'wsproto'},
     include_package_data=True,
-    license='BSD License',
+    license='MIT',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
