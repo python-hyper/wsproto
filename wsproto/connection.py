@@ -259,6 +259,9 @@ class WSConnection(object):
         while self._events:
             yield self._events.popleft()
 
+        if self._proto is None:
+            return
+
         try:
             for frame in self._proto.received_frames():
 
