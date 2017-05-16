@@ -4,6 +4,7 @@ import pytest
 from binascii import unhexlify
 from codecs import getincrementaldecoder
 import struct
+import sys
 
 import wsproto.frame_protocol as fp
 import wsproto.extensions as wpext
@@ -241,6 +242,23 @@ class TestMessageDecoder(object):
             payload=payload,
             frame_finished=True,
             message_finished=False,
+        )
+
+        with pytest.raises(fp.ParseFailed) as excinfo:
+            decoder.process_frame(frame)
+        assert excinfo.value.code is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
+    @pytest.mark.skipif(sys.version_info.major == 2,
+                        reason="Python 2.7's utf-8 decoder is too permissive")
+    def test_bad_unicode(self):
+        payload = unhexlify('cebae1bdb9cf83cebcceb5eda080656469746564')
+
+        decoder = fp.MessageDecoder()
+        frame = fp.Frame(
+            opcode=fp.Opcode.TEXT,
+            payload=payload,
+            frame_finished=True,
+            message_finished=True,
         )
 
         with pytest.raises(fp.ParseFailed) as excinfo:
