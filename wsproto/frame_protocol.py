@@ -9,6 +9,7 @@ WebSocket frame protocol implementation.
 import os
 import itertools
 import struct
+import sys
 from codecs import getincrementaldecoder
 from collections import namedtuple
 
@@ -472,6 +473,9 @@ class FrameProtocol(object):
         if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
         elif isinstance(payload, str):
+            opcode = Opcode.TEXT
+            payload = payload.encode('utf-8')
+        elif sys.version_info.major == 2 and isinstance(payload, unicode):
             opcode = Opcode.TEXT
             payload = payload.encode('utf-8')
 

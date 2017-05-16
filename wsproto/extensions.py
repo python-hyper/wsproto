@@ -6,6 +6,7 @@ wsproto/extensions
 WebSocket extensions.
 """
 
+import sys
 import zlib
 
 from .frame_protocol import CloseReason, Opcode
@@ -162,6 +163,9 @@ class PerMessageDeflate(Extension):
         if not self._inbound_compressed or not self._inbound_is_compressible:
             return data
 
+        if sys.version_info.major == 2:
+            data = str(data)
+
         try:
             return self._decompressor.decompress(data)
         except zlib.error:
@@ -207,8 +211,11 @@ class PerMessageDeflate(Extension):
                 bits = self.client_max_window_bits
             else:
                 bits = self.server_max_window_bits
-            self._compressor = zlib.compressobj(wbits=-bits)
+            self._compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
+                                                zlib.DEFLATED, -bits)
 
+        if sys.version_info.major == 2:
+            data = str(data)
         data = self._compressor.compress(data)
 
         if fin:
