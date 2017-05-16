@@ -32,6 +32,10 @@ class XorMaskerNull:
         return data
 
 
+if sys.version_info.major > 2:
+    unicode = str
+
+
 # RFC6455, Section 5.2 - Base Framing Protocol
 
 # Payload length constants
@@ -473,9 +477,6 @@ class FrameProtocol(object):
         if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
         elif isinstance(payload, str):
-            opcode = Opcode.TEXT
-            payload = payload.encode('utf-8')
-        elif sys.version_info.major == 2 and isinstance(payload, unicode):
             opcode = Opcode.TEXT
             payload = payload.encode('utf-8')
 
