@@ -1,4 +1,5 @@
-import asyncio
+import select
+import socket
 
 from wsproto.connection import WSConnection, SERVER, ConnectionRequested, \
                                ConnectionClosed
@@ -7,7 +8,7 @@ from wsproto.extensions import PerMessageDeflate
 
 count = 0
 
-def new_conn(reader, writer):
+def new_conn(sock):
     global count
     print("test_server.py received connection {}".format(count))
     count += 1
@@ -15,8 +16,8 @@ def new_conn(reader, writer):
     closed = False
     while not closed:
         try:
-            data = yield from reader.read(65535)
-        except ConnectionError:
+            data = sock.recv(65535)
+        except socket.error:
             data = None
 
         ws.receive_bytes(data or None)
@@ -34,24 +35,36 @@ def new_conn(reader, writer):
 
         try:
             data = ws.bytes_to_send()
-            writer.write(data)
-            yield from writer.drain()
-        except (ConnectionError, OSError):
+            sock.send(data)
+        except socket.error:
             closed = True
 
-    writer.close()
+    sock.close()
 
-# It's important to get a clean shutdown so that coverage will work
-def shutdown_conn(reader, writer):
-    asyncio.get_event_loop().stop()
+def start_listener(host='127.0.0.1', port=8642, shutdown_port=8643):
+    server = socket.socket()
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind((host, port))
+    server.listen(1)
+    shutdown_server = socket.socket()
+    shutdown_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    shutdown_server.bind((host, shutdown_port))
+    shutdown_server.listen(1)
 
-start_server = asyncio.start_server(new_conn, '127.0.0.1', 8642)
-start_shutdown_watcher = asyncio.start_server(shutdown_conn, '127.0.0.1', 8643)
+    done = False
+    filenos = {s.fileno(): s for s in (server, shutdown_server)}
+
+    while not done:
+        r, _, _ = select.select(filenos.keys(), [], [], 0)
+
+        for sock in [filenos[fd] for fd in r]:
+            if sock is server:
+                new_conn(server.accept()[0])
+            else:
+                done = True
 
 if __name__ == '__main__':
     try:
-        asyncio.get_event_loop().run_until_complete(start_server)
-        asyncio.get_event_loop().run_until_complete(start_shutdown_watcher)
-        asyncio.get_event_loop().run_forever()
+        start_listener()
     except KeyboardInterrupt:
         pass
