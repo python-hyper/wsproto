@@ -24,7 +24,7 @@ class Extension(object):
         return None
 
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
-        pass
+        return (False, False, False)
 
     def frame_inbound_payload_data(self, proto, data):
         return data
@@ -138,9 +138,7 @@ class PerMessageDeflate(Extension):
         return '; '.join(parameters)
 
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
-        if True in rsv[1:]:
-            return CloseReason.PROTOCOL_ERROR
-        elif rsv[0] and opcode.iscontrol():
+        if rsv[0] and opcode.iscontrol():
             return CloseReason.PROTOCOL_ERROR
         elif rsv[0] and opcode is Opcode.CONTINUATION:
             return CloseReason.PROTOCOL_ERROR
@@ -157,6 +155,8 @@ class PerMessageDeflate(Extension):
                     bits = self.client_max_window_bits
                 if self._decompressor is None:
                     self._decompressor = zlib.decompressobj(-bits)
+
+        return (True, False, False)
 
     def frame_inbound_payload_data(self, proto, data):
         if not self._inbound_compressed or not self._inbound_is_compressible:

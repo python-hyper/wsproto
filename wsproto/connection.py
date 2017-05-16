@@ -117,7 +117,7 @@ class WSConnection(object):
         self._nonce = None
         self._outgoing = b''
         self._events = deque()
-        self._proto = FrameProtocol(self.client, self.extensions)
+        self._proto = None
 
         if self.client:
             self._upgrade_connection = h11.Connection(h11.CLIENT)
@@ -338,6 +338,7 @@ class WSConnection(object):
                                             "unrecognized extension {!r}"
                                             .format(name))
 
+        self._proto = FrameProtocol(self.client, self.extensions)
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)
 
@@ -421,4 +422,5 @@ class WSConnection(object):
         response = h11.InformationalResponse(status_code=101,
                                              headers=headers.items())
         self._outgoing += self._upgrade_connection.send(response)
+        self._proto = FrameProtocol(self.client, self.extensions)
         self._state = ConnectionState.OPEN

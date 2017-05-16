@@ -37,8 +37,8 @@ class XorMaskerNull:
 PAYLOAD_LENGTH_TWO_BYTE = 126
 PAYLOAD_LENGTH_EIGHT_BYTE = 127
 MAX_PAYLOAD_NORMAL = 125
-MAX_PAYLOAD_TWO_BYTE = 2 ** 16
-MAX_PAYLOAD_EIGHT_BYTE = 2 ** 64
+MAX_PAYLOAD_TWO_BYTE = 2 ** 16 - 1
+MAX_PAYLOAD_EIGHT_BYTE = 2 ** 64 - 1
 MAX_FRAME_PAYLOAD = MAX_PAYLOAD_EIGHT_BYTE
 
 # MASK and PAYLOAD LEN are packed into a byte
@@ -139,6 +139,233 @@ def _truncate_utf8(data, nbytes):
         return data
 
 
+class Buffer(object):
+    def __init__(self, initial_bytes=None):
+        self.buffer = bytearray()
+        self.bytes_used = 0
+        if initial_bytes:
+            self.feed(initial_bytes)
+
+    def feed(self, new_bytes):
+        self.buffer += new_bytes
+
+    def consume_at_most(self, nbytes):
+        if not nbytes:
+            return bytearray()
+
+        data = self.buffer[self.bytes_used:self.bytes_used + nbytes]
+        self.bytes_used += len(data)
+        return data
+
+    def consume_exactly(self, nbytes):
+        if len(self.buffer) - self.bytes_used < nbytes:
+            return None
+
+        return self.consume_at_most(nbytes)
+
+    def commit(self):
+        # In CPython 3.4+, del[:n] is amortized O(n), *not* quadratic
+        del self.buffer[:self.bytes_used]
+        self.bytes_used = 0
+
+    def rollback(self):
+        self.bytes_used = 0
+
+    def __len__(self):
+        return len(self.buffer)
+
+
+class MessageDecoder(object):
+    def __init__(self):
+        self.opcode = None
+        self.received_first_frame = False
+        self.decoder = None
+
+    def process_frame(self, frame):
+        assert not frame.opcode.iscontrol()
+
+        if self.opcode is None:
+            if frame.opcode is Opcode.CONTINUATION:
+                raise ParseFailed("unexpected CONTINUATION")
+            self.opcode = frame.opcode
+        elif not self.received_first_frame and frame.opcode is not self.opcode:
+            raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
+        elif self.received_first_frame and frame.opcode is not Opcode.CONTINUATION:
+            raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
+
+        if frame.opcode is Opcode.TEXT:
+            self.decoder = getincrementaldecoder("utf-8")()
+
+        finished = frame.frame_finished and frame.message_finished
+        if frame.frame_finished:
+            self.received_first_frame = True
+
+        if self.decoder is not None:
+            try:
+                data = self.decoder.decode(frame.payload, finished)
+            except UnicodeDecodeError as exc:
+                raise ParseFailed(str(exc),
+                                  CloseReason.INVALID_FRAME_PAYLOAD_DATA)
+        else:
+            data = frame.payload
+
+        frame = Frame(self.opcode, data, frame.frame_finished, finished)
+
+        if finished:
+            self.opcode = None
+            self.decoder = None
+            self.received_first_frame = False
+
+        return frame
+
+
+class FrameDecoder(object):
+    def __init__(self, client, extensions=[]):
+        self.client = client
+        self.extensions = extensions
+
+        self.buffer = Buffer()
+
+        self.header = None
+        self.masker = None
+        self.payload_required = 0
+        self.payload_consumed = 0
+
+    def receive_bytes(self, data):
+        self.buffer.feed(data)
+
+    def process_buffer(self):
+        if not self.header:
+            if not self.parse_header():
+                return None
+
+        if len(self.buffer) < self.payload_required:
+            return None
+
+        payload_remaining = self.header.payload_len - self.payload_consumed
+        payload = self.buffer.consume_at_most(payload_remaining)
+        if not payload and self.header.payload_len > 0:
+            return None
+        self.buffer.commit()
+
+        self.payload_consumed += len(payload)
+        finished = self.payload_consumed == self.header.payload_len
+
+        payload = self.masker.process(payload)
+
+        for extension in self.extensions:
+            payload = extension.frame_inbound_payload_data(self, payload)
+            if isinstance(payload, CloseReason):
+                raise ParseFailed("error in extension", payload)
+
+        if finished:
+            final = bytearray()
+            for extension in self.extensions:
+                result = extension.frame_inbound_complete(self,
+                                                          self.header.fin)
+                if isinstance(result, CloseReason):
+                    raise ParseFailed("error in extension", result)
+                if result is not None:
+                    final += result
+            payload += final
+
+        frame = Frame(self.header.opcode, payload, finished,
+                      self.header.fin)
+
+        if finished:
+            self.header = None
+            self.masker = None
+
+        return frame
+
+    def parse_header(self):
+        data = self.buffer.consume_exactly(2)
+        if data is None:
+            self.buffer.rollback()
+            return False
+
+        fin = bool(data[0] & FIN_MASK)
+        rsv = (bool(data[0] & RSV1_MASK),
+               bool(data[0] & RSV2_MASK),
+               bool(data[0] & RSV3_MASK))
+        opcode = data[0] & OPCODE_MASK
+        try:
+            opcode = Opcode(opcode)
+        except ValueError:
+            raise ParseFailed("Invalid opcode {:#x}".format(opcode))
+
+        if opcode.iscontrol() and not fin:
+            raise ParseFailed("Invalid attempt to fragment control frame")
+
+        has_mask = bool(data[1] & MASK_MASK)
+        payload_len = data[1] & PAYLOAD_LEN_MASK
+        payload_len = self.parse_extended_payload_length(opcode, payload_len)
+        if payload_len is None:
+            self.buffer.rollback()
+            return False
+
+        rsv_used = [False, False, False]
+        for extension in self.extensions:
+            result = extension.frame_inbound_header(self, opcode, rsv,
+                                                    payload_len)
+            if isinstance(result, CloseReason):
+                raise ParseFailed("error in extension", result)
+            for bit, used in enumerate(result):
+                if used:
+                    rsv_used[bit] = True
+        for expected, found in zip(rsv_used, rsv):
+            if found and not expected:
+                raise ParseFailed("Reserved bit set unexpectedly")
+
+        if has_mask and self.client:
+            raise ParseFailed("client received unexpected masked frame")
+        if not has_mask and not self.client:
+            raise ParseFailed("server received unexpected unmasked frame")
+        if has_mask:
+            masking_key = self.buffer.consume_exactly(4)
+            if masking_key is None:
+                self.buffer.rollback()
+                return False
+            self.masker = XorMaskerSimple(masking_key)
+        else:
+            self.masker = XorMaskerNull()
+
+        self.buffer.commit()
+        self.header = Header(fin, rsv, opcode, payload_len, None)
+        if self.header.opcode.iscontrol():
+            self.payload_required = payload_len
+        else:
+            self.payload_required = 0
+        self.payload_consumed = 0
+        return True
+
+    def parse_extended_payload_length(self, opcode, payload_len):
+        if opcode.iscontrol() and payload_len > MAX_PAYLOAD_NORMAL:
+            raise ParseFailed("Control frame with payload len > 125")
+        if payload_len == PAYLOAD_LENGTH_TWO_BYTE:
+            data = self.buffer.consume_exactly(2)
+            if data is None:
+                return None
+            (payload_len,) = struct.unpack("!H", data)
+            if payload_len <= MAX_PAYLOAD_NORMAL:
+                raise ParseFailed(
+                    "Payload length used 2 bytes when 1 would have sufficed")
+        elif payload_len == PAYLOAD_LENGTH_EIGHT_BYTE:
+            data = self.buffer.consume_exactly(8)
+            if data is None:
+                return None
+            (payload_len,) = struct.unpack("!Q", data)
+            if payload_len <= MAX_PAYLOAD_TWO_BYTE:
+                raise ParseFailed(
+                    "Payload length used 8 bytes when 2 would have sufficed")
+            if payload_len >> 63:
+                # I'm not sure why this is illegal, but that's what the RFC
+                # says, so...
+                raise ParseFailed("8-byte payload length with non-zero MSB")
+
+        return payload_len
+
+
 class FrameProtocol(object):
     class State(Enum):
         HEADER = 1
@@ -151,113 +378,20 @@ class FrameProtocol(object):
         self.extensions = extensions
 
         # Global state
-        self._buffer = bytearray()
+        extensions = [ext for ext in self.extensions if ext.enabled()]
+        self._frame_decoder = FrameDecoder(self.client, extensions=extensions)
+        self._message_decoder = MessageDecoder()
         self._parse_more = self.parse_more_gen()
 
         self._outbound_opcode = None
 
-    def _consume_at_most(self, nbytes):
-        if not nbytes:
-            return bytearray()
-        while not self._buffer:
-            yield
-        data = self._buffer[:nbytes]
-        # In CPython 3.4+, del[:n] is amortized O(n), *not* quadratic
-        del self._buffer[:nbytes]
-        return data
+    def _process_close(self, frame):
+        data = frame.payload
 
-    def _consume_exactly(self, nbytes):
-        while len(self._buffer) < nbytes:
-            yield
-        return (yield from self._consume_at_most(nbytes))
-
-    def _parse_extended_payload_length(self, opcode, payload_len):
-        if opcode.iscontrol() and payload_len > MAX_PAYLOAD_NORMAL:
-            raise ParseFailed("Control frame with payload len > 125")
-        if payload_len == PAYLOAD_LENGTH_TWO_BYTE:
-            data = yield from self._consume_exactly(2)
-            (payload_len,) = struct.unpack("!H", data)
-            if payload_len <= MAX_PAYLOAD_NORMAL:
-                raise ParseFailed(
-                    "Payload length used 2 bytes when 1 would have sufficed")
-        elif payload_len == PAYLOAD_LENGTH_EIGHT_BYTE:
-            data = yield from self._consume_exactly(8)
-            (payload_len,) = struct.unpack("!Q", data)
-            if payload_len < MAX_PAYLOAD_TWO_BYTE:
-                raise ParseFailed(
-                    "Payload length used 8 bytes when 2 would have sufficed")
-            if payload_len >> 63:
-                # I'm not sure why this is illegal, but that's what the RFC
-                # says, so...
-                raise ParseFailed("8-byte payload length with non-zero MSB")
-
-        return payload_len
-
-    def _parse_header(self):
-        # returns a Header object
-        (fin_rsv_opcode,) = yield from self._consume_exactly(1)
-        fin = bool(fin_rsv_opcode & FIN_MASK)
-        rsv = (bool(fin_rsv_opcode & RSV1_MASK),
-               bool(fin_rsv_opcode & RSV2_MASK),
-               bool(fin_rsv_opcode & RSV3_MASK))
-        opcode = fin_rsv_opcode & OPCODE_MASK
-        try:
-            opcode = Opcode(opcode)
-        except ValueError:
-            raise ParseFailed("Invalid opcode {:#x}".format(opcode))
-
-        if opcode.iscontrol() and not fin:
-            raise ParseFailed("Invalid attempt to fragment control frame")
-
-        (mask_len,) = yield from self._consume_exactly(1)
-        has_mask = bool(mask_len & MASK_MASK)
-        payload_len = mask_len & PAYLOAD_LEN_MASK
-        payload_len = yield from self._parse_extended_payload_length(
-            opcode, payload_len
-        )
-
-        for extension in self.extensions:
-            result = extension.frame_inbound_header(
-                self, opcode, rsv, payload_len)
-            if result is not None:
-                raise ParseFailed("error in extension", result)
-        if not self.extensions and True in rsv:
-            raise ParseFailed("Reserved bit set unexpectedly")
-
-        if has_mask and self.client:
-            raise ParseFailed("client received unexpected masked frame")
-        if not has_mask and not self.client:
-            raise ParseFailed("server received unexpected unmasked frame")
-        if has_mask:
-            masking_key = yield from self._consume_exactly(4)
-        else:
-            masking_key = NULL_MASK
-
-        return Header(fin, rsv, opcode, payload_len, masking_key)
-
-    def _process_payload_chunk(self, masker, data):
-        data = masker.process(data)
-        for extension in self.extensions:
-            data = extension.frame_inbound_payload_data(self, data)
-            if isinstance(data, CloseReason):
-                raise ParseFailed("error in extension", data)
-        return data
-
-    def _process_payload_complete(self, fin):
-        final = bytearray()
-        for extension in self.extensions:
-            result = extension.frame_inbound_complete(self, fin)
-            if isinstance(result, CloseReason):
-                raise ParseFailed("error in extension", result)
-            if result is not None:
-                final += result
-        return final
-
-    def _process_CLOSE_payload(self, data):
         if len(data) == 0:
             # "If this Close control frame contains no status code, _The
             # WebSocket Connection Close Code_ is considered to be 1005"
-            return (CloseReason.NO_STATUS_RCVD, "")
+            data = (CloseReason.NO_STATUS_RCVD, "")
         elif len(data) == 1:
             raise ParseFailed("CLOSE with 1 byte payload")
         else:
@@ -281,47 +415,10 @@ class FrameProtocol(object):
                 raise ParseFailed(
                     "Error decoding CLOSE reason: " + str(exc),
                     CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-            return (code, reason)
+            data = (code, reason)
 
-    def _parse_frame_payload(self,
-                             opcode,
-                             remaining,
-                             message_decoder,
-                             masker,
-                             fin_flag):
-        frame_finished = False
-        message_finished = False
-        while not frame_finished:
-            # For control frames, we collect all the data and return it as
-            # a single lump. For message frames, we stream out chunks as
-            # they arrive, to minimize buffering.
-            if opcode.iscontrol():
-                data = yield from self._consume_exactly(remaining)
-            else:
-                data = yield from self._consume_at_most(remaining)
-            remaining -= len(data)
-            frame_finished = (remaining == 0)
-            message_finished = (frame_finished and fin_flag)
-
-            data = self._process_payload_chunk(masker, data)
-            if frame_finished:
-                data += self._process_payload_complete(fin_flag)
-
-            if opcode is Opcode.CLOSE:
-                data = self._process_CLOSE_payload(data)
-
-            if not opcode.iscontrol():
-                if message_decoder is not None:
-                    try:
-                        data = message_decoder.decode(data, message_finished)
-                    except UnicodeDecodeError as exc:
-                        raise ParseFailed(
-                            str(exc),
-                            CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-
-            yield Frame(opcode, data, frame_finished, message_finished)
-
-        return message_finished
+        return Frame(frame.opcode, data, frame.frame_finished,
+                     frame.message_finished)
 
     def parse_more_gen(self):
         # Consume as much as we can from self._buffer, yielding events, and
@@ -330,55 +427,22 @@ class FrameProtocol(object):
         # XX FIXME this should probably be refactored so that we never see
         # disabled extensions in the first place...
         self.extensions = [ext for ext in self.extensions if ext.enabled()]
+        closed = False
 
-        unfinished_message_opcode = None
-        unfinished_message_decoder = None
-        effective_opcode = None
-        while effective_opcode is not Opcode.CLOSE:
-            header = yield from self._parse_header()
+        while not closed:
+            frame = self._frame_decoder.process_buffer()
 
-            if unfinished_message_opcode is None:
-                if header.opcode is Opcode.CONTINUATION:
-                    raise ParseFailed("unexpected CONTINUATION")
-                elif not header.opcode.iscontrol():
-                    # Neither CONTINUATION nor control -> starting a new
-                    # unfinished message
-                    unfinished_message_opcode = header.opcode
-            elif not header.opcode.iscontrol():
-                # We're in the middle of an unfinished message
-                if header.opcode is not Opcode.CONTINUATION:
-                    raise ParseFailed("expected CONTINUATION, not {!r}"
-                                      .format(header.opcode))
+            if frame is not None:
+                if not frame.opcode.iscontrol():
+                    frame = self._message_decoder.process_frame(frame)
+                elif frame.opcode == Opcode.CLOSE:
+                    frame = self._process_close(frame)
+                    closed = True
 
-            effective_opcode = header.opcode
-            if effective_opcode is Opcode.CONTINUATION:
-                effective_opcode = unfinished_message_opcode
-
-            if header.masking_key == NULL_MASK:
-                masker = XorMaskerNull()
-            else:
-                masker = XorMaskerSimple(header.masking_key)
-
-            if unfinished_message_opcode is Opcode.TEXT and \
-               unfinished_message_decoder is None:
-                unfinished_message_decoder = getincrementaldecoder("utf-8")()
-
-            message_finished = yield from self._parse_frame_payload(
-                opcode=effective_opcode,
-                remaining=header.payload_len,
-                message_decoder=unfinished_message_decoder,
-                masker=masker,
-                fin_flag=header.fin
-            )
-
-            if message_finished and not effective_opcode.iscontrol():
-                # This isn't a control, so if this message is finished
-                # then the unfinished message is also finished.
-                unfinished_message_opcode = None
-                unfinished_message_decoder = None
+            yield frame
 
     def receive_bytes(self, data):
-        self._buffer += data
+        self._frame_decoder.receive_bytes(data)
 
     def received_frames(self):
         for event in self._parse_more:
