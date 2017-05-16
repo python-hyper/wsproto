@@ -179,7 +179,7 @@ class Buffer(object):
 class MessageDecoder(object):
     def __init__(self):
         self.opcode = None
-        self.received_first_frame = False
+        self.seen_first_frame = False
         self.decoder = None
 
     def process_frame(self, frame):
@@ -189,9 +189,9 @@ class MessageDecoder(object):
             if frame.opcode is Opcode.CONTINUATION:
                 raise ParseFailed("unexpected CONTINUATION")
             self.opcode = frame.opcode
-        elif not self.received_first_frame and frame.opcode is not self.opcode:
+        elif not self.seen_first_frame and frame.opcode is not self.opcode:
             raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
-        elif self.received_first_frame and frame.opcode is not Opcode.CONTINUATION:
+        elif self.seen_first_frame and frame.opcode is not Opcode.CONTINUATION:
             raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
 
         if frame.opcode is Opcode.TEXT:
@@ -199,7 +199,7 @@ class MessageDecoder(object):
 
         finished = frame.frame_finished and frame.message_finished
         if frame.frame_finished:
-            self.received_first_frame = True
+            self.seen_first_frame = True
 
         if self.decoder is not None:
             try:
@@ -215,7 +215,7 @@ class MessageDecoder(object):
         if finished:
             self.opcode = None
             self.decoder = None
-            self.received_first_frame = False
+            self.seen_first_frame = False
 
         return frame
 

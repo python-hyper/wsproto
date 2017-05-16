@@ -96,7 +96,7 @@ class TestMessageDecoder(object):
         payload = b'x' * 23
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.BINARY
-        decoder.received_first_frame = True
+        decoder.seen_first_frame = True
         frame = fp.Frame(
             opcode=fp.Opcode.CONTINUATION,
             payload=payload,
@@ -130,7 +130,7 @@ class TestMessageDecoder(object):
         binary_payload = text_payload.encode('utf8')
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.TEXT
-        decoder.received_first_frame = True
+        decoder.seen_first_frame = True
         decoder.decoder = getincrementaldecoder("utf-8")()
 
         assert decoder.decoder.decode(binary_payload[:4]) == text_payload[:2]
@@ -154,7 +154,7 @@ class TestMessageDecoder(object):
         binary_payload = text_payload.encode('utf8')
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.TEXT
-        decoder.received_first_frame = True
+        decoder.seen_first_frame = True
         decoder.decoder = getincrementaldecoder("utf-8")()
 
         assert decoder.decoder.decode(binary_payload[:-2]) == text_payload[:-1]
@@ -190,7 +190,7 @@ class TestMessageDecoder(object):
         payload = b'x' * 23
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.BINARY
-        decoder.received_first_frame = True
+        decoder.seen_first_frame = True
         frame = fp.Frame(
             opcode=fp.Opcode.BINARY,
             payload=payload,
