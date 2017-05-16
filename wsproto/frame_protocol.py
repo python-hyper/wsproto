@@ -20,7 +20,7 @@ try:
 except ImportError:
     class XorMaskerSimple:
         def __init__(self, masking_key):
-            self._maskbytes = itertools.cycle(masking_key)
+            self._maskbytes = itertools.cycle(bytearray(masking_key))
 
         def process(self, data):
             maskbytes = self._maskbytes
