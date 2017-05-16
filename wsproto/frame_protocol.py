@@ -24,7 +24,7 @@ except ImportError:
 
         def process(self, data):
             maskbytes = self._maskbytes
-            return bytearray(b ^ next(maskbytes) for b in data)
+            return bytearray(b ^ next(maskbytes) for b in bytearray(data))
 
 
 class XorMaskerNull:
