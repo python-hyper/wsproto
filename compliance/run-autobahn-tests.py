@@ -58,8 +58,24 @@ CASES = {
         # At one point these were catching a unique bug that none of the
         # above were -- they're relatively quick and involve
         # fragmentation.
-        + ["12.1.11", "12.1.12", "13.1.11", "13.1.12"]
-    ,
+        + ["12.1.11", "12.1.12", "13.1.11", "13.1.12"],
+    "py27":
+        # Python 2.7 has an overly permissive UTF-8 decoder so skip any test
+        # that relies on UTF-8 decoder failure.
+        ["{}.*".format(i) for i in range(1, 6)]
+        + ["6.{}.*".format(i) for i in range(1, 24) if i not in (3, 4, 20, 21)]
+        + ["6.4.{}".format(i) for i in range(1, 5) if i not in (2,)]
+        + ["7.{}.*".format(i) for i in range(1, 14) if i not in (5, )]
+        + ["{}.*".format(i) for i in range(8, 14)],
+    "py27-fast":
+        # As above but excluding slower compression tests.
+        ["{}.*".format(i) for i in range(1, 6)]
+        + ["6.{}.*".format(i) for i in range(1, 24) if i not in (3, 4, 20, 21)]
+        + ["6.4.{}".format(i) for i in range(1, 5) if i not in (2,)]
+        + ["7.{}.*".format(i) for i in range(1, 14) if i not in (5, )]
+        + ["{}.*".format(i) for i in range(8, 12)]
+        + ["12.*.[1234]$", "13.*.[1234]$"]
+        + ["12.1.11", "12.1.12", "13.1.11", "13.1.12"],
 }
 
 def say(*args):
@@ -188,9 +204,13 @@ def main():
     parser.add_argument("MODE", help="'client' or 'server'")
     # can do e.g.
     #   --cases='["1.*"]'
+    if sys.version_info.major == 2:
+        default_cases = "py27-fast"
+    else:
+        default_cases = "fast"
     parser.add_argument("--cases",
                         help="'fast' or 'all' or a JSON list",
-                        default="fast")
+                        default=default_cases)
     parser.add_argument("--cov", help="enable coverage", action="store_true")
 
     args = parser.parse_args()
