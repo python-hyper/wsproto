@@ -23,7 +23,7 @@ except ImportError:
 
         def process(self, data):
             maskbytes = self._maskbytes
-            return bytes(b ^ next(maskbytes) for b in data)
+            return bytearray(b ^ next(maskbytes) for b in data)
 
 
 class XorMaskerNull:
@@ -112,7 +112,7 @@ NULL_MASK = struct.pack("!I", 0)
 
 class ParseFailed(Exception):
     def __init__(self, msg, code=CloseReason.PROTOCOL_ERROR):
-        super().__init__(msg)
+        super(ParseFailed, self).__init__(msg)
         self.code = code
 
 
@@ -458,7 +458,7 @@ class FrameProtocol(object):
         if code in LOCAL_ONLY_CLOSE_REASONS:
             code = CloseReason.NORMAL_CLOSURE
         if code is not None:
-            payload += struct.pack('!H', code)
+            payload += bytearray(struct.pack('!H', code))
             if reason is not None:
                 payload += _truncate_utf8(reason.encode('utf-8'),
                                           MAX_PAYLOAD_NORMAL - 2)
@@ -519,14 +519,14 @@ class FrameProtocol(object):
         if self.client:
             first_payload |= 1 << 7
 
-        header = bytes([fin_rsv_opcode, first_payload])
+        header = bytearray([fin_rsv_opcode, first_payload])
         if second_payload is not None:
             if opcode.iscontrol():
                 raise ValueError("payload too long for control frame")
             if quad_payload:
-                header += struct.pack('!Q', second_payload)
+                header += bytearray(struct.pack('!Q', second_payload))
             else:
-                header += struct.pack('!H', second_payload)
+                header += bytearray(struct.pack('!H', second_payload))
 
         if self.client:
             # "The masking key is a 32-bit value chosen at random by the

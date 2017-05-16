@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import pytest
 from binascii import unhexlify
 from codecs import getincrementaldecoder
@@ -508,8 +510,8 @@ class TestFrameDecoder(object):
         )
 
     def test_not_enough_for_mask(self):
-        payload = b'xy'
-        mask = b'abcd'
+        payload = bytearray(b'xy')
+        mask = bytearray(b'abcd')
         masked_payload = bytearray([
             payload[0] ^ mask[0],
             payload[1] ^ mask[1]
@@ -619,7 +621,7 @@ class TestFrameDecoderExtensions(object):
             if self._fail_inbound_complete:
                 return fp.CloseReason.ABNORMAL_CLOSURE
             if fin and self._rsv_bit_set:
-                return '™'.encode('utf-8')
+                return u'™'.encode('utf-8')
 
     def test_rsv_bit(self):
         ext = self.FakeExtension()
@@ -776,15 +778,15 @@ def test_close_with_long_reason():
     proto = fp.FrameProtocol(client=False, extensions=[])
     data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE,
                        reason="x" * 200)
-    assert data == unhexlify("887d03e8") + b"x" * 123
+    assert data == bytearray(unhexlify("887d03e8")) + b"x" * 123
 
     # While preserving valid utf-8
     proto = fp.FrameProtocol(client=False, extensions=[])
     # pound sign is 2 bytes in utf-8, so naive truncation to 123 bytes will
     # cut it in half. Instead we truncate to 122 bytes.
     data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE,
-                       reason="£" * 100)
-    assert data == unhexlify("887c03e8") + "£".encode("utf-8") * 61
+                       reason=u"£" * 100)
+    assert data == unhexlify("887c03e8") + u"£".encode("utf-8") * 61
 
 
 def test_payload_length_decode():
