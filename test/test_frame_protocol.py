@@ -248,8 +248,6 @@ class TestMessageDecoder(object):
             decoder.process_frame(frame)
         assert excinfo.value.code is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
-    @pytest.mark.skipif(sys.version_info.major == 2,
-                        reason="Python 2.7's utf-8 decoder is too permissive")
     def test_bad_unicode(self):
         payload = unhexlify('cebae1bdb9cf83cebcceb5eda080656469746564')
 
