@@ -447,7 +447,6 @@ class TestFrameDecoder(object):
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
 
-
     def test_long_message_frame(self):
         payload = b'x' * 512
         payload_len = struct.pack('!H', len(payload))
