@@ -631,6 +631,17 @@ class TestFrameDecoder(object):
             split=65535,
         )
 
+    def test_overly_long_control_frame(self):
+        payload = b'x' * 128
+        payload_len = struct.pack('!H', len(payload))
+        frame_bytes = b'\x89\x7e' + payload_len + payload
+
+        self._parse_failure_test(
+            client=True,
+            frame_bytes=frame_bytes,
+            close_reason=fp.CloseReason.PROTOCOL_ERROR,
+        )
+
 
 class TestFrameDecoderExtensions(object):
     class FakeExtension(wpext.Extension):
