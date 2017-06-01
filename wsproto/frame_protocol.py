@@ -188,7 +188,6 @@ class Buffer(object):
 class MessageDecoder(object):
     def __init__(self):
         self.opcode = None
-        self.seen_first_frame = False
         self.validator = None
         self.decoder = None
 
@@ -199,9 +198,7 @@ class MessageDecoder(object):
             if frame.opcode is Opcode.CONTINUATION:
                 raise ParseFailed("unexpected CONTINUATION")
             self.opcode = frame.opcode
-        elif not self.seen_first_frame and frame.opcode is not self.opcode:
-            raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
-        elif self.seen_first_frame and frame.opcode is not Opcode.CONTINUATION:
+        elif frame.opcode is not Opcode.CONTINUATION:
             raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
 
         if frame.opcode is Opcode.TEXT:
@@ -210,8 +207,6 @@ class MessageDecoder(object):
             self.decoder = getincrementaldecoder("utf-8")()
 
         finished = frame.frame_finished and frame.message_finished
-        if frame.frame_finished:
-            self.seen_first_frame = True
 
         if self.decoder is not None:
             data = self.decode_payload(frame.payload, finished)
@@ -249,6 +244,7 @@ class FrameDecoder(object):
         self.buffer = Buffer()
 
         self.header = None
+        self.effective_opcode = None
         self.masker = None
         self.payload_required = 0
         self.payload_consumed = 0
@@ -291,12 +287,15 @@ class FrameDecoder(object):
                     final += result
             payload += final
 
-        frame = Frame(self.header.opcode, payload, finished,
+        frame = Frame(self.effective_opcode, payload, finished,
                       self.header.fin)
 
         if finished:
             self.header = None
+            self.effective_opcode = None
             self.masker = None
+        elif not self.effective_opcode.iscontrol():
+            self.effective_opcode = Opcode.CONTINUATION
 
         return frame
 
@@ -343,6 +342,7 @@ class FrameDecoder(object):
 
         self.buffer.commit()
         self.header = Header(fin, rsv, opcode, payload_len, None)
+        self.effective_opcode = self.header.opcode
         if self.header.opcode.iscontrol():
             self.payload_required = payload_len
         else:

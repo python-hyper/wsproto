@@ -282,7 +282,7 @@ class TestMessageDecoder(object):
         assert frame.payload == text_payload[:split]
 
         frame = fp.Frame(
-            opcode=fp.Opcode.TEXT,
+            opcode=fp.Opcode.CONTINUATION,
             payload=payload[split:],
             frame_finished=True,
             message_finished=True
@@ -291,6 +291,35 @@ class TestMessageDecoder(object):
         assert frame.opcode is fp.Opcode.TEXT
         assert frame.message_finished is True
         assert frame.payload == text_payload[split:]
+
+    def test_split_unicode_message(self):
+        text_payload = u'∂' * 64
+        payload = text_payload.encode('utf-8')
+        split = 64
+
+        decoder = fp.MessageDecoder()
+
+        frame = fp.Frame(
+            opcode=fp.Opcode.TEXT,
+            payload=payload[:split],
+            frame_finished=False,
+            message_finished=True
+        )
+        frame = decoder.process_frame(frame)
+        assert frame.opcode is fp.Opcode.TEXT
+        assert frame.message_finished is False
+        assert frame.payload == text_payload[:(split // 3)]
+
+        frame = fp.Frame(
+            opcode=fp.Opcode.CONTINUATION,
+            payload=payload[split:],
+            frame_finished=True,
+            message_finished=True
+        )
+        frame = decoder.process_frame(frame)
+        assert frame.opcode is fp.Opcode.TEXT
+        assert frame.message_finished is True
+        assert frame.payload == text_payload[(split // 3):]
 
 
 class TestFrameDecoder(object):
@@ -332,7 +361,7 @@ class TestFrameDecoder(object):
         decoder.receive_bytes(frame_bytes[split:])
         frame = decoder.process_buffer()
         assert frame is not None
-        assert frame.opcode is opcode
+        assert frame.opcode is fp.Opcode.CONTINUATION
         assert frame.payload == payload[-len(frame.payload):]
         assert frame.frame_finished is True
         assert frame.message_finished is True
@@ -556,6 +585,7 @@ class TestFrameDecoder(object):
         assert decoder.process_buffer() is None
         frame_bytes = frame_bytes[header_len:]
         payload_sent = 0
+        expected_opcode = fp.Opcode.TEXT
         for offset in range(0, len(frame_bytes), chunk_size):
             chunk = frame_bytes[offset:offset + chunk_size]
             decoder.receive_bytes(chunk)
@@ -563,10 +593,12 @@ class TestFrameDecoder(object):
             payload_sent += chunk_size
             all_payload_sent = payload_sent == len(payload)
             assert frame is not None
-            assert frame.opcode is fp.Opcode.TEXT
+            assert frame.opcode is expected_opcode
             assert frame.frame_finished is all_payload_sent
             assert frame.message_finished is True
             assert frame.payload == payload[offset:offset + chunk_size]
+
+            expected_opcode = fp.Opcode.CONTINUATION
 
     def test_partial_control_frame(self):
         chunk_size = 11
@@ -788,6 +820,50 @@ class TestFrameProtocolReceive(object):
         assert frame.opcode == fp.Opcode.TEXT
         assert len(frame.payload) == len(payload)
         assert frame.payload == payload
+
+    def _close_test(self, code, reason=None, reason_bytes=None):
+        payload = struct.pack('!H', code)
+        if reason:
+            payload += reason.encode('utf8')
+        elif reason_bytes:
+            payload += reason_bytes
+
+        frame_bytes = b'\x88' + bytearray([len(payload)]) + payload
+
+        protocol = fp.FrameProtocol(client=True, extensions=[])
+        protocol.receive_bytes(frame_bytes)
+        frames = list(protocol.received_frames())
+        assert len(frames) == 1
+        frame = frames[0]
+        assert frame.opcode == fp.Opcode.CLOSE
+        assert frame.payload[0] == code
+        if reason:
+            assert frame.payload[1] == reason
+        else:
+            assert not frame.payload[1]
+
+    def test_close_no_payload(self):
+        self._close_test(fp.CloseReason.NORMAL_CLOSURE)
+
+    def test_close_easy_payload(self):
+        self._close_test(fp.CloseReason.NORMAL_CLOSURE, u'tarah old chap')
+
+    def test_close_utf8_payload(self):
+        self._close_test(fp.CloseReason.NORMAL_CLOSURE, u'fñør∂')
+
+    def test_close_bad_utf8_payload(self):
+        payload = unhexlify('cebae1bdb9cf83cebcceb5eda080656469746564')
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(fp.CloseReason.NORMAL_CLOSURE,
+                             reason_bytes=payload)
+        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
+    def test_close_incomplete_utf8_payload(self):
+        payload = u'fñør∂'.encode('utf8')[:-1]
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(fp.CloseReason.NORMAL_CLOSURE,
+                             reason_bytes=payload)
+        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
 
 def test_close_with_long_reason():
