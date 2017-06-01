@@ -21,7 +21,7 @@ def get_case_count(server):
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
-    sock.send(connection.bytes_to_send())
+    sock.sendall(connection.bytes_to_send())
 
     case_count = None
     while case_count is None:
@@ -35,7 +35,7 @@ def get_case_count(server):
                     case_count = json.loads(data)
                     connection.close()
             try:
-                sock.send(connection.bytes_to_send())
+                sock.sendall(connection.bytes_to_send())
             except (ConnectionError, OSError):
                 break
 
@@ -50,7 +50,7 @@ def run_case(server, case, agent):
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
-    sock.send(connection.bytes_to_send())
+    sock.sendall(connection.bytes_to_send())
     closed = False
 
     while not closed:
@@ -70,7 +70,7 @@ def run_case(server, case, agent):
             break
         try:
             data = connection.bytes_to_send()
-            sock.send(data)
+            sock.sendall(data)
         except (ConnectionError, OSError):
             closed = True
             break
@@ -82,7 +82,7 @@ def update_reports(server, agent):
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
-    sock.send(connection.bytes_to_send())
+    sock.sendall(connection.bytes_to_send())
     closed = False
 
     while not closed:
@@ -91,7 +91,7 @@ def update_reports(server, agent):
         for event in connection.events():
             if isinstance(event, ConnectionEstablished):
                 connection.close()
-                sock.send(connection.bytes_to_send())
+                sock.sendall(connection.bytes_to_send())
                 try:
                     sock.close()
                 except (ConnectionError, OSError):

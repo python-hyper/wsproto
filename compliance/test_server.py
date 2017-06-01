@@ -35,7 +35,7 @@ def new_conn(sock):
 
         try:
             data = ws.bytes_to_send()
-            sock.send(data)
+            sock.sendall(data)
         except socket.error:
             closed = True
 
