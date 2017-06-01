@@ -125,7 +125,7 @@ except ImportError:
             """
             #
             # The code here is written for optimal JITting in PyPy, not for best
-            # readability by your grandma or particular elegance. Do NOT touch!
+            # readability or particular elegance. Do NOT touch!
             #
             l = len(ba)
             i = 0
