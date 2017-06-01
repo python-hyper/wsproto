@@ -401,11 +401,10 @@ class FrameProtocol(object):
 
     def __init__(self, client, extensions):
         self.client = client
-        self.extensions = extensions
+        self.extensions = [ext for ext in extensions if ext.enabled()]
 
         # Global state
-        extensions = [ext for ext in self.extensions if ext.enabled()]
-        self._frame_decoder = FrameDecoder(self.client, extensions=extensions)
+        self._frame_decoder = FrameDecoder(self.client, self.extensions)
         self._message_decoder = MessageDecoder()
         self._parse_more = self.parse_more_gen()
 
