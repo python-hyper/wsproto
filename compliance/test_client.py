@@ -1,16 +1,16 @@
 import json
 import socket
-import sys
 
-if sys.version_info.major == 2:
-    from urlparse import urlparse
-else:
-    from urllib.parse import urlparse
-
+from wsproto.compat import PY2
 from wsproto.connection import WSConnection, CLIENT, ConnectionEstablished, \
                                ConnectionClosed
 from wsproto.events import TextReceived, DataReceived
 from wsproto.extensions import PerMessageDeflate
+
+if PY2:
+    from urlparse import urlparse
+else:
+    from urllib.parse import urlparse
 
 SERVER = 'ws://127.0.0.1:8642'
 AGENT = 'wsproto'
