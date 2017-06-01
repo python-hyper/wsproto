@@ -84,6 +84,8 @@ def wait_for_listener(port):
                 raise
         else:
             return
+        finally:
+            sock.close()
 
 def coverage(command, coverage_settings):
     if not coverage_settings["enabled"]:
