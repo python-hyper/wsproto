@@ -223,14 +223,13 @@ class MessageDecoder(object):
         if finished:
             self.opcode = None
             self.decoder = None
-            self.seen_first_frame = False
 
         return frame
 
     def decode_payload(self, data, finished):
         if self.validator is not None:
             results = self.validator.validate(str(data))
-            if not results[0]:
+            if not results[0] or (finished and not results[1]):
                 raise ParseFailed(u'encountered invalid UTF-8 while processing'
                                   ' text message at payload octet index %d' %
                                   results[3],
@@ -436,7 +435,7 @@ class FrameProtocol(object):
                     "CLOSE with unknown reserved code")
             if PY2:
                 results = Utf8Validator().validate(str(data[2:]))
-                if not results[0]:
+                if not (results[0] and results[1]):
                     raise ParseFailed(u'encountered invalid UTF-8 while'
                                       ' processing close message at payload'
                                       ' octet index %d' %
