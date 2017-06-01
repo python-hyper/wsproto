@@ -4,7 +4,6 @@ import pytest
 from binascii import unhexlify
 from codecs import getincrementaldecoder
 import struct
-import sys
 
 import wsproto.frame_protocol as fp
 import wsproto.extensions as wpext
