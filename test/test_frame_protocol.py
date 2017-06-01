@@ -601,6 +601,7 @@ class TestFrameDecoder(object):
             split=65535,
         )
 
+
 class TestFrameDecoderExtensions(object):
     class FakeExtension(wpext.Extension):
         name = 'fake'
@@ -620,7 +621,7 @@ class TestFrameDecoderExtensions(object):
             if opcode is fp.Opcode.PONG:
                 return fp.CloseReason.MANDATORY_EXT
             self._rsv_bit_set = rsv[2]
-            return (False, False, True)
+            return fp.RsvBits(False, False, True)
 
         def frame_inbound_payload_data(self, proto, data):
             self._inbound_payload_data_called = True

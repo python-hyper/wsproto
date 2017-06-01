@@ -130,6 +130,9 @@ Frame = namedtuple("Frame",
                    "opcode payload frame_finished message_finished".split())
 
 
+RsvBits = namedtuple("RsvBits", "rsv1 rsv2 rsv3".split())
+
+
 def _truncate_utf8(data, nbytes):
     if len(data) <= nbytes:
         return data
@@ -305,9 +308,9 @@ class FrameDecoder(object):
             return False
 
         fin = bool(data[0] & FIN_MASK)
-        rsv = (bool(data[0] & RSV1_MASK),
-               bool(data[0] & RSV2_MASK),
-               bool(data[0] & RSV3_MASK))
+        rsv = RsvBits(bool(data[0] & RSV1_MASK),
+                      bool(data[0] & RSV2_MASK),
+                      bool(data[0] & RSV3_MASK))
         opcode = data[0] & OPCODE_MASK
         try:
             opcode = Opcode(opcode)
@@ -519,13 +522,13 @@ class FrameProtocol(object):
         return self._serialize_frame(opcode, payload, fin)
 
     def _serialize_frame(self, opcode, payload=b'', fin=True):
-        rsv = (False, False, False)
+        rsv = RsvBits(False, False, False)
         for extension in reversed(self.extensions):
             if not extension.enabled():
                 continue
 
-            rsv, payload = extension.frame_outbound(
-                self, opcode, rsv, payload, fin)
+            rsv, payload = extension.frame_outbound(self, opcode, rsv, payload,
+                                                    fin)
 
         fin_rsv = 0
         for bit in rsv:
