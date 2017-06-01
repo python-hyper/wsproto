@@ -505,7 +505,7 @@ class FrameProtocol(object):
     def send_data(self, payload=b'', fin=True):
         if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
-        elif isinstance(payload, (str, unicode)):
+        elif isinstance(payload, unicode):
             opcode = Opcode.TEXT
             payload = payload.encode('utf-8')
 
