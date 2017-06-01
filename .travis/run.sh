@@ -44,7 +44,7 @@ case "$MODE" in
         pip install coverage
 
         cd compliance/
-        python run-autobahn-tests.py --cov --cases=fast "$SIDE"
+        python run-autobahn-tests.py --cov "$SIDE"
 
         pip install codecov && codecov
         ;;

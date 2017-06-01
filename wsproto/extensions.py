@@ -8,7 +8,8 @@ WebSocket extensions.
 
 import zlib
 
-from .frame_protocol import CloseReason, Opcode
+from .compat import PY2
+from .frame_protocol import CloseReason, Opcode, RsvBits
 
 
 class Extension(object):
@@ -24,7 +25,7 @@ class Extension(object):
         return None
 
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
-        pass
+        return RsvBits(False, False, False)
 
     def frame_inbound_payload_data(self, proto, data):
         return data
@@ -138,17 +139,15 @@ class PerMessageDeflate(Extension):
         return '; '.join(parameters)
 
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
-        if True in rsv[1:]:
+        if rsv.rsv1 and opcode.iscontrol():
             return CloseReason.PROTOCOL_ERROR
-        elif rsv[0] and opcode.iscontrol():
-            return CloseReason.PROTOCOL_ERROR
-        elif rsv[0] and opcode is Opcode.CONTINUATION:
+        elif rsv.rsv1 and opcode is Opcode.CONTINUATION:
             return CloseReason.PROTOCOL_ERROR
 
         self._inbound_is_compressible = self._compressible_opcode(opcode)
 
         if self._inbound_compressed is None:
-            self._inbound_compressed = rsv[0]
+            self._inbound_compressed = rsv.rsv1
             if self._inbound_compressed:
                 assert self._inbound_is_compressible
                 if proto.client:
@@ -158,9 +157,14 @@ class PerMessageDeflate(Extension):
                 if self._decompressor is None:
                     self._decompressor = zlib.decompressobj(-bits)
 
+        return RsvBits(True, False, False)
+
     def frame_inbound_payload_data(self, proto, data):
         if not self._inbound_compressed or not self._inbound_is_compressible:
             return data
+
+        if PY2:
+            data = str(data)
 
         try:
             return self._decompressor.decompress(data)
@@ -198,8 +202,7 @@ class PerMessageDeflate(Extension):
             return (rsv, data)
 
         if opcode is not Opcode.CONTINUATION:
-            rsv = list(rsv)
-            rsv[0] = True
+            rsv = RsvBits(True, *rsv[1:])
 
         if self._compressor is None:
             assert opcode is not Opcode.CONTINUATION
@@ -207,8 +210,11 @@ class PerMessageDeflate(Extension):
                 bits = self.client_max_window_bits
             else:
                 bits = self.server_max_window_bits
-            self._compressor = zlib.compressobj(wbits=-bits)
+            self._compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
+                                                zlib.DEFLATED, -bits)
 
+        if PY2:
+            data = str(data)
         data = self._compressor.compress(data)
 
         if fin:

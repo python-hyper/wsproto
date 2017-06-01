@@ -1,9 +1,12 @@
 # Things that would be nice:
 # - less hard-coding of paths here
 
+from __future__ import print_function
+
 import sys
 import os.path
 import argparse
+import errno
 import subprocess
 import json
 import socket
@@ -55,12 +58,11 @@ CASES = {
         # At one point these were catching a unique bug that none of the
         # above were -- they're relatively quick and involve
         # fragmentation.
-        + ["12.1.11", "12.1.12", "13.1.11", "13.1.12"]
-    ,
+        + ["12.1.11", "12.1.12", "13.1.11", "13.1.12"],
 }
 
 def say(*args):
-    print("run-tests.py:", *args)
+    print("run-autobahn-tests.py:", *args)
 
 def setup_venv():
     if not os.path.exists("autobahntestsuite-venv"):
@@ -72,13 +74,18 @@ def setup_venv():
 
 def wait_for_listener(port):
     while True:
-        with socket.socket() as sock:
-            try:
-                sock.connect(("localhost", port))
-            except ConnectionRefusedError:
+        sock = socket.socket()
+        try:
+            sock.connect(("localhost", port))
+        except socket.error as exc:
+            if exc.errno == errno.ECONNREFUSED:
                 time.sleep(0.01)
             else:
-                return
+                raise
+        else:
+            return
+        finally:
+            sock.close()
 
 def coverage(command, coverage_settings):
     if not coverage_settings["enabled"]:
@@ -155,9 +162,9 @@ def run_server_tests(cases, coverage_settings):
     finally:
         say("Stopping server...")
         # Connection on this port triggers a shutdown
-        with socket.socket() as sock:
-            sock.connect(("localhost", PORT + 1))
-            sock.send(b"x")
+        sock = socket.socket()
+        sock.connect(("localhost", PORT + 1))
+        sock.close()
         server.wait()
 
     return summarize("reports/servers")

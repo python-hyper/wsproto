@@ -1,26 +1,31 @@
-import asyncio
 import json
-from urllib.parse import urlparse
+import socket
 
+from wsproto.compat import PY2
 from wsproto.connection import WSConnection, CLIENT, ConnectionEstablished, \
                                ConnectionClosed
 from wsproto.events import TextReceived, DataReceived
 from wsproto.extensions import PerMessageDeflate
 
+if PY2:
+    from urlparse import urlparse
+else:
+    from urllib.parse import urlparse
+
 SERVER = 'ws://127.0.0.1:8642'
 AGENT = 'wsproto'
 
-@asyncio.coroutine
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')
     connection = WSConnection(CLIENT, uri.netloc, uri.path)
-    reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
+    sock = socket.socket()
+    sock.connect((uri.hostname, uri.port or 80))
 
-    writer.write(connection.bytes_to_send())
+    sock.sendall(connection.bytes_to_send())
 
     case_count = None
     while case_count is None:
-        data = yield from reader.read(65535)
+        data = sock.recv(65535)
         connection.receive_bytes(data)
         data = ""
         for event in connection.events():
@@ -30,27 +35,27 @@ def get_case_count(server):
                     case_count = json.loads(data)
                     connection.close()
             try:
-                writer.write(connection.bytes_to_send())
-                yield from writer.drain()
+                sock.sendall(connection.bytes_to_send())
             except (ConnectionError, OSError):
                 break
 
+    sock.close()
     return case_count
 
-@asyncio.coroutine
 def run_case(server, case, agent):
     uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
     connection = WSConnection(CLIENT,
                               uri.netloc, '%s?%s' % (uri.path, uri.query),
                               extensions=[PerMessageDeflate()])
-    reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
+    sock = socket.socket()
+    sock.connect((uri.hostname, uri.port or 80))
 
-    writer.write(connection.bytes_to_send())
+    sock.sendall(connection.bytes_to_send())
     closed = False
 
     while not closed:
         try:
-            data = yield from reader.read(65535)
+            data = sock.recv(65535)
         except ConnectionError:
             data = None
         connection.receive_bytes(data or None)
@@ -65,32 +70,30 @@ def run_case(server, case, agent):
             break
         try:
             data = connection.bytes_to_send()
-            writer.write(data)
-            yield from writer.drain()
+            sock.sendall(data)
         except (ConnectionError, OSError):
             closed = True
             break
 
-@asyncio.coroutine
 def update_reports(server, agent):
     uri = urlparse(server + '/updateReports?agent=%s' % agent)
     connection = WSConnection(CLIENT,
                               uri.netloc, '%s?%s' % (uri.path, uri.query))
-    reader, writer = yield from asyncio.open_connection(uri.hostname, uri.port or 80)
+    sock = socket.socket()
+    sock.connect((uri.hostname, uri.port or 80))
 
-    writer.write(connection.bytes_to_send())
+    sock.sendall(connection.bytes_to_send())
     closed = False
 
     while not closed:
-        data = yield from reader.read(65535)
+        data = sock.recv(65535)
         connection.receive_bytes(data)
         for event in connection.events():
             if isinstance(event, ConnectionEstablished):
                 connection.close()
-                writer.write(connection.bytes_to_send())
+                sock.sendall(connection.bytes_to_send())
                 try:
-                    yield from writer.drain()
-                    writer.close()
+                    sock.close()
                 except (ConnectionError, OSError):
                     pass
                 finally:
@@ -106,19 +109,17 @@ CASE = None
 # 12.1.1 = 304
 # 13.1.1 = 394
 
-@asyncio.coroutine
 def run_tests(server, agent):
-    case_count = yield from get_case_count(server)
+    case_count = get_case_count(server)
     if CASE is not None:
         print(">>>>> Running test case %d" % CASE)
-        yield from run_case(server, CASE, agent)
+        run_case(server, CASE, agent)
     else:
         for case in range(1, case_count + 1):
             print(">>>>> Running test case %d of %d" % (case, case_count))
-            yield from run_case(server, case, agent)
+            run_case(server, case, agent)
         print("\nRan %d cases." % case_count)
-    yield from update_reports(server, agent)
+    update_reports(server, agent)
 
 if __name__ == '__main__':
-    main = run_tests(SERVER, AGENT)
-    asyncio.get_event_loop().run_until_complete(main)
+    run_tests(SERVER, AGENT)
