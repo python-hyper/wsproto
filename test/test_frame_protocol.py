@@ -864,20 +864,30 @@ class TestFrameProtocolReceive(object):
         assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
 
-def test_close_with_long_reason():
-    # Long close reasons get silently truncated
-    proto = fp.FrameProtocol(client=False, extensions=[])
-    data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE,
-                       reason="x" * 200)
-    assert data == bytearray(unhexlify("887d03e8")) + b"x" * 123
+class TestFrameProtocolSend(object):
+    def test_unreasoning_close(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE)
+        assert data == b'\x88\x02\x03\xe8'
 
-    # While preserving valid utf-8
-    proto = fp.FrameProtocol(client=False, extensions=[])
-    # pound sign is 2 bytes in utf-8, so naive truncation to 123 bytes will
-    # cut it in half. Instead we truncate to 122 bytes.
-    data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE,
-                       reason=u"£" * 100)
-    assert data == unhexlify("887c03e8") + u"£".encode("utf-8") * 61
+    def test_reasoned_close(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        reason = u'¯\_(ツ)_/¯'
+        expected_payload = struct.pack('!H', fp.CloseReason.NORMAL_CLOSURE) + \
+            reason.encode('utf8')
+        data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE, reason=reason)
+        assert data == b'\x88' + bytearray([len(expected_payload)]) + \
+            expected_payload
+
+    def test_overly_reasoned_close(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        reason = u'¯\_(ツ)_/¯' * 10
+        expected_payload = struct.pack('!H', fp.CloseReason.NORMAL_CLOSURE) + \
+            reason.encode('utf8')
+        data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE, reason=reason)
+        assert bytes(data[0:1]) == b'\x88'
+        assert len(data) <= 127
+        assert data[4:].decode('utf8')
 
 
 def test_payload_length_decode():
