@@ -294,7 +294,7 @@ class FrameDecoder(object):
             self.header = None
             self.effective_opcode = None
             self.masker = None
-        elif not self.effective_opcode.iscontrol():
+        else:
             self.effective_opcode = Opcode.CONTINUATION
 
         return frame
