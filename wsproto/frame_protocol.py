@@ -9,12 +9,12 @@ WebSocket frame protocol implementation.
 import os
 import itertools
 import struct
-import sys
 from codecs import getincrementaldecoder
 from collections import namedtuple
 
 from enum import Enum, IntEnum
 
+from .compat import PY2, PY3
 from .utf8validator import Utf8Validator
 
 try:
@@ -34,7 +34,7 @@ class XorMaskerNull:
         return data
 
 
-if sys.version_info.major > 2:
+if PY3:
     unicode = str
 
 
@@ -205,7 +205,7 @@ class MessageDecoder(object):
             raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
 
         if frame.opcode is Opcode.TEXT:
-            if sys.version_info.major == 2:
+            if PY2:
                 self.validator = Utf8Validator()
             self.decoder = getincrementaldecoder("utf-8")()
 
@@ -435,7 +435,7 @@ class FrameProtocol(object):
                code <= MAX_PROTOCOL_CLOSE_REASON:
                 raise ParseFailed(
                     "CLOSE with unknown reserved code")
-            if sys.version_info.major == 2:
+            if PY2:
                 results = Utf8Validator().validate(str(data[2:]))
                 if not results[0]:
                     raise ParseFailed(u'encountered invalid UTF-8 while'
