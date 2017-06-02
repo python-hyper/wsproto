@@ -502,6 +502,8 @@ class FrameProtocol(object):
         elif isinstance(payload, unicode):
             opcode = Opcode.TEXT
             payload = payload.encode('utf-8')
+        else:
+            raise ValueError('Must provide bytes or text')
 
         if self._outbound_opcode is None:
             self._outbound_opcode = opcode
