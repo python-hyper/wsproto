@@ -950,6 +950,62 @@ class TestFrameProtocolSend(object):
         data = proto.pong(payload)
         assert data == b'\x8a' + bytearray([len(payload)]) + payload
 
+    def test_single_short_binary_data(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b"it's all just ascii, right?"
+        data = proto.send_data(payload, fin=True)
+        assert data == b'\x82' + bytearray([len(payload)]) + payload
+
+    def test_single_short_text_data(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = u'😃😄🙃😉'
+        data = proto.send_data(payload, fin=True)
+        payload = payload.encode('utf8')
+        assert data == b'\x81' + bytearray([len(payload)]) + payload
+
+    def test_multiple_short_binary_data(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b"it's all just ascii, right?"
+        data = proto.send_data(payload, fin=False)
+        assert data == b'\x02' + bytearray([len(payload)]) + payload
+
+        payload = b'sure no worries'
+        data = proto.send_data(payload, fin=True)
+        assert data == b'\x80' + bytearray([len(payload)]) + payload
+
+    def test_multiple_short_text_data(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = u'😃😄🙃😉'
+        data = proto.send_data(payload, fin=False)
+        payload = payload.encode('utf8')
+        assert data == b'\x01' + bytearray([len(payload)]) + payload
+
+        payload = u'🙈🙉🙊'
+        data = proto.send_data(payload, fin=True)
+        payload = payload.encode('utf8')
+        assert data == b'\x80' + bytearray([len(payload)]) + payload
+
+    def test_mismatched_data_messages1(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = u'😃😄🙃😉'
+        data = proto.send_data(payload, fin=False)
+        payload = payload.encode('utf8')
+        assert data == b'\x01' + bytearray([len(payload)]) + payload
+
+        payload = b'seriously, all ascii'
+        with pytest.raises(TypeError):
+            proto.send_data(payload)
+
+    def test_mismatched_data_messages2(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b"it's all just ascii, right?"
+        data = proto.send_data(payload, fin=False)
+        assert data == b'\x02' + bytearray([len(payload)]) + payload
+
+        payload = u'✔️☑️✅✔︎☑'
+        with pytest.raises(TypeError):
+            proto.send_data(payload)
+
 
 def test_payload_length_decode():
     # "the minimal number of bytes MUST be used to encode the length, for
