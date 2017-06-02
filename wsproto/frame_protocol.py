@@ -506,6 +506,10 @@ class FrameProtocol(object):
         elif isinstance(payload, unicode):
             opcode = Opcode.TEXT
             payload = payload.encode('utf-8')
+        else:
+            raise ValueError("Unrecognized payload type {!r} (should be "
+                             "bytes-like or str)"
+                             .format(type(payload).__name__))
 
         if self._outbound_opcode is None:
             self._outbound_opcode = opcode
