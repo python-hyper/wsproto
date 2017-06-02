@@ -660,10 +660,11 @@ class TestFrameDecoderExtensions(object):
 
         def __init__(self):
             self._inbound_header_called = False
-            self._rsv_bit_set = False
+            self._inbound_rsv_bit_set = False
             self._inbound_payload_data_called = False
             self._inbound_complete_called = False
             self._fail_inbound_complete = False
+            self._outbound_rsv_bit_set = False
 
         def enabled(self):
             return True
@@ -672,7 +673,7 @@ class TestFrameDecoderExtensions(object):
             self._inbound_header_called = True
             if opcode is fp.Opcode.PONG:
                 return fp.CloseReason.MANDATORY_EXT
-            self._rsv_bit_set = rsv[2]
+            self._inbound_rsv_bit_set = rsv.rsv3
             return fp.RsvBits(False, False, True)
 
         def frame_inbound_payload_data(self, proto, data):
@@ -681,7 +682,7 @@ class TestFrameDecoderExtensions(object):
                 return fp.CloseReason.POLICY_VIOLATION
             elif data == b'ragequit':
                 self._fail_inbound_complete = True
-            if self._rsv_bit_set:
+            if self._inbound_rsv_bit_set:
                 data = data.decode('utf-8').upper().encode('utf-8')
             return data
 
@@ -689,8 +690,17 @@ class TestFrameDecoderExtensions(object):
             self._inbound_complete_called = True
             if self._fail_inbound_complete:
                 return fp.CloseReason.ABNORMAL_CLOSURE
-            if fin and self._rsv_bit_set:
+            if fin and self._inbound_rsv_bit_set:
                 return u'™'.encode('utf-8')
+
+        def frame_outbound(self, proto, opcode, rsv, data, fin):
+            if opcode is fp.Opcode.TEXT:
+                rsv = fp.RsvBits(rsv.rsv1, rsv.rsv2, True)
+                self._outbound_rsv_bit_set = True
+            if fin and self._outbound_rsv_bit_set:
+                data += u'®'.encode('utf-8')
+                self._outbound_rsv_bit_set = False
+            return rsv, data
 
     def test_rsv_bit(self):
         ext = self.FakeExtension()
@@ -702,7 +712,7 @@ class TestFrameDecoderExtensions(object):
         frame = decoder.process_buffer()
         assert frame is not None
         assert ext._inbound_header_called
-        assert ext._rsv_bit_set
+        assert ext._inbound_rsv_bit_set
 
     def test_wrong_rsv_bit(self):
         ext = self.FakeExtension()
@@ -741,7 +751,7 @@ class TestFrameDecoderExtensions(object):
         frame = decoder.process_buffer()
         assert frame is not None
         assert ext._inbound_header_called
-        assert ext._rsv_bit_set
+        assert ext._inbound_rsv_bit_set
         assert ext._inbound_payload_data_called
         assert frame.payload == expected_payload
 
@@ -758,7 +768,7 @@ class TestFrameDecoderExtensions(object):
         frame = decoder.process_buffer()
         assert frame is not None
         assert ext._inbound_header_called
-        assert not ext._rsv_bit_set
+        assert not ext._inbound_rsv_bit_set
         assert ext._inbound_payload_data_called
         assert frame.payload == expected_payload
 
@@ -788,7 +798,7 @@ class TestFrameDecoderExtensions(object):
         frame = decoder.process_buffer()
         assert frame is not None
         assert ext._inbound_header_called
-        assert ext._rsv_bit_set
+        assert ext._inbound_rsv_bit_set
         assert ext._inbound_payload_data_called
         assert ext._inbound_complete_called
         assert frame.payload == expected_payload
@@ -806,7 +816,7 @@ class TestFrameDecoderExtensions(object):
         frame = decoder.process_buffer()
         assert frame is not None
         assert ext._inbound_header_called
-        assert not ext._rsv_bit_set
+        assert not ext._inbound_rsv_bit_set
         assert ext._inbound_payload_data_called
         assert ext._inbound_complete_called
         assert frame.payload == expected_payload
@@ -823,6 +833,27 @@ class TestFrameDecoderExtensions(object):
             decoder.receive_bytes(frame_bytes)
             decoder.process_buffer()
         assert excinfo.value.code is fp.CloseReason.ABNORMAL_CLOSURE
+
+    def test_outbound_handling_single_frame(self):
+        ext = self.FakeExtension()
+        proto = fp.FrameProtocol(client=False, extensions=[ext])
+        payload = u'😃😄🙃😉'
+        data = proto.send_data(payload, fin=True)
+        payload = (payload + u'®').encode('utf8')
+        assert data == b'\x91' + bytearray([len(payload)]) + payload
+
+    def test_outbound_handling_multiple_frames(self):
+        ext = self.FakeExtension()
+        proto = fp.FrameProtocol(client=False, extensions=[ext])
+        payload = u'😃😄🙃😉'
+        data = proto.send_data(payload, fin=False)
+        payload = payload.encode('utf8')
+        assert data == b'\x11' + bytearray([len(payload)]) + payload
+
+        payload = u'¯\_(ツ)_/¯'
+        data = proto.send_data(payload, fin=True)
+        payload = (payload + u'®').encode('utf8')
+        assert data == b'\x80' + bytearray([len(payload)]) + payload
 
 
 class TestFrameProtocolReceive(object):
