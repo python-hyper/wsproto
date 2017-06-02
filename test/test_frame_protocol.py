@@ -929,6 +929,16 @@ class TestFrameProtocolSend(object):
         assert len(data) <= 127
         assert data[4:].decode('utf8')
 
+    def test_reasoned_but_uncoded_close(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        with pytest.raises(TypeError):
+            proto.close(reason='termites')
+
+    def test_local_only_close_reason(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        data = proto.close(code=fp.CloseReason.NO_STATUS_RCVD)
+        assert data == b'\x88\x02\x03\xe8'
+
 
 def test_payload_length_decode():
     # "the minimal number of bytes MUST be used to encode the length, for
