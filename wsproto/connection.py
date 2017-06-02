@@ -268,7 +268,6 @@ class WSConnection(object):
 
         try:
             for frame in self._proto.received_frames():
-
                 if frame.opcode is Opcode.PING:
                     assert frame.frame_finished and frame.message_finished
                     self._outgoing += self._proto.pong(frame.payload)
