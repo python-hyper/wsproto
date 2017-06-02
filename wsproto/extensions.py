@@ -8,7 +8,6 @@ WebSocket extensions.
 
 import zlib
 
-from .compat import PY2
 from .frame_protocol import CloseReason, Opcode, RsvBits
 
 
@@ -163,11 +162,8 @@ class PerMessageDeflate(Extension):
         if not self._inbound_compressed or not self._inbound_is_compressible:
             return data
 
-        if PY2:
-            data = str(data)
-
         try:
-            return self._decompressor.decompress(data)
+            return self._decompressor.decompress(bytes(data))
         except zlib.error:
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
@@ -213,9 +209,7 @@ class PerMessageDeflate(Extension):
             self._compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
                                                 zlib.DEFLATED, -bits)
 
-        if PY2:
-            data = str(data)
-        data = self._compressor.compress(data)
+        data = self._compressor.compress(bytes(data))
 
         if fin:
             data += self._compressor.flush(zlib.Z_SYNC_FLUSH)
