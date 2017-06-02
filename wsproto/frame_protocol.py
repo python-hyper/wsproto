@@ -520,9 +520,6 @@ class FrameProtocol(object):
     def _serialize_frame(self, opcode, payload=b'', fin=True):
         rsv = RsvBits(False, False, False)
         for extension in reversed(self.extensions):
-            if not extension.enabled():
-                continue
-
             rsv, payload = extension.frame_outbound(self, opcode, rsv, payload,
                                                     fin)
 
