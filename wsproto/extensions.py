@@ -177,9 +177,9 @@ class PerMessageDeflate(Extension):
     def frame_inbound_complete(self, proto, fin):
         if not fin:
             return
-        elif not self._inbound_compressed:
-            return
         elif not self._inbound_is_compressible:
+            return
+        elif not self._inbound_compressed:
             return
 
         try:
