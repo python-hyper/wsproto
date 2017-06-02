@@ -1102,8 +1102,6 @@ class TestFrameProtocolSend(object):
     def test_overly_reasoned_close(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
         reason = u'¯\_(ツ)_/¯' * 10
-        expected_payload = struct.pack('!H', fp.CloseReason.NORMAL_CLOSURE) + \
-            reason.encode('utf8')
         data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE, reason=reason)
         assert bytes(data[0:1]) == b'\x88'
         assert len(data) <= 127
