@@ -831,7 +831,9 @@ class TestFrameProtocolReceive(object):
         assert frame.payload == payload
 
     def _close_test(self, code, reason=None, reason_bytes=None):
-        payload = struct.pack('!H', code)
+        payload = b''
+        if code:
+            payload += struct.pack('!H', code)
         if reason:
             payload += reason.encode('utf8')
         elif reason_bytes:
@@ -845,11 +847,14 @@ class TestFrameProtocolReceive(object):
         assert len(frames) == 1
         frame = frames[0]
         assert frame.opcode == fp.Opcode.CLOSE
-        assert frame.payload[0] == code
+        assert frame.payload[0] == code or fp.CloseReason.NO_STATUS_RCVD
         if reason:
             assert frame.payload[1] == reason
         else:
             assert not frame.payload[1]
+
+    def test_close_no_code(self):
+        self._close_test(None)
 
     def test_close_no_payload(self):
         self._close_test(fp.CloseReason.NORMAL_CLOSURE)
