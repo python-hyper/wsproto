@@ -939,6 +939,17 @@ class TestFrameProtocolSend(object):
         data = proto.close(code=fp.CloseReason.NO_STATUS_RCVD)
         assert data == b'\x88\x02\x03\xe8'
 
+    def test_pong_without_payload(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        data = proto.pong()
+        assert data == b'\x8a\x00'
+
+    def test_pong_with_payload(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = u'¯\_(ツ)_/¯'.encode('utf8')
+        data = proto.pong(payload)
+        assert data == b'\x8a' + bytearray([len(payload)]) + payload
+
 
 def test_payload_length_decode():
     # "the minimal number of bytes MUST be used to encode the length, for
