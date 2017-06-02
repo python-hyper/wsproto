@@ -929,6 +929,11 @@ class TestFrameProtocolReceive(object):
 
 
 class TestFrameProtocolSend(object):
+    def test_simplest_possible_close(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        data = proto.close()
+        assert data == b'\x88\x00'
+
     def test_unreasoning_close(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
         data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE)
