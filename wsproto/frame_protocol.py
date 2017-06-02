@@ -429,7 +429,7 @@ class FrameProtocol(object):
                     "CLOSE with unknown reserved code")
             validator = Utf8Validator()
             if validator is not None:
-                results = validator.validate(str(data[2:]))
+                results = validator.validate(bytes(data[2:]))
                 if not (results[0] and results[1]):
                     raise ParseFailed(u'encountered invalid UTF-8 while'
                                       ' processing close message at payload'
