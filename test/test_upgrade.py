@@ -6,19 +6,16 @@ Test the HTTP upgrade phase of connection
 import base64
 import email
 import random
-import sys
 
+from wsproto.compat import PY3
 from wsproto.connection import WSConnection, CLIENT, SERVER
 from wsproto.events import (
     ConnectionEstablished, ConnectionFailed, ConnectionRequested
 )
 
 
-IS_PYTHON3 = sys.version_info >= (3, 0)
-
-
 def parse_headers(headers):
-    if IS_PYTHON3:
+    if PY3:
         headers = email.message_from_bytes(headers)
     else:
         headers = email.message_from_string(headers)
