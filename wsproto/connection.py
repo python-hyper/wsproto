@@ -236,7 +236,11 @@ class WSConnection(object):
     def _process_upgrade(self, data):
         self._upgrade_connection.receive_data(data)
         while True:
-            event = self._upgrade_connection.next_event()
+            try:
+                event = self._upgrade_connection.next_event()
+            except h11.RemoteProtocolError:
+                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                        "Bad HTTP message"), b''
             if event is h11.NEED_DATA:
                 break
             elif self.client and isinstance(event, (h11.InformationalResponse,
@@ -247,7 +251,7 @@ class WSConnection(object):
                 return self._process_connection_request(event), None
             else:
                 return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                        "Bad HTTP message")
+                                        "Bad HTTP message"), b''
 
         self._incoming = b''
         return None, None
