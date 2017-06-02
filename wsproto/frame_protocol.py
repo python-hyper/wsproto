@@ -14,7 +14,7 @@ from collections import namedtuple
 
 from enum import Enum, IntEnum
 
-from .compat import PY2, PY3
+from .compat import PY2, PY3, unicode
 from .utf8validator import Utf8Validator
 
 try:
@@ -32,10 +32,6 @@ except ImportError:
 class XorMaskerNull:
     def process(self, data):
         return data
-
-
-if PY3:
-    unicode = str
 
 
 # RFC6455, Section 5.2 - Base Framing Protocol
