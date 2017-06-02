@@ -870,6 +870,16 @@ class TestFrameProtocolReceive(object):
             self._close_test(123)
         assert exc.value.code == fp.CloseReason.PROTOCOL_ERROR
 
+    def test_close_unknown_code(self):
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(2998)
+        assert exc.value.code == fp.CloseReason.PROTOCOL_ERROR
+
+    def test_close_local_only_code(self):
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(fp.CloseReason.NO_STATUS_RCVD)
+        assert exc.value.code == fp.CloseReason.PROTOCOL_ERROR
+
     def test_close_no_payload(self):
         self._close_test(fp.CloseReason.NORMAL_CLOSURE)
 
