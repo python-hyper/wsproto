@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import pytest
+import itertools
 from binascii import unhexlify
 from codecs import getincrementaldecoder
 import struct
+
+import pytest
 
 import wsproto.frame_protocol as fp
 import wsproto.extensions as wpext
@@ -1006,50 +1008,61 @@ class TestFrameProtocolSend(object):
         with pytest.raises(TypeError):
             proto.send_data(payload)
 
+    def test_message_length_max_short(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b'x' * 125
+        data = proto.send_data(payload, fin=True)
+        assert data == b'\x82' + bytearray([len(payload)]) + payload
 
-def test_payload_length_decode():
-    # "the minimal number of bytes MUST be used to encode the length, for
-    # example, the length of a 124-byte-long string can't be encoded as the
-    # sequence 126, 0, 124" -- RFC 6455
+    def test_message_length_min_two_byte(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b'x' * 126
+        data = proto.send_data(payload, fin=True)
+        assert data == b'\x82\x7e' + struct.pack('!H', len(payload)) + payload
 
-    def make_header(encoding_bytes, payload_len):
-        if encoding_bytes == 1:
-            assert payload_len <= 125
-            return unhexlify("81") + bytes([payload_len])
-        elif encoding_bytes == 2:
-            assert payload_len < 2**16
-            return unhexlify("81" "7e") + struct.pack("!H", payload_len)
-        elif encoding_bytes == 8:
-            return unhexlify("81" "7f") + struct.pack("!Q", payload_len)
-        else:
-            assert False
+    def test_message_length_max_two_byte(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b'x' * (2 ** 16 - 1)
+        data = proto.send_data(payload, fin=True)
+        assert data == b'\x82\x7e' + struct.pack('!H', len(payload)) + payload
 
-    def make_and_parse(encoding_bytes, payload_len):
+    def test_message_length_min_eight_byte(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b'x' * (2 ** 16)
+        data = proto.send_data(payload, fin=True)
+        assert data == b'\x82\x7f' + struct.pack('!Q', len(payload)) + payload
+
+    def test_client_side_masking_short_frame(self):
         proto = fp.FrameProtocol(client=True, extensions=[])
-        proto.receive_bytes(make_header(encoding_bytes, payload_len))
-        list(proto.received_frames())
+        payload = b'x' * 125
+        data = proto.send_data(payload, fin=True)
+        assert data[0] == 0x82
+        assert struct.unpack('!B', data[1:2])[0] == len(payload) | 0x80
+        masking_key = data[2:6]
+        maskbytes = itertools.cycle(masking_key)
+        assert data[6:] == \
+            bytearray(b ^ next(maskbytes) for b in bytearray(payload))
 
-    # Valid lengths for 1 byte
-    for payload_len in [0, 1, 2, 123, 124, 125]:
-        make_and_parse(1, payload_len)
-        for encoding_bytes in [2, 8]:
-            with pytest.raises(fp.ParseFailed) as excinfo:
-                make_and_parse(encoding_bytes, payload_len)
-            assert "used {} bytes".format(encoding_bytes) in str(excinfo.value)
+    def test_client_side_masking_two_byte_frame(self):
+        proto = fp.FrameProtocol(client=True, extensions=[])
+        payload = b'x' * 126
+        data = proto.send_data(payload, fin=True)
+        assert data[0] == 0x82
+        assert data[1] == 0xfe
+        assert struct.unpack('!H', data[2:4])[0] == len(payload)
+        masking_key = data[4:8]
+        maskbytes = itertools.cycle(masking_key)
+        assert data[8:] == \
+            bytearray(b ^ next(maskbytes) for b in bytearray(payload))
 
-    # Valid lengths for 2 bytes
-    for payload_len in [126, 127, 1000, 2**16 - 1]:
-        make_and_parse(2, payload_len)
-        with pytest.raises(fp.ParseFailed) as excinfo:
-            make_and_parse(8, payload_len)
-        assert "used 8 bytes" in str(excinfo.value)
-
-    # Valid lengths for 8 bytes
-    for payload_len in [2**16, 2**16 + 1, 2**32, 2**63 - 1]:
-        make_and_parse(8, payload_len)
-
-    # Invalid lengths for 8 bytes
-    for payload_len in [2**63, 2**63 + 1]:
-        with pytest.raises(fp.ParseFailed) as excinfo:
-            make_and_parse(8, payload_len)
-        assert "non-zero MSB" in str(excinfo.value)
+    def test_client_side_masking_eight_byte_frame(self):
+        proto = fp.FrameProtocol(client=True, extensions=[])
+        payload = b'x' * 65536
+        data = proto.send_data(payload, fin=True)
+        assert data[0] == 0x82
+        assert data[1] == 0xff
+        assert struct.unpack('!Q', data[2:10])[0] == len(payload)
+        masking_key = data[10:14]
+        maskbytes = itertools.cycle(masking_key)
+        assert data[14:] == \
+            bytearray(b ^ next(maskbytes) for b in bytearray(payload))
