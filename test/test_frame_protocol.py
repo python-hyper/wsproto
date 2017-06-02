@@ -11,6 +11,21 @@ import wsproto.frame_protocol as fp
 import wsproto.extensions as wpext
 
 
+class FakeValidator(object):
+    def __init__(self):
+        self.validated = b''
+
+        self.valid = True
+        self.ends_on_complete = True
+        self.octet = 0
+        self.code_point = 0
+
+    def validate(self, data):
+        self.validated += data
+        return (self.valid, self.ends_on_complete, self.octet,
+                self.code_point)
+
+
 class TestBuffer(object):
     def test_consume_at_most_zero_bytes(self):
         buf = fp.Buffer(b'xxyyy')
@@ -321,6 +336,54 @@ class TestMessageDecoder(object):
         assert frame.opcode is fp.Opcode.TEXT
         assert frame.message_finished is True
         assert frame.payload == text_payload[(split // 3):]
+
+    def send_frame_to_validator(self, payload, finished):
+        decoder = fp.MessageDecoder()
+        frame = fp.Frame(
+            opcode=fp.Opcode.TEXT,
+            payload=payload,
+            frame_finished=finished,
+            message_finished=True,
+        )
+        frame = decoder.process_frame(frame)
+
+    def test_text_message_hits_validator(self, monkeypatch):
+        validator = FakeValidator()
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        text_payload = u'fñör∂'
+        binary_payload = text_payload.encode('utf8')
+        self.send_frame_to_validator(binary_payload, True)
+
+        assert validator.validated == binary_payload
+
+    def test_message_validation_failure_fails_properly(self, monkeypatch):
+        validator = FakeValidator()
+        validator.valid = False
+
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        with pytest.raises(fp.ParseFailed):
+            self.send_frame_to_validator(b'', True)
+
+    def test_message_validation_finish_on_incomplete(self, monkeypatch):
+        validator = FakeValidator()
+        validator.valid = True
+        validator.ends_on_complete = False
+
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        with pytest.raises(fp.ParseFailed):
+            self.send_frame_to_validator(b'', True)
+
+    def test_message_validation_unfinished_on_incomplete(self, monkeypatch):
+        validator = FakeValidator()
+        validator.valid = True
+        validator.ends_on_complete = False
+
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        self.send_frame_to_validator(b'', False)
 
 
 class TestFrameDecoder(object):
