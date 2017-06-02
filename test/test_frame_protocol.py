@@ -1100,3 +1100,10 @@ class TestFrameProtocolSend(object):
 
         with pytest.raises(ValueError):
             proto.pong(payload)
+
+    def test_data_we_have_no_idea_what_to_do_with(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = dict()
+
+        with pytest.raises(ValueError):
+            proto.send_data(payload)
