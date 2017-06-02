@@ -1066,3 +1066,10 @@ class TestFrameProtocolSend(object):
         maskbytes = itertools.cycle(masking_key)
         assert data[14:] == \
             bytearray(b ^ next(maskbytes) for b in bytearray(payload))
+
+    def test_control_frame_with_overly_long_payload(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = b'x' * 126
+
+        with pytest.raises(ValueError):
+            proto.pong(payload)
