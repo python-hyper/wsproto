@@ -856,6 +856,15 @@ class TestFrameProtocolReceive(object):
     def test_close_no_code(self):
         self._close_test(None)
 
+    def test_close_one_byte_code(self):
+        frame_bytes = b'\x88\x01\x0e'
+        protocol = fp.FrameProtocol(client=True, extensions=[])
+
+        with pytest.raises(fp.ParseFailed) as exc:
+            protocol.receive_bytes(frame_bytes)
+            list(protocol.received_frames())
+        assert exc.value.code == fp.CloseReason.PROTOCOL_ERROR
+
     def test_close_no_payload(self):
         self._close_test(fp.CloseReason.NORMAL_CLOSURE)
 
