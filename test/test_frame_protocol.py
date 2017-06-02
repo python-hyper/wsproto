@@ -1021,6 +1021,35 @@ class TestFrameProtocolReceive(object):
         assert len(frame.payload) == len(payload)
         assert frame.payload == payload
 
+    def test_close_reasons_get_utf8_validated(self, monkeypatch):
+        validator = FakeValidator()
+        reason = u'ƒñø®∂'
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
+
+        assert validator.validated == reason.encode('utf8')
+
+    def test_close_reason_failing_validation_fails(self, monkeypatch):
+        validator = FakeValidator()
+        validator.valid = False
+        reason = u'ƒñø®∂'
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
+        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
+    def test_close_reason_with_incomplete_utf8_fails(self, monkeypatch):
+        validator = FakeValidator()
+        validator.ends_on_complete = False
+        reason = u'ƒñø®∂'
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
+        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
 
 class TestFrameProtocolSend(object):
     def test_simplest_possible_close(self):
