@@ -554,6 +554,15 @@ class TestFrameDecoder(object):
             split=7,
         )
 
+    def test_eight_byte_length_with_msb_set(self):
+        frame_bytes = b'\x81\x7f\x80\x80\x80\x80\x80\x80\x80\x80'
+
+        self._parse_failure_test(
+            client=True,
+            frame_bytes=frame_bytes,
+            close_reason=fp.CloseReason.PROTOCOL_ERROR,
+        )
+
     def test_not_enough_for_mask(self):
         payload = bytearray(b'xy')
         mask = bytearray(b'abcd')
