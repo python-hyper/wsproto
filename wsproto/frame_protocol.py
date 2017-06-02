@@ -14,8 +14,7 @@ from collections import namedtuple
 
 from enum import Enum, IntEnum
 
-from .compat import PY2, PY3
-from .utf8validator import Utf8Validator
+from .compat import unicode, Utf8Validator
 
 try:
     from wsaccel.xormask import XorMaskerSimple
@@ -32,10 +31,6 @@ except ImportError:
 class XorMaskerNull:
     def process(self, data):
         return data
-
-
-if PY3:
-    unicode = str
 
 
 # RFC6455, Section 5.2 - Base Framing Protocol
@@ -202,8 +197,7 @@ class MessageDecoder(object):
             raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
 
         if frame.opcode is Opcode.TEXT:
-            if PY2:
-                self.validator = Utf8Validator()
+            self.validator = Utf8Validator()
             self.decoder = getincrementaldecoder("utf-8")()
 
         finished = frame.frame_finished and frame.message_finished
@@ -223,7 +217,7 @@ class MessageDecoder(object):
 
     def decode_payload(self, data, finished):
         if self.validator is not None:
-            results = self.validator.validate(str(data))
+            results = self.validator.validate(bytes(data))
             if not results[0] or (finished and not results[1]):
                 raise ParseFailed(u'encountered invalid UTF-8 while processing'
                                   ' text message at payload octet index %d' %
@@ -433,8 +427,9 @@ class FrameProtocol(object):
                code <= MAX_PROTOCOL_CLOSE_REASON:
                 raise ParseFailed(
                     "CLOSE with unknown reserved code")
-            if PY2:
-                results = Utf8Validator().validate(str(data[2:]))
+            validator = Utf8Validator()
+            if validator is not None:
+                results = validator.validate(bytes(data[2:]))
                 if not (results[0] and results[1]):
                     raise ParseFailed(u'encountered invalid UTF-8 while'
                                       ' processing close message at payload'
@@ -497,7 +492,7 @@ class FrameProtocol(object):
 
         return self._serialize_frame(Opcode.CLOSE, payload)
 
-    def pong(self, payload=None):
+    def pong(self, payload=b''):
         return self._serialize_frame(Opcode.PONG, payload)
 
     def send_data(self, payload=b'', fin=True):
@@ -506,6 +501,8 @@ class FrameProtocol(object):
         elif isinstance(payload, unicode):
             opcode = Opcode.TEXT
             payload = payload.encode('utf-8')
+        else:
+            raise ValueError('Must provide bytes or text')
 
         if self._outbound_opcode is None:
             self._outbound_opcode = opcode
@@ -522,9 +519,6 @@ class FrameProtocol(object):
     def _serialize_frame(self, opcode, payload=b'', fin=True):
         rsv = RsvBits(False, False, False)
         for extension in reversed(self.extensions):
-            if not extension.enabled():
-                continue
-
             rsv, payload = extension.frame_outbound(self, opcode, rsv, payload,
                                                     fin)
 
