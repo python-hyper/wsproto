@@ -14,8 +14,7 @@ from collections import namedtuple
 
 from enum import Enum, IntEnum
 
-from .compat import PY2, PY3, unicode
-from .utf8validator import Utf8Validator
+from .compat import unicode, Utf8Validator
 
 try:
     from wsaccel.xormask import XorMaskerSimple
@@ -198,8 +197,7 @@ class MessageDecoder(object):
             raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
 
         if frame.opcode is Opcode.TEXT:
-            if PY2:
-                self.validator = Utf8Validator()
+            self.validator = Utf8Validator()
             self.decoder = getincrementaldecoder("utf-8")()
 
         finished = frame.frame_finished and frame.message_finished
@@ -219,7 +217,7 @@ class MessageDecoder(object):
 
     def decode_payload(self, data, finished):
         if self.validator is not None:
-            results = self.validator.validate(str(data))
+            results = self.validator.validate(bytes(data))
             if not results[0] or (finished and not results[1]):
                 raise ParseFailed(u'encountered invalid UTF-8 while processing'
                                   ' text message at payload octet index %d' %
@@ -429,8 +427,9 @@ class FrameProtocol(object):
                code <= MAX_PROTOCOL_CLOSE_REASON:
                 raise ParseFailed(
                     "CLOSE with unknown reserved code")
-            if PY2:
-                results = Utf8Validator().validate(str(data[2:]))
+            validator = Utf8Validator()
+            if validator is not None:
+                results = validator.validate(str(data[2:]))
                 if not (results[0] and results[1]):
                     raise ParseFailed(u'encountered invalid UTF-8 while'
                                       ' processing close message at payload'
