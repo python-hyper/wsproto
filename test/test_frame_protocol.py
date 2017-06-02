@@ -385,6 +385,17 @@ class TestMessageDecoder(object):
 
         self.send_frame_to_validator(b'', False)
 
+    def test_message_no_validation_can_still_fail(self, monkeypatch):
+        validator = FakeValidator()
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        payload = u'fñörd'
+        payload = payload.encode('iso-8859-1')
+
+        with pytest.raises(fp.ParseFailed) as exc:
+            self.send_frame_to_validator(payload, True)
+        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
 
 class TestFrameDecoder(object):
     def _single_frame_test(self, client, frame_bytes, opcode, payload,
@@ -1048,6 +1059,23 @@ class TestFrameProtocolReceive(object):
 
         with pytest.raises(fp.ParseFailed) as exc:
             self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
+        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
+
+    def test_close_no_validation(self, monkeypatch):
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: None)
+        reason = u'ƒñø®∂'
+        self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
+
+    def test_close_no_validation_can_still_fail(self, monkeypatch):
+        validator = FakeValidator()
+        monkeypatch.setattr(fp, 'Utf8Validator', lambda: validator)
+
+        reason = u'fñörd'
+        reason = reason.encode('iso-8859-1')
+
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(fp.CloseReason.NORMAL_CLOSURE,
+                             reason_bytes=reason)
         assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
 
