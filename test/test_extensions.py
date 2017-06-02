@@ -15,6 +15,10 @@ class TestExtension(object):
         ext = wpext.Extension()
         assert ext.accept(None, None) is None
 
+    def test_finalize(self):
+        ext = wpext.Extension()
+        assert ext.finalize(None, None) is None
+
     def test_frame_inbound_header(self):
         ext = wpext.Extension()
         result = ext.frame_inbound_header(None, None, None, None)
