@@ -497,7 +497,7 @@ class FrameProtocol(object):
 
         return self._serialize_frame(Opcode.CLOSE, payload)
 
-    def pong(self, payload=None):
+    def pong(self, payload=b''):
         return self._serialize_frame(Opcode.PONG, payload)
 
     def send_data(self, payload=b'', fin=True):
