@@ -66,7 +66,7 @@ def _normed_header_dict(h11_headers):
 # wrong, because those can contain quoted strings, which can in turn contain
 # commas. XX FIXME
 def _split_comma_header(value):
-    return [piece.strip() for piece in value.split(b',')]
+    return [piece.decode('ascii').strip() for piece in value.split(b',')]
 
 
 class WSConnection(object):
@@ -320,6 +320,7 @@ class WSConnection(object):
 
         subprotocol = headers.get(b'sec-websocket-protocol', None)
         if subprotocol is not None:
+            subprotocol = subprotocol.decode('ascii')
             if subprotocol not in self.subprotocols:
                 return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                         "unrecognized subprotocol {!r}"
@@ -330,7 +331,6 @@ class WSConnection(object):
             accepts = _split_comma_header(extensions)
 
             for accept in accepts:
-                accept = accept.decode('ascii')
                 name = accept.split(';', 1)[0].strip()
                 for extension in self.extensions:
                     if extension.name == name:
@@ -400,7 +400,6 @@ class WSConnection(object):
             offers = _split_comma_header(extensions)
 
             for offer in offers:
-                offer = offer.decode('ascii')
                 name = offer.split(';', 1)[0].strip()
                 for extension in self.extensions:
                     if extension.name == name:
