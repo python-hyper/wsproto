@@ -914,6 +914,19 @@ class TestFrameProtocolReceive(object):
                              reason_bytes=payload)
         assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
+    def test_random_control_frame(self):
+        payload = b'give me one ping vasily'
+        frame_bytes = b'\x89' + bytearray([len(payload)]) + payload
+
+        protocol = fp.FrameProtocol(client=True, extensions=[])
+        protocol.receive_bytes(frame_bytes)
+        frames = list(protocol.received_frames())
+        assert len(frames) == 1
+        frame = frames[0]
+        assert frame.opcode == fp.Opcode.PING
+        assert len(frame.payload) == len(payload)
+        assert frame.payload == payload
+
 
 class TestFrameProtocolSend(object):
     def test_unreasoning_close(self):
