@@ -865,6 +865,11 @@ class TestFrameProtocolReceive(object):
             list(protocol.received_frames())
         assert exc.value.code == fp.CloseReason.PROTOCOL_ERROR
 
+    def test_close_bad_code(self):
+        with pytest.raises(fp.ParseFailed) as exc:
+            self._close_test(123)
+        assert exc.value.code == fp.CloseReason.PROTOCOL_ERROR
+
     def test_close_no_payload(self):
         self._close_test(fp.CloseReason.NORMAL_CLOSURE)
 
