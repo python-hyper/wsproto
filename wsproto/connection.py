@@ -435,8 +435,5 @@ class WSConnection(object):
         self._state = ConnectionState.OPEN
 
     def ping(self, payload=None):
-        if payload is not None:
-            payload = bytes(payload)
-        else:
-            payload = b''
+        payload = bytes(payload or b'')
         self._outgoing += self._proto.ping(payload)
