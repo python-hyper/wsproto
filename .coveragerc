@@ -9,3 +9,8 @@ exclude_lines =
   pragma: no cover
   ^def test_
 precision = 1
+
+[paths]
+source =
+    wsproto
+    .tox/*/lib/*/site-packages/wsproto
