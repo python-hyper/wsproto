@@ -1,105 +1,105 @@
 # -*- coding: utf-8 -*-
 
+import itertools
+
 import pytest
 
 from wsproto.connection import WSConnection, CLIENT, SERVER, ConnectionState
-from wsproto.events import (ConnectionClosed, TextReceived, BytesReceived)
+from wsproto.events import (
+    ConnectionClosed,
+    ConnectionEstablished,
+    ConnectionRequested,
+    TextReceived,
+    BytesReceived,
+)
 from wsproto.frame_protocol import CloseReason, FrameProtocol
 
 
-class FakeProtocol(object):
-    def __init__(self):
-        self.send_data_response = None
-        self.close_response = None
-        self.received_frames_response = []
-
-        self.send_data_payload = None
-        self.send_data_final = None
-        self.close_code = None
-        self.close_reason = None
-        self.receive_bytes_bytes = None
-
-    def send_data(self, payload, final):
-        self.send_data_payload = payload
-        self.send_data_final = final
-        return self.send_data_response
-
-    def close(self, code, reason):
-        self.close_code = code
-        self.close_reason = reason
-        return self.close_response
-
-    def receive_bytes(self, data):
-        self.receive_bytes_bytes = data
-
-    def received_frames(self):
-        return self.received_frames_response
-
-
 class TestConnection(object):
-    @pytest.mark.parametrize('final', [True, False])
-    def test_send_data(self, final):
-        data = b'x' * 23
-        payload = b'y' * 23
+    def create_connection(self):
+        server = WSConnection(SERVER)
+        client = WSConnection(CLIENT, host='localhost', resource='foo')
 
-        proto = FakeProtocol()
-        proto.send_data_response = payload
+        server.receive_bytes(client.bytes_to_send())
+        event = next(server.events())
+        assert isinstance(event, ConnectionRequested)
 
-        connection = WSConnection(SERVER)
-        connection._proto = proto
-        connection.send_data(data, final)
+        server.accept(event)
+        client.receive_bytes(server.bytes_to_send())
+        assert isinstance(next(client.events()), ConnectionEstablished)
 
-        assert proto.send_data_payload == data
-        assert proto.send_data_final is final
-        assert connection.bytes_to_send() == payload
+        return client, server
 
-    @pytest.mark.parametrize('code,reason', [
-        (CloseReason.NORMAL_CLOSURE, u'bye'),
-        (CloseReason.GOING_AWAY, u'👋👋'),
+    def test_negotiation(self):
+        self.create_connection()
+
+    @pytest.mark.parametrize('as_client,final', [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False)
     ])
-    def test_close(self, code, reason):
-        payload = b'y' * 23
+    def test_send_and_receive(self, as_client, final):
+        client, server = self.create_connection()
+        if as_client:
+            me = client
+            them = server
+        else:
+            me = server
+            them = client
 
-        proto = FakeProtocol()
-        proto.close_response = payload
+        data = b'x' * 23
 
-        connection = WSConnection(SERVER)
-        connection._proto = proto
-        connection.close(code, reason)
+        me.send_data(data, final)
+        them.receive_bytes(me.bytes_to_send())
 
-        assert proto.close_code is code
-        assert proto.close_reason == reason
-        assert connection.bytes_to_send() == payload
+        event = next(them.events())
+        assert isinstance(event, BytesReceived)
+        assert event.data == data
+        assert event.message_finished is final
+
+    @pytest.mark.parametrize('as_client,code,reason', [
+        (True, CloseReason.NORMAL_CLOSURE, u'bye'),
+        (True, CloseReason.GOING_AWAY, u'👋👋'),
+        (False, CloseReason.NORMAL_CLOSURE, u'bye'),
+        (False, CloseReason.GOING_AWAY, u'👋👋'),
+    ])
+    def test_close(self, as_client, code, reason):
+        client, server = self.create_connection()
+        if as_client:
+            me = client
+            them = server
+        else:
+            me = server
+            them = client
+
+        me.close(code, reason)
+        them.receive_bytes(me.bytes_to_send())
+
+        event = next(them.events())
+        assert isinstance(event, ConnectionClosed)
+        assert event.code is code
+        assert event.reason == reason
 
     def test_normal_closure(self):
-        payload = b'y' * 23
+        client, server = self.create_connection()
 
-        proto = FakeProtocol()
-        proto.close_response = payload
-
-        connection = WSConnection(SERVER)
-        connection._proto = proto
-        connection.close()
-
-        connection.bytes_to_send()
-        connection.receive_bytes(None)
-        with pytest.raises(StopIteration):
-            next(connection.events())
-        assert connection.closed
+        for conn in (client, server):
+            conn.close()
+            conn.receive_bytes(None)
+            with pytest.raises(StopIteration):
+                print(repr(next(conn.events())))
+            assert conn.closed
 
     def test_abnormal_closure(self):
-        payload = b'y' * 23
+        client, server = self.create_connection()
 
-        proto = FakeProtocol()
-        proto.close_response = payload
-
-        connection = WSConnection(SERVER)
-        connection._proto = proto
-        connection._state = ConnectionState.OPEN
-
-        connection.receive_bytes(None)
-        assert isinstance(next(connection.events()), ConnectionClosed)
-        assert connection.closed
+        for conn in (client, server):
+            conn.receive_bytes(None)
+            event = next(conn.events())
+            assert isinstance(event, ConnectionClosed)
+            assert event.code is CloseReason.ABNORMAL_CLOSURE
+            assert conn.closed
 
     def test_bytes_send_all(self):
         connection = WSConnection(SERVER)
@@ -113,50 +113,45 @@ class TestConnection(object):
         assert connection.bytes_to_send(5) == b'fnord'
         assert connection.bytes_to_send() == b' fnord'
 
-    def test_receive_bytes(self):
-        payload = b'y' * 23
+    @pytest.mark.parametrize('as_client', [True, False])
+    def test_ping_pong(self, as_client):
+        client, server = self.create_connection()
+        if as_client:
+            me = client
+            them = server
+        else:
+            me = server
+            them = client
 
-        proto = FakeProtocol()
-
-        connection = WSConnection(SERVER)
-        connection._proto = proto
-        connection._state = ConnectionState.OPEN
-
-        connection.receive_bytes(payload)
-        assert proto.receive_bytes_bytes == payload
-
-    def test_events_ping(self):
         payload = b'x' * 23
-        frame = b'\x89' + bytearray([len(payload)]) + payload
 
-        connection = WSConnection(CLIENT, host='localhost', resource='foo')
-        connection._proto = FrameProtocol(True, [])
-        connection._state = ConnectionState.OPEN
-        connection.bytes_to_send()
+        me.ping(payload)
+        wire_data = me.bytes_to_send()
+        assert wire_data[0] == 0x89
+        masked = bool(wire_data[1] & 0x80)
+        assert wire_data[1] & ~0x80 == len(payload)
+        if masked:
+            maskbytes = itertools.cycle(bytearray(wire_data[2:6]))
+            data = bytearray(b ^ next(maskbytes)
+                             for b in bytearray(wire_data[6:]))
+        else:
+            data = wire_data[2:]
+        assert data == payload
 
-        connection.receive_bytes(frame)
+        them.receive_bytes(wire_data)
         with pytest.raises(StopIteration):
-            next(connection.events())
-        output = connection.bytes_to_send()
-        assert output[:2] == b'\x8a' + bytearray([len(payload) | 0x80])
-
-    def test_events_close(self):
-        payload = b'\x03\xe8' + b'x' * 23
-        frame = b'\x88' + bytearray([len(payload)]) + payload
-
-        connection = WSConnection(CLIENT, host='localhost', resource='foo')
-        connection._proto = FrameProtocol(True, [])
-        connection._state = ConnectionState.OPEN
-        connection.bytes_to_send()
-
-        connection.receive_bytes(frame)
-        event = next(connection.events())
-        assert isinstance(event, ConnectionClosed)
-        assert event.code == CloseReason.NORMAL_CLOSURE
-        assert event.reason == payload[2:].decode('utf8')
-
-        output = connection.bytes_to_send()
-        assert output[:2] == b'\x88' + bytearray([len(payload) | 0x80])
+            print(repr(next(them.events())))
+        wire_data = them.bytes_to_send()
+        assert wire_data[0] == 0x8a
+        masked = bool(wire_data[1] & 0x80)
+        assert wire_data[1] & ~0x80 == len(payload)
+        if masked:
+            maskbytes = itertools.cycle(bytearray(wire_data[2:6]))
+            data = bytearray(b ^ next(maskbytes)
+                             for b in bytearray(wire_data[6:]))
+        else:
+            data = wire_data[2:]
+        assert data == payload
 
     @pytest.mark.parametrize('text,payload,full_message,full_frame', [
         (True, u'ƒñö®∂😎', True, True),
@@ -225,18 +220,15 @@ class TestConnection(object):
         assert not connection.bytes_to_send()
 
     def test_frame_protocol_gets_fed_garbage(self):
+        client, server = self.create_connection()
+
         payload = b'x' * 23
         frame = b'\x09' + bytearray([len(payload)]) + payload
 
-        connection = WSConnection(CLIENT, host='localhost', resource='foo')
-        connection._proto = FrameProtocol(True, [])
-        connection._state = ConnectionState.OPEN
-        connection.bytes_to_send()
-
-        connection.receive_bytes(frame)
-        event = next(connection.events())
+        client.receive_bytes(frame)
+        event = next(client.events())
         assert isinstance(event, ConnectionClosed)
         assert event.code == CloseReason.PROTOCOL_ERROR
 
-        output = connection.bytes_to_send()
+        output = client.bytes_to_send()
         assert output[:1] == b'\x88'
