@@ -1117,6 +1117,17 @@ class TestFrameProtocolSend(object):
         data = proto.close(code=fp.CloseReason.NO_STATUS_RCVD)
         assert data == b'\x88\x02\x03\xe8'
 
+    def test_ping_without_payload(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        data = proto.ping()
+        assert data == b'\x89\x00'
+
+    def test_ping_with_payload(self):
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        payload = u'¯\_(ツ)_/¯'.encode('utf8')
+        data = proto.ping(payload)
+        assert data == b'\x89' + bytearray([len(payload)]) + payload
+
     def test_pong_without_payload(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
         data = proto.pong()
