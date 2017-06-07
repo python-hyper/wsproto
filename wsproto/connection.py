@@ -433,3 +433,10 @@ class WSConnection(object):
         self._outgoing += self._upgrade_connection.send(response)
         self._proto = FrameProtocol(self.client, self.extensions)
         self._state = ConnectionState.OPEN
+
+    def ping(self, payload=None):
+        if payload is not None:
+            payload = bytes(payload)
+        else:
+            payload = b''
+        self._outgoing += self._proto.ping(payload)

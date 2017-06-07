@@ -492,6 +492,9 @@ class FrameProtocol(object):
 
         return self._serialize_frame(Opcode.CLOSE, payload)
 
+    def ping(self, payload=b''):
+        return self._serialize_frame(Opcode.PING, payload)
+
     def pong(self, payload=b''):
         return self._serialize_frame(Opcode.PONG, payload)
 
