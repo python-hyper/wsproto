@@ -1,0 +1,6 @@
+pylint:
+  disable:
+    - unused-argument
+
+  options:
+    max-args: 6
