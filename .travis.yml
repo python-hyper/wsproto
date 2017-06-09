@@ -34,9 +34,9 @@ env:
 
 matrix:
   include:
-  - python: 3.5
+  - python: 3.6
     env: MODE=docs
-  - python: 3.5
+  - python: 3.6
     env: MODE=flake8
 
 script:
