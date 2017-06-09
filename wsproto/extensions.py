@@ -164,7 +164,7 @@ class PerMessageDeflate(Extension):
                 else:
                     bits = self.client_max_window_bits
                 if self._decompressor is None:
-                    self._decompressor = zlib.decompressobj(-bits)
+                    self._decompressor = zlib.decompressobj(-int(bits))
 
         return RsvBits(True, False, False)
 
@@ -217,7 +217,7 @@ class PerMessageDeflate(Extension):
             else:
                 bits = self.server_max_window_bits
             self._compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
-                                                zlib.DEFLATED, -bits)
+                                                zlib.DEFLATED, -int(bits))
 
         data = self._compressor.compress(bytes(data))
 
