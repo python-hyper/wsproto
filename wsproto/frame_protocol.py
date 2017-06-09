@@ -231,9 +231,9 @@ class MessageDecoder(object):
 
 
 class FrameDecoder(object):
-    def __init__(self, client, extensions=[]):
+    def __init__(self, client, extensions=None):
         self.client = client
-        self.extensions = extensions
+        self.extensions = extensions or []
 
         self.buffer = Buffer()
 

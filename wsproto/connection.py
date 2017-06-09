@@ -100,13 +100,13 @@ class WSConnection(object):
     """
 
     def __init__(self, conn_type, host=None, resource=None, extensions=None,
-                 subprotocols=[]):
+                 subprotocols=None):
         self.client = conn_type is ConnectionType.CLIENT
 
         self.host = host
         self.resource = resource
 
-        self.subprotocols = subprotocols
+        self.subprotocols = subprotocols or []
         self.extensions = extensions or []
 
         self.version = b'13'
