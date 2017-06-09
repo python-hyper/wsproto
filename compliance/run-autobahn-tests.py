@@ -90,11 +90,11 @@ def wait_for_listener(port):
 def coverage(command, coverage_settings):
     if not coverage_settings["enabled"]:
         return [sys.executable] + command
-    else:
-        return ([sys.executable, "-m", "coverage", "run",
-                 "--include", coverage_settings["wsproto-path"],
-                 "--rcfile", coverage_settings["coveragerc"]]
-                + command)
+
+    return ([sys.executable, "-m", "coverage", "run",
+             "--include", coverage_settings["wsproto-path"],
+             "--rcfile", coverage_settings["coveragerc"]]
+            + command)
 
 def summarize(report_path):
     with open(os.path.join(report_path, "index.json")) as f:

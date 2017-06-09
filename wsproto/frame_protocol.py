@@ -131,17 +131,17 @@ RsvBits = namedtuple("RsvBits", "rsv1 rsv2 rsv3".split())
 def _truncate_utf8(data, nbytes):
     if len(data) <= nbytes:
         return data
-    else:
-        # Truncate
-        data = data[:nbytes]
-        # But we might have cut a codepoint in half, in which case we want to
-        # discard the partial character so the data is at least
-        # well-formed. This is a little inefficient since it processes the
-        # whole message twice when in theory we could just peek at the last
-        # few characters, but since this is only used for close messages (max
-        # length = 125 bytes) it really doesn't matter.
-        data = data.decode("utf-8", errors="ignore").encode("utf-8")
-        return data
+
+    # Truncate
+    data = data[:nbytes]
+    # But we might have cut a codepoint in half, in which case we want to
+    # discard the partial character so the data is at least
+    # well-formed. This is a little inefficient since it processes the
+    # whole message twice when in theory we could just peek at the last
+    # few characters, but since this is only used for close messages (max
+    # length = 125 bytes) it really doesn't matter.
+    data = data.decode("utf-8", errors="ignore").encode("utf-8")
+    return data
 
 
 class Buffer(object):
@@ -572,5 +572,5 @@ class FrameProtocol(object):
             masking_key = os.urandom(4)
             masker = XorMaskerSimple(masking_key)
             return header + masking_key + masker.process(payload)
-        else:
-            return header + payload
+
+        return header + payload
