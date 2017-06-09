@@ -31,7 +31,7 @@ matrix:
   - python: 3.6
     env: MODE=docs
   - python: 3.6
-    env: MODE=flake8
+    env: MODE=prospector
 
 cache: pip
 

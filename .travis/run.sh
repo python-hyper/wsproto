@@ -40,7 +40,7 @@ install_wsproto() {
 }
 
 case "$MODE" in
-    flake8)
+    prospector)
         pip install flake8
         flake8 --max-complexity 12 wsproto
         ;;
