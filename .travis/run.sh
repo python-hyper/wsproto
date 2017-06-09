@@ -1,7 +1,34 @@
 #!/bin/bash
 
 set -e
-set -x
+
+# ${foo:-} means "$foo, unless that's undefined, in which case an empty string"
+if [ -n "${PYPY_VERSION:-}" ]; then
+    curl -Lo pypy.tar.bz2 https://bitbucket.org/squeaky/portable-pypy/downloads/${PYPY_VERSION}-linux_x86_64-portable.tar.bz2
+    tar xaf pypy.tar.bz2
+    # Something like:
+    #   pypy-5.6-linux_x86_64-portable/bin/pypy
+    #   pypy3.5-5.7.1-beta-linux_x86_64-portable/bin/pypy
+    PYPY=$(echo pypy*/bin/pypy)
+    $PYPY -m ensurepip
+    $PYPY -m pip install virtualenv
+    $PYPY -m virtualenv testenv
+    # http://redsymbol.net/articles/unofficial-bash-strict-mode/#sourcing-nonconforming-document
+    set +u
+    source testenv/bin/activate
+    set -u
+
+    # Don't use wsaccel under PyPy
+    WSACCEL=0
+fi
+
+if [ -z "${WSACCEL:-}" ]; then
+    WSACCEL=1
+fi
+
+echo "Python version:"
+python --version
+echo "WSACCEL=$WSACCEL"
 
 install_wsproto() {
     pip install -U pip setuptools
@@ -24,6 +51,7 @@ case "$MODE" in
         pip install sphinx
         sphinx-build -nW -b html -d docs/build/doctrees docs/source docs/build/html
         ;;
+
     pytest)
         install_wsproto
         pip install -r test_requirements.txt
