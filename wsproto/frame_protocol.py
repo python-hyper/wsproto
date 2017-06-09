@@ -519,18 +519,21 @@ class FrameProtocol(object):
 
         return self._serialize_frame(opcode, payload, fin)
 
+    def _make_fin_rsv_opcode(self, fin, rsv, opcode):
+        fin = int(fin) << 7
+        rsv = (int(rsv.rsv1) << 6) + (int(rsv.rsv2) << 5) + \
+            (int(rsv.rsv3) << 4)
+        opcode = int(opcode)
+
+        return fin | rsv | opcode
+
     def _serialize_frame(self, opcode, payload=b'', fin=True):
         rsv = RsvBits(False, False, False)
         for extension in reversed(self.extensions):
             rsv, payload = extension.frame_outbound(self, opcode, rsv, payload,
                                                     fin)
 
-        fin_rsv = 0
-        for bit in rsv:
-            fin_rsv <<= 1
-            fin_rsv |= int(bit)
-        fin_rsv |= (int(fin) << 3)
-        fin_rsv_opcode = fin_rsv << 4 | opcode
+        fin_rsv_opcode = self._make_fin_rsv_opcode(fin, rsv, opcode)
 
         payload_length = len(payload)
         quad_payload = False
