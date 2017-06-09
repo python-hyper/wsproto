@@ -8,7 +8,6 @@ WebSocket extensions.
 
 import zlib
 
-from .compat import PY2
 from .frame_protocol import CloseReason, Opcode, RsvBits
 
 
@@ -24,6 +23,9 @@ class Extension(object):
     def accept(self, connection, offer):
         return None
 
+    def finalize(self, connection, offer):
+        return None
+
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
         return RsvBits(False, False, False)
 
@@ -31,7 +33,7 @@ class Extension(object):
         return data
 
     def frame_inbound_complete(self, proto, fin):
-        pass
+        return None
 
     def frame_outbound(self, proto, opcode, rsv, data, fin):
         return (rsv, data)
@@ -40,12 +42,19 @@ class Extension(object):
 class PerMessageDeflate(Extension):
     name = 'permessage-deflate'
 
+    DEFAULT_CLIENT_MAX_WINDOW_BITS = 15
+    DEFAULT_SERVER_MAX_WINDOW_BITS = 15
+
     def __init__(self, client_no_context_takeover=False,
-                 client_max_window_bits=15, server_no_context_takeover=False,
-                 server_max_window_bits=15):
+                 client_max_window_bits=None, server_no_context_takeover=False,
+                 server_max_window_bits=None):
         self.client_no_context_takeover = client_no_context_takeover
+        if client_max_window_bits is None:
+            client_max_window_bits = self.DEFAULT_CLIENT_MAX_WINDOW_BITS
         self.client_max_window_bits = client_max_window_bits
         self.server_no_context_takeover = server_no_context_takeover
+        if server_max_window_bits is None:
+            server_max_window_bits = self.DEFAULT_SERVER_MAX_WINDOW_BITS
         self.server_max_window_bits = server_max_window_bits
 
         self._compressor = None
@@ -163,20 +172,17 @@ class PerMessageDeflate(Extension):
         if not self._inbound_compressed or not self._inbound_is_compressible:
             return data
 
-        if PY2:
-            data = str(data)
-
         try:
-            return self._decompressor.decompress(data)
+            return self._decompressor.decompress(bytes(data))
         except zlib.error:
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     def frame_inbound_complete(self, proto, fin):
         if not fin:
             return
-        elif not self._inbound_compressed:
-            return
         elif not self._inbound_is_compressible:
+            return
+        elif not self._inbound_compressed:
             return
 
         try:
@@ -213,9 +219,7 @@ class PerMessageDeflate(Extension):
             self._compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
                                                 zlib.DEFLATED, -bits)
 
-        if PY2:
-            data = str(data)
-        data = self._compressor.compress(data)
+        data = self._compressor.compress(bytes(data))
 
         if fin:
             data += self._compressor.flush(zlib.Z_SYNC_FLUSH)

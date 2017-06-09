@@ -66,7 +66,7 @@ def _normed_header_dict(h11_headers):
 # wrong, because those can contain quoted strings, which can in turn contain
 # commas. XX FIXME
 def _split_comma_header(value):
-    return [piece.strip() for piece in value.split(b',')]
+    return [piece.decode('ascii').strip() for piece in value.split(b',')]
 
 
 class WSConnection(object):
@@ -236,14 +236,22 @@ class WSConnection(object):
     def _process_upgrade(self, data):
         self._upgrade_connection.receive_data(data)
         while True:
-            event = self._upgrade_connection.next_event()
+            try:
+                event = self._upgrade_connection.next_event()
+            except h11.RemoteProtocolError:
+                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                        "Bad HTTP message"), b''
             if event is h11.NEED_DATA:
                 break
-            elif self.client and isinstance(event, h11.InformationalResponse):
+            elif self.client and isinstance(event, (h11.InformationalResponse,
+                                                    h11.Response)):
                 data = self._upgrade_connection.trailing_data[0]
                 return self._establish_client_connection(event), data
             elif not self.client and isinstance(event, h11.Request):
                 return self._process_connection_request(event), None
+            else:
+                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                        "Bad HTTP message"), b''
 
         self._incoming = b''
         return None, None
@@ -264,7 +272,6 @@ class WSConnection(object):
 
         try:
             for frame in self._proto.received_frames():
-
                 if frame.opcode is Opcode.PING:
                     assert frame.frame_finished and frame.message_finished
                     self._outgoing += self._proto.pong(frame.payload)
@@ -320,6 +327,7 @@ class WSConnection(object):
 
         subprotocol = headers.get(b'sec-websocket-protocol', None)
         if subprotocol is not None:
+            subprotocol = subprotocol.decode('ascii')
             if subprotocol not in self.subprotocols:
                 return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                         "unrecognized subprotocol {!r}"
@@ -330,7 +338,6 @@ class WSConnection(object):
             accepts = _split_comma_header(extensions)
 
             for accept in accepts:
-                accept = accept.decode('ascii')
                 name = accept.split(';', 1)[0].strip()
                 for extension in self.extensions:
                     if extension.name == name:
@@ -400,7 +407,6 @@ class WSConnection(object):
             offers = _split_comma_header(extensions)
 
             for offer in offers:
-                offer = offer.decode('ascii')
                 name = offer.split(';', 1)[0].strip()
                 for extension in self.extensions:
                     if extension.name == name:
@@ -427,3 +433,7 @@ class WSConnection(object):
         self._outgoing += self._upgrade_connection.send(response)
         self._proto = FrameProtocol(self.client, self.extensions)
         self._state = ConnectionState.OPEN
+
+    def ping(self, payload=None):
+        payload = bytes(payload or b'')
+        self._outgoing += self._proto.ping(payload)
