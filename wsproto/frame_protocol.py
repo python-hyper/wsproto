@@ -406,7 +406,7 @@ class FrameProtocol(object):
     def _process_close(self, frame):
         data = frame.payload
 
-        if len(data) == 0:
+        if not data:
             # "If this Close control frame contains no status code, _The
             # WebSocket Connection Close Code_ is considered to be 1005"
             data = (CloseReason.NO_STATUS_RCVD, "")
