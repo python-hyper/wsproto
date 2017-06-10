@@ -14,4 +14,7 @@ if PY3:
         return None
 else:
     unicode = unicode
-    from .utf8validator import Utf8Validator
+    try:
+        from wsaccel.utf8validator import Utf8Validator
+    except ImportError:
+        from .utf8validator import Utf8Validator
