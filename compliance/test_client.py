@@ -15,6 +15,11 @@ else:
 SERVER = 'ws://127.0.0.1:8642'
 AGENT = 'wsproto'
 
+if PY2:
+    CONNECTION_EXCEPTIONS = (OSError,)
+else:
+    CONNECTION_EXCEPTIONS = (ConnectionError, OSError)
+
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')
     connection = WSConnection(CLIENT, uri.netloc, uri.path)
@@ -36,7 +41,7 @@ def get_case_count(server):
                     connection.close()
             try:
                 sock.sendall(connection.bytes_to_send())
-            except (ConnectionError, OSError):
+            except CONNECTION_EXCEPTIONS:
                 break
 
     sock.close()
@@ -56,7 +61,7 @@ def run_case(server, case, agent):
     while not closed:
         try:
             data = sock.recv(65535)
-        except ConnectionError:
+        except CONNECTION_EXCEPTIONS:
             data = None
         connection.receive_bytes(data or None)
         for event in connection.events():
@@ -71,7 +76,7 @@ def run_case(server, case, agent):
         try:
             data = connection.bytes_to_send()
             sock.sendall(data)
-        except (ConnectionError, OSError):
+        except CONNECTION_EXCEPTIONS:
             closed = True
             break
 
@@ -94,7 +99,7 @@ def update_reports(server, agent):
                 sock.sendall(connection.bytes_to_send())
                 try:
                     sock.close()
-                except (ConnectionError, OSError):
+                except CONNECTION_EXCEPTIONS:
                     pass
                 finally:
                     closed = True

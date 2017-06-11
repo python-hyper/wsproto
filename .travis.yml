@@ -2,7 +2,6 @@ language: python
 sudo: false
 python:
   - "2.7"
-  - "3.4"
   - "3.5"
   - "3.6"
 
@@ -12,33 +11,29 @@ branches:
 
 env:
   - MODE=pytest
-    WSACCEL=1
-
-  - MODE=pytest
-    WSACCEL=0
-
   - MODE=autobahn
     SIDE=client
-    WSACCEL=1
-
-  - MODE=autobahn
-    SIDE=client
-    WSACCEL=0
-
   - MODE=autobahn
     SIDE=server
-    WSACCEL=1
-
-  - MODE=autobahn
-    SIDE=server
-    WSACCEL=0
 
 matrix:
   include:
-  - python: 3.5
+  - python: 2.7
+    env: MODE=pytest WSACCEL=0
+  - python: 3.6
+    env: MODE=pytest WSACCEL=0
+  - os: linux
+    language: generic
+    env: MODE=pytest PYPY_VERSION=pypy-5.8
+  - os: linux
+    language: generic
+    env: MODE=pytest PYPY_VERSION=pypy3.5-5.8-beta
+  - python: 3.6
     env: MODE=docs
-  - python: 3.5
+  - python: 3.6
     env: MODE=flake8
+
+cache: pip
 
 script:
   - "./.travis/run.sh"

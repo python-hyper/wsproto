@@ -14,3 +14,4 @@ precision = 1
 source =
     wsproto
     .tox/*/lib/*/site-packages/wsproto
+    .tox/*/site-packages/wsproto
