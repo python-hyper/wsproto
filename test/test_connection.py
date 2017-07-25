@@ -11,7 +11,8 @@ from wsproto.events import (
     ConnectionRequested,
     TextReceived,
     BytesReceived,
-)
+    PingReceived,
+    PongReceived)
 from wsproto.frame_protocol import CloseReason, FrameProtocol
 
 
@@ -125,22 +126,19 @@ class TestConnection(object):
 
         payload = b'x' * 23
 
+        # Send a PING message
         me.ping(payload)
         wire_data = me.bytes_to_send()
-        assert wire_data[0] == 0x89
-        masked = bool(wire_data[1] & 0x80)
-        assert wire_data[1] & ~0x80 == len(payload)
-        if masked:
-            maskbytes = itertools.cycle(bytearray(wire_data[2:6]))
-            data = bytearray(b ^ next(maskbytes)
-                             for b in bytearray(wire_data[6:]))
-        else:
-            data = wire_data[2:]
-        assert data == payload
 
+        # Verify that the peer emits the PingReceive event with the correct payload
         them.receive_bytes(wire_data)
+        event = next(them.events())
+        assert isinstance(event, PingReceived)
+        assert event.payload == payload
         with pytest.raises(StopIteration):
             print(repr(next(them.events())))
+
+        # Let the peer send the automatic PONG message
         wire_data = them.bytes_to_send()
         assert wire_data[0] == 0x8a
         masked = bool(wire_data[1] & 0x80)
@@ -152,6 +150,28 @@ class TestConnection(object):
         else:
             data = wire_data[2:]
         assert data == payload
+
+        # Verify that connection emits the PongReceive event with the correct payload
+        me.receive_bytes(wire_data)
+        event = next(me.events())
+        assert isinstance(event, PongReceived)
+        assert event.payload == payload
+        with pytest.raises(StopIteration):
+            print(repr(next(me.events())))
+
+    @pytest.mark.parametrize('args, expected_payload', [
+        ((), b''),
+        ((b'abcdef',), b'abcdef')
+    ], ids=['nopayload', 'payload'])
+    def test_unsolicited_pong(self, args, expected_payload):
+        client, server = self.create_connection()
+        client.pong(*args)
+        wire_data = client.bytes_to_send()
+        server.receive_bytes(wire_data)
+        events = list(server.events())
+        assert len(events) == 1
+        assert isinstance(events[0], PongReceived)
+        assert events[0].payload == expected_payload
 
     @pytest.mark.parametrize('text,payload,full_message,full_frame', [
         (True, u'ƒñö®∂😎', True, True),
