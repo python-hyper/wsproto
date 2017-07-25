@@ -441,10 +441,24 @@ class WSConnection(object):
 
     def ping(self, payload=None):
         """
-        Send a PING to the peer.
+        Send a PING message to the peer.
 
         :param payload: an optional payload to send with the message
         """
 
         payload = bytes(payload or b'')
         self._outgoing += self._proto.ping(payload)
+
+    def pong(self, payload=None):
+        """
+        Send a PONG message to the peer.
+
+        This method can be used to send an unsolicted PONG to the peer.
+        It is not needed otherwise since every received PING causes a
+        corresponding PONG to be sent automatically.
+
+        :param payload: an optional payload to send with the message
+        """
+
+        payload = bytes(payload or b'')
+        self._outgoing += self._proto.pong(payload)

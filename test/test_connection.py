@@ -159,6 +159,20 @@ class TestConnection(object):
         with pytest.raises(StopIteration):
             print(repr(next(me.events())))
 
+    @pytest.mark.parametrize('args, expected_payload', [
+        ((), b''),
+        ((b'abcdef',), b'abcdef')
+    ], ids=['nopayload', 'payload'])
+    def test_unsolicited_pong(self, args, expected_payload):
+        client, server = self.create_connection()
+        client.pong(*args)
+        wire_data = client.bytes_to_send()
+        server.receive_bytes(wire_data)
+        events = list(server.events())
+        assert len(events) == 1
+        assert isinstance(events[0], PongReceived)
+        assert events[0].payload == expected_payload
+
     @pytest.mark.parametrize('text,payload,full_message,full_frame', [
         (True, u'ƒñö®∂😎', True, True),
         (True, u'ƒñö®∂😎', False, True),
