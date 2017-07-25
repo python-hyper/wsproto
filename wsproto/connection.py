@@ -17,7 +17,7 @@ import h11
 
 from .events import (
     ConnectionRequested, ConnectionEstablished, ConnectionClosed,
-    ConnectionFailed, TextReceived, BytesReceived
+    ConnectionFailed, TextReceived, BytesReceived, PingReceived, PongReceived
 )
 from .frame_protocol import FrameProtocol, ParseFailed, CloseReason, Opcode
 
@@ -275,6 +275,11 @@ class WSConnection(object):
                 if frame.opcode is Opcode.PING:
                     assert frame.frame_finished and frame.message_finished
                     self._outgoing += self._proto.pong(frame.payload)
+                    yield PingReceived(frame.payload)
+
+                elif frame.opcode is Opcode.PONG:
+                    assert frame.frame_finished and frame.message_finished
+                    yield PongReceived(frame.payload)
 
                 elif frame.opcode is Opcode.CLOSE:
                     code, reason = frame.payload
@@ -435,5 +440,11 @@ class WSConnection(object):
         self._state = ConnectionState.OPEN
 
     def ping(self, payload=None):
+        """
+        Send a PING to the peer.
+
+        :param payload: an optional payload to send with the message
+        """
+
         payload = bytes(payload or b'')
         self._outgoing += self._proto.ping(payload)

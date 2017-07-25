@@ -69,3 +69,13 @@ class TextReceived(DataReceived):
 
 class BytesReceived(DataReceived):
     pass
+
+
+class PingReceived(object):
+    def __init__(self, payload):
+        self.payload = payload
+
+
+class PongReceived(object):
+    def __init__(self, payload):
+        self.payload = payload
