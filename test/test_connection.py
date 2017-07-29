@@ -14,34 +14,37 @@ from wsproto.events import (
     PingReceived,
     PongReceived)
 from wsproto.frame_protocol import CloseReason, FrameProtocol
+from wsproto.extensions import PerMessageDeflate
+from wsproto import exceptions
 
 
 class TestConnection(object):
-    def create_connection(self):
-        server = WSConnection(SERVER)
-        client = WSConnection(CLIENT, host='localhost', resource='foo')
+    def create_connection(self, state=ConnectionState.CONNECTING):
+        server = WSConnection(SERVER, state)
+        client = WSConnection(CLIENT, state, host='localhost', resource='foo')
+        if state is ConnectionState.CONNECTING:
+            server.receive_bytes(client.bytes_to_send())
+            event = next(server.events())
+            assert isinstance(event, ConnectionRequested)
 
-        server.receive_bytes(client.bytes_to_send())
-        event = next(server.events())
-        assert isinstance(event, ConnectionRequested)
-
-        server.accept(event)
-        client.receive_bytes(server.bytes_to_send())
-        assert isinstance(next(client.events()), ConnectionEstablished)
+            server.accept(event)
+            client.receive_bytes(server.bytes_to_send())
+            assert isinstance(next(client.events()), ConnectionEstablished)
 
         return client, server
 
     def test_negotiation(self):
         self.create_connection()
 
+    @pytest.mark.parametrize('state', [ConnectionState.CONNECTING, ConnectionState.OPEN])
     @pytest.mark.parametrize('as_client,final', [
         (True, True),
         (True, False),
         (False, True),
         (False, False)
     ])
-    def test_send_and_receive(self, as_client, final):
-        client, server = self.create_connection()
+    def test_send_and_receive(self, state, as_client, final):
+        client, server = self.create_connection(state)
         if as_client:
             me = client
             them = server
@@ -59,14 +62,15 @@ class TestConnection(object):
         assert event.data == data
         assert event.message_finished is final
 
+    @pytest.mark.parametrize('state', [ConnectionState.CONNECTING, ConnectionState.OPEN])
     @pytest.mark.parametrize('as_client,code,reason', [
         (True, CloseReason.NORMAL_CLOSURE, u'bye'),
         (True, CloseReason.GOING_AWAY, u'👋👋'),
         (False, CloseReason.NORMAL_CLOSURE, u'bye'),
         (False, CloseReason.GOING_AWAY, u'👋👋'),
     ])
-    def test_close(self, as_client, code, reason):
-        client, server = self.create_connection()
+    def test_close(self, state, as_client, code, reason):
+        client, server = self.create_connection(state)
         if as_client:
             me = client
             them = server
@@ -92,8 +96,9 @@ class TestConnection(object):
                 print(repr(next(conn.events())))
             assert conn.closed
 
-    def test_abnormal_closure(self):
-        client, server = self.create_connection()
+    @pytest.mark.parametrize('state', [ConnectionState.CONNECTING, ConnectionState.OPEN])
+    def test_abnormal_closure(self, state):
+        client, server = self.create_connection(state)
 
         for conn in (client, server):
             conn.receive_bytes(None)
@@ -114,9 +119,10 @@ class TestConnection(object):
         assert connection.bytes_to_send(5) == b'fnord'
         assert connection.bytes_to_send() == b' fnord'
 
+    @pytest.mark.parametrize('state', [ConnectionState.CONNECTING, ConnectionState.OPEN])
     @pytest.mark.parametrize('as_client', [True, False])
-    def test_ping_pong(self, as_client):
-        client, server = self.create_connection()
+    def test_ping_pong(self, state, as_client):
+        client, server = self.create_connection(state)
         if as_client:
             me = client
             them = server
@@ -159,12 +165,13 @@ class TestConnection(object):
         with pytest.raises(StopIteration):
             print(repr(next(me.events())))
 
+    @pytest.mark.parametrize('state', [ConnectionState.CONNECTING, ConnectionState.OPEN])
     @pytest.mark.parametrize('args, expected_payload', [
         ((), b''),
         ((b'abcdef',), b'abcdef')
     ], ids=['nopayload', 'payload'])
-    def test_unsolicited_pong(self, args, expected_payload):
-        client, server = self.create_connection()
+    def test_unsolicited_pong(self, state, args, expected_payload):
+        client, server = self.create_connection(state)
         client.pong(*args)
         wire_data = client.bytes_to_send()
         server.receive_bytes(wire_data)
@@ -252,3 +259,30 @@ class TestConnection(object):
 
         output = client.bytes_to_send()
         assert output[:1] == b'\x88'
+
+    @pytest.mark.parametrize('as_client', [True, False])
+    @pytest.mark.parametrize('ext', [PerMessageDeflate(), 'permessage-deflate;client_no_context_takeover;client_max_window_bits=10'])
+    def test_enable_extension(self, as_client, ext):
+        client = WSConnection(CLIENT, ConnectionState.OPEN, extensions=[ext])
+        server = WSConnection(SERVER, ConnectionState.OPEN, extensions=[ext])
+
+        assert len(client.extensions) == 1
+        assert client.extensions[0].enabled()
+        assert len(server.extensions) == 1
+        assert server.extensions[0].enabled()
+
+        if as_client:
+            me = client
+            them = server
+        else:
+            me = server
+            them = client
+
+        me.send_data("Hello")
+        them.receive_bytes(me.bytes_to_send())
+        event = next(them.events())
+        assert event.data == "Hello"
+
+    def test_unsupported_extension(self):
+        with pytest.raises(exceptions.UnsupportedExtension):
+            WSConnection(CLIENT, ConnectionState.OPEN, extensions=["unsupported-extension"])

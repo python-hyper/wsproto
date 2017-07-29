@@ -51,11 +51,11 @@ class PerMessageDeflate(Extension):
         self.client_no_context_takeover = client_no_context_takeover
         if client_max_window_bits is None:
             client_max_window_bits = self.DEFAULT_CLIENT_MAX_WINDOW_BITS
-        self.client_max_window_bits = client_max_window_bits
+        self.client_max_window_bits = int(client_max_window_bits)
         self.server_no_context_takeover = server_no_context_takeover
         if server_max_window_bits is None:
             server_max_window_bits = self.DEFAULT_SERVER_MAX_WINDOW_BITS
-        self.server_max_window_bits = server_max_window_bits
+        self.server_max_window_bits = int(server_max_window_bits)
 
         self._compressor = None
         self._decompressor = None
