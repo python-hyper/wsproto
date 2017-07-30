@@ -20,7 +20,8 @@ from .events import (
     ConnectionFailed, TextReceived, BytesReceived, PingReceived, PongReceived
 )
 from .frame_protocol import FrameProtocol, ParseFailed, CloseReason, Opcode
-
+from .extensions import PerMessageDeflate
+from .exceptions import UnsupportedExtension
 
 # RFC6455, Section 1.3 - Opening Handshake
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -82,6 +83,11 @@ class WSConnection(object):
         pass ``SERVER``.
     :type conn_type: ``ConnectionType``
 
+    :param conn_state: Initial state of the connection. If initial state is
+        set to OPEN the user is expected to set the extensions parameter
+        according to the handshake observed.
+    :type conn_state: ``ConnectionState``
+
     :param host: The hostname to pass to the server when acting as a client.
     :type host: ``str``
 
@@ -91,7 +97,9 @@ class WSConnection(object):
 
     :param extensions: A list of  extensions to use on this connection.
         Extensions should be instances of a subclass of
-        :class:`Extension <wsproto.extensions.Extension>`.
+        :class:`Extension <wsproto.extensions.Extension>`
+        or a sec-websocket-extensions header value if connection is not in
+        connecting state.
 
     :param subprotocols: A list of subprotocols to request when acting as a
         client, ordered by preference. This has no impact on the connection
@@ -99,7 +107,8 @@ class WSConnection(object):
     :type subprotocol: ``list`` of ``str``
     """
 
-    def __init__(self, conn_type, host=None, resource=None, extensions=None,
+    def __init__(self, conn_type, conn_state=ConnectionState.CONNECTING,
+                 host=None, resource=None, extensions=None,
                  subprotocols=[]):
         self.client = conn_type is ConnectionType.CLIENT
 
@@ -111,7 +120,7 @@ class WSConnection(object):
 
         self.version = b'13'
 
-        self._state = ConnectionState.CONNECTING
+        self._state = conn_state
         self._close_reason = None
 
         self._nonce = None
@@ -119,13 +128,40 @@ class WSConnection(object):
         self._events = deque()
         self._proto = None
 
+        self.supported = {"permessage-deflate": PerMessageDeflate}
+
         if self.client:
             self._upgrade_connection = h11.Connection(h11.CLIENT)
         else:
             self._upgrade_connection = h11.Connection(h11.SERVER)
 
-        if self.client:
+        if self.client and self._state is ConnectionState.CONNECTING:
             self.initiate_connection()
+        elif self._state is not ConnectionState.CONNECTING:
+            for i, extension in enumerate(self.extensions):
+                if isinstance(extension, str):
+                    args = {}
+                    extension = extension.rstrip(';').split(';')
+                    name, params = extension[0], extension[1:]
+                    if name not in self.supported.keys():
+                        raise UnsupportedExtension(name)
+
+                    for param in params:
+                        if "=" in param:
+                            param, val = param.split('=', 1)
+                            args[param] = val.strip()
+                        else:
+                            args[param] = True
+
+                    extension = self.supported[name](**args)
+                    self.extensions[i] = extension
+
+                self._enable_extensions(
+                    extension.name.encode("ascii") +
+                    b";" +
+                    extension.offer(self).encode("ascii")
+                )
+            self._proto = FrameProtocol(self.client, self.extensions)
 
     def initiate_connection(self):
         self._generate_nonce()
@@ -157,6 +193,55 @@ class WSConnection(object):
         upgrade = h11.Request(method=b'GET', target=self.resource,
                               headers=headers.items())
         self._outgoing += self._upgrade_connection.send(upgrade)
+
+    def _enable_client_extensions(self, extensions):
+        if extensions:
+            accepts = _split_comma_header(extensions)
+
+            for accept in accepts:
+                name = accept.split(';', 1)[0].strip()
+                for extension in self.extensions:
+                    if extension.name == name:
+                        extension.finalize(self, accept)
+                        break
+                else:
+                    return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                            "unrecognized extension {!r}"
+                                            .format(name))
+
+    def _enable_server_extensions(self, extensions):
+        accepts = {}
+        if extensions is not None:
+            offers = _split_comma_header(extensions)
+
+            for offer in offers:
+                name = offer.split(';', 1)[0].strip()
+                for extension in self.extensions:
+                    if extension.name == name:
+                        accept = extension.accept(self, offer)
+                        if accept is True:
+                            accepts[extension.name] = True
+                        elif accept:
+                            accepts[extension.name] = accept.encode(
+                                'ascii')
+
+        if accepts:
+            extensions = []
+            for name, params in accepts.items():
+                if params is True:
+                    extensions.append(name.encode('ascii'))
+                else:
+                    # py34 annoyance: doesn't support bytestring formatting
+                    params = params.decode("ascii")
+                    extensions.append(('%s; %s' % (name, params))
+                                      .encode("ascii"))
+            return extensions
+
+    def _enable_extensions(self, extensions):
+        if self.client:
+            return self._enable_client_extensions(extensions)
+        else:
+            return self._enable_server_extensions(extensions)
 
     def send_data(self, payload, final=True):
         """
@@ -339,19 +424,9 @@ class WSConnection(object):
                                         .format(subprotocol))
 
         extensions = headers.get(b'sec-websocket-extensions', None)
-        if extensions:
-            accepts = _split_comma_header(extensions)
-
-            for accept in accepts:
-                name = accept.split(';', 1)[0].strip()
-                for extension in self.extensions:
-                    if extension.name == name:
-                        extension.finalize(self, accept)
-                        break
-                else:
-                    return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                            "unrecognized extension {!r}"
-                                            .format(name))
+        event = self._enable_extensions(extensions)
+        if event is not None:
+            return event
 
         self._proto = FrameProtocol(self.client, self.extensions)
         self._state = ConnectionState.OPEN
@@ -407,30 +482,8 @@ class WSConnection(object):
             headers[b'Sec-WebSocket-Protocol'] = subprotocol
 
         extensions = request_headers.get(b'sec-websocket-extensions', None)
-        accepts = {}
-        if extensions is not None:
-            offers = _split_comma_header(extensions)
-
-            for offer in offers:
-                name = offer.split(';', 1)[0].strip()
-                for extension in self.extensions:
-                    if extension.name == name:
-                        accept = extension.accept(self, offer)
-                        if accept is True:
-                            accepts[extension.name] = True
-                        elif accept:
-                            accepts[extension.name] = accept.encode('ascii')
-
-        if accepts:
-            extensions = []
-            for name, params in accepts.items():
-                if params is True:
-                    extensions.append(name.encode('ascii'))
-                else:
-                    # py34 annoyance: doesn't support bytestring formatting
-                    params = params.decode("ascii")
-                    extensions.append(('%s; %s' % (name, params))
-                                      .encode("ascii"))
+        extensions = self._enable_extensions(extensions)
+        if extensions:
             headers[b"Sec-WebSocket-Extensions"] = b', '.join(extensions)
 
         response = h11.InformationalResponse(status_code=101,

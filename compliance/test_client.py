@@ -22,7 +22,9 @@ else:
 
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')
-    connection = WSConnection(CLIENT, uri.netloc, uri.path)
+    connection = WSConnection(CLIENT,
+                              host=uri.netloc,
+                              resource=uri.path)
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
@@ -50,7 +52,8 @@ def get_case_count(server):
 def run_case(server, case, agent):
     uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
     connection = WSConnection(CLIENT,
-                              uri.netloc, '%s?%s' % (uri.path, uri.query),
+                              host=uri.netloc,
+                              resource='%s?%s' % (uri.path, uri.query),
                               extensions=[PerMessageDeflate()])
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
@@ -83,7 +86,8 @@ def run_case(server, case, agent):
 def update_reports(server, agent):
     uri = urlparse(server + '/updateReports?agent=%s' % agent)
     connection = WSConnection(CLIENT,
-                              uri.netloc, '%s?%s' % (uri.path, uri.query))
+                              host=uri.netloc,
+                              resource='%s?%s' % (uri.path, uri.query))
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 

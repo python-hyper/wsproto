@@ -10,7 +10,7 @@ import random
 import pytest
 
 from wsproto.compat import PY3
-from wsproto.connection import WSConnection, CLIENT, SERVER
+from wsproto.connection import WSConnection, ConnectionState, CLIENT, SERVER
 from wsproto.events import (
     ConnectionEstablished, ConnectionFailed, ConnectionRequested
 )
@@ -48,7 +48,7 @@ class FakeExtension(Extension):
 
 class TestClientUpgrade(object):
     def initiate(self, host, path, **kwargs):
-        ws = WSConnection(CLIENT, host, path, **kwargs)
+        ws = WSConnection(CLIENT, ConnectionState.CONNECTING, host, path, **kwargs)
 
         data = ws.bytes_to_send()
         request, headers = data.split(b'\r\n', 1)
