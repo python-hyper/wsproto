@@ -34,6 +34,12 @@ class TestConnection(object):
     def test_negotiation(self):
         self.create_connection()
 
+    def test_default_args(self):
+        with pytest.raises(ValueError, match="Host must not be None"):
+            client = WSConnection(CLIENT, resource='/ws')
+        with pytest.raises(ValueError, match="Resource must not be None"):
+            server = WSConnection(CLIENT, host='localhost')
+
     @pytest.mark.parametrize('as_client,final', [
         (True, True),
         (True, False),
