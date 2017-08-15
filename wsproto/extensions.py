@@ -246,3 +246,11 @@ class PerMessageDeflate(Extension):
         descr = '; '.join(descr)
 
         return '<%s %s>' % (self.__class__.__name__, descr)
+
+#: SUPPORTED_EXTENSIONS maps all supported extension names to their class.
+#: This can be used to iterate all supported extensions of wsproto, instantiate
+#: new extensions based on their name, or check if a given extension is
+#: supported or not.
+SUPPORTED_EXTENSIONS = {
+    PerMessageDeflate.name: PerMessageDeflate
+}
