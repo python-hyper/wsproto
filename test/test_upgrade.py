@@ -641,10 +641,11 @@ class TestServerUpgrade(object):
         assert headers['sec-websocket-extensions'] == \
             '%s; %s' % (ext.name, ext_params)
 
-    def test_disinterested_extension_negotiation(self):
+    @pytest.mark.parametrize('accept_response', [False, None])
+    def test_disinterested_extension_negotiation(self, accept_response):
         test_host = 'frob.nitz'
         test_path = '/fnord'
-        ext = FakeExtension(accept_response=False)
+        ext = FakeExtension(accept_response=accept_response)
 
         ws = WSConnection(SERVER, extensions=[ext])
 
@@ -673,6 +674,39 @@ class TestServerUpgrade(object):
 
         assert ext.offered == ext.name
         assert 'sec-websocket-extensions' not in headers
+
+    def test_no_params_extension_negotiation(self):
+        test_host = 'frob.nitz'
+        test_path = '/fnord'
+        ext = FakeExtension(accept_response='')
+
+        ws = WSConnection(SERVER, extensions=[ext])
+
+        nonce = bytes(random.getrandbits(8) for x in range(0, 16))
+        nonce = base64.b64encode(nonce)
+
+        request = b"GET " + test_path.encode('ascii') + b" HTTP/1.1\r\n"
+        request += b'Host: ' + test_host.encode('ascii') + b'\r\n'
+        request += b'Connection: Upgrade\r\n'
+        request += b'Upgrade: WebSocket\r\n'
+        request += b'Sec-WebSocket-Version: 13\r\n'
+        request += b'Sec-WebSocket-Key: ' + nonce + b'\r\n'
+        request += b'Sec-WebSocket-Extensions: ' + \
+            ext.name.encode('ascii') + b'\r\n'
+        request += b'\r\n'
+
+        ws.receive_bytes(request)
+        event = next(ws.events())
+        assert isinstance(event, ConnectionRequested)
+        ws.accept(event)
+
+        data = ws.bytes_to_send()
+        response, headers = data.split(b'\r\n', 1)
+        version, code, reason = response.split(b' ')
+        headers = parse_headers(headers)
+
+        assert ext.offered == ext.name
+        assert 'sec-websocket-extensions' in headers
 
     def test_unwanted_extension_negotiation(self):
         test_host = 'frob.nitz'
