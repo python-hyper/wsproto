@@ -125,6 +125,12 @@ class WSConnection(object):
             self._upgrade_connection = h11.Connection(h11.SERVER)
 
         if self.client:
+            if self.host is None:
+                raise ValueError(
+                    "Host must not be None for a client-side connection.")
+            if self.resource is None:
+                raise ValueError(
+                    "Resource must not be None for a client-side connection.")
             self.initiate_connection()
 
     def initiate_connection(self):
