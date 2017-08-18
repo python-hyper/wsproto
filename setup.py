@@ -29,7 +29,7 @@ setup(
     author='Benno Rice',
     author_email='benno@jeamland.net',
     packages=find_packages(),
-    package_data={'': ['LICENSE', 'README.md']},
+    package_data={'': ['LICENSE', 'README.rst']},
     package_dir={'wsproto': 'wsproto'},
     include_package_data=True,
     license='MIT',

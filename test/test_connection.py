@@ -95,7 +95,7 @@ class TestConnection(object):
             conn.close()
             conn.receive_bytes(None)
             with pytest.raises(StopIteration):
-                print(repr(next(conn.events())))
+                repr(next(conn.events()))
             assert conn.closed
 
     def test_abnormal_closure(self):
@@ -143,7 +143,7 @@ class TestConnection(object):
         assert isinstance(event, PingReceived)
         assert event.payload == payload
         with pytest.raises(StopIteration):
-            print(repr(next(them.events())))
+            repr(next(them.events()))
 
         # Let the peer send the automatic PONG message
         wire_data = them.bytes_to_send()
@@ -165,7 +165,7 @@ class TestConnection(object):
         assert isinstance(event, PongReceived)
         assert event.payload == payload
         with pytest.raises(StopIteration):
-            print(repr(next(me.events())))
+            repr(next(me.events()))
 
     @pytest.mark.parametrize('args, expected_payload', [
         ((), b''),
