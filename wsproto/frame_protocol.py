@@ -131,17 +131,17 @@ RsvBits = namedtuple("RsvBits", "rsv1 rsv2 rsv3".split())
 def _truncate_utf8(data, nbytes):
     if len(data) <= nbytes:
         return data
-    else:
-        # Truncate
-        data = data[:nbytes]
-        # But we might have cut a codepoint in half, in which case we want to
-        # discard the partial character so the data is at least
-        # well-formed. This is a little inefficient since it processes the
-        # whole message twice when in theory we could just peek at the last
-        # few characters, but since this is only used for close messages (max
-        # length = 125 bytes) it really doesn't matter.
-        data = data.decode("utf-8", errors="ignore").encode("utf-8")
-        return data
+
+    # Truncate
+    data = data[:nbytes]
+    # But we might have cut a codepoint in half, in which case we want to
+    # discard the partial character so the data is at least
+    # well-formed. This is a little inefficient since it processes the
+    # whole message twice when in theory we could just peek at the last
+    # few characters, but since this is only used for close messages (max
+    # length = 125 bytes) it really doesn't matter.
+    data = data.decode("utf-8", errors="ignore").encode("utf-8")
+    return data
 
 
 class Buffer(object):
@@ -231,9 +231,9 @@ class MessageDecoder(object):
 
 
 class FrameDecoder(object):
-    def __init__(self, client, extensions=[]):
+    def __init__(self, client, extensions=None):
         self.client = client
-        self.extensions = extensions
+        self.extensions = extensions or []
 
         self.buffer = Buffer()
 
@@ -406,7 +406,7 @@ class FrameProtocol(object):
     def _process_close(self, frame):
         data = frame.payload
 
-        if len(data) == 0:
+        if not data:
             # "If this Close control frame contains no status code, _The
             # WebSocket Connection Close Code_ is considered to be 1005"
             data = (CloseReason.NO_STATUS_RCVD, "")
@@ -519,18 +519,21 @@ class FrameProtocol(object):
 
         return self._serialize_frame(opcode, payload, fin)
 
+    def _make_fin_rsv_opcode(self, fin, rsv, opcode):
+        fin = int(fin) << 7
+        rsv = (int(rsv.rsv1) << 6) + (int(rsv.rsv2) << 5) + \
+            (int(rsv.rsv3) << 4)
+        opcode = int(opcode)
+
+        return fin | rsv | opcode
+
     def _serialize_frame(self, opcode, payload=b'', fin=True):
         rsv = RsvBits(False, False, False)
         for extension in reversed(self.extensions):
             rsv, payload = extension.frame_outbound(self, opcode, rsv, payload,
                                                     fin)
 
-        fin_rsv = 0
-        for bit in rsv:
-            fin_rsv <<= 1
-            fin_rsv |= int(bit)
-        fin_rsv |= (int(fin) << 3)
-        fin_rsv_opcode = fin_rsv << 4 | opcode
+        fin_rsv_opcode = self._make_fin_rsv_opcode(fin, rsv, opcode)
 
         payload_length = len(payload)
         quad_payload = False
@@ -572,5 +575,5 @@ class FrameProtocol(object):
             masking_key = os.urandom(4)
             masker = XorMaskerSimple(masking_key)
             return header + masking_key + masker.process(payload)
-        else:
-            return header + payload
+
+        return header + payload

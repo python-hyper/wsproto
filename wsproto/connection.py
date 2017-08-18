@@ -100,13 +100,13 @@ class WSConnection(object):
     """
 
     def __init__(self, conn_type, host=None, resource=None, extensions=None,
-                 subprotocols=[]):
+                 subprotocols=None):
         self.client = conn_type is ConnectionType.CLIENT
 
         self.host = host
         self.resource = resource
 
-        self.subprotocols = subprotocols
+        self.subprotocols = subprotocols or []
         self.extensions = extensions or []
 
         self.version = b'13'
@@ -393,6 +393,34 @@ class WSConnection(object):
 
         return ConnectionRequested(proposed_subprotocols, event)
 
+    def _extension_accept(self, extensions_header):
+        accepts = {}
+        offers = _split_comma_header(extensions_header)
+
+        for offer in offers:
+            name = offer.split(';', 1)[0].strip()
+            for extension in self.extensions:
+                if extension.name == name:
+                    accept = extension.accept(self, offer)
+                    if accept is True:
+                        accepts[extension.name] = True
+                    elif accept is not False and accept is not None:
+                        accepts[extension.name] = accept.encode('ascii')
+
+        if accepts:
+            extensions = []
+            for name, params in accepts.items():
+                if params is True:
+                    extensions.append(name.encode('ascii'))
+                else:
+                    # py34 annoyance: doesn't support bytestring formatting
+                    params = params.decode("ascii")
+                    extensions.append(('%s; %s' % (name, params))
+                                      .encode("ascii"))
+            return b', '.join(extensions)
+
+        return None
+
     def accept(self, event, subprotocol=None):
         request = event.h11request
         request_headers = _normed_header_dict(request.headers)
@@ -413,31 +441,10 @@ class WSConnection(object):
             headers[b'Sec-WebSocket-Protocol'] = subprotocol
 
         extensions = request_headers.get(b'sec-websocket-extensions', None)
-        accepts = {}
-        if extensions is not None:
-            offers = _split_comma_header(extensions)
-
-            for offer in offers:
-                name = offer.split(';', 1)[0].strip()
-                for extension in self.extensions:
-                    if extension.name == name:
-                        accept = extension.accept(self, offer)
-                        if accept is True:
-                            accepts[extension.name] = True
-                        elif accept is not False and accept is not None:
-                            accepts[extension.name] = accept.encode('ascii')
-
-        if accepts:
-            extensions = []
-            for name, params in accepts.items():
-                if params is True:
-                    extensions.append(name.encode('ascii'))
-                else:
-                    # py34 annoyance: doesn't support bytestring formatting
-                    params = params.decode("ascii")
-                    extensions.append(('%s; %s' % (name, params))
-                                      .encode("ascii"))
-            headers[b"Sec-WebSocket-Extensions"] = b', '.join(extensions)
+        if extensions:
+            accepts = self._extension_accept(extensions)
+            if accepts:
+                headers[b"Sec-WebSocket-Extensions"] = accepts
 
         response = h11.InformationalResponse(status_code=101,
                                              headers=headers.items())

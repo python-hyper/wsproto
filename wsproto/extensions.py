@@ -18,13 +18,13 @@ class Extension(object):
         return False
 
     def offer(self, connection):
-        return None
+        pass
 
     def accept(self, connection, offer):
-        return None
+        pass
 
     def finalize(self, connection, offer):
-        return None
+        pass
 
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
         return RsvBits(False, False, False)
@@ -33,7 +33,7 @@ class Extension(object):
         return data
 
     def frame_inbound_complete(self, proto, fin):
-        return None
+        pass
 
     def frame_outbound(self, proto, opcode, rsv, data, fin):
         return (rsv, data)
@@ -164,7 +164,7 @@ class PerMessageDeflate(Extension):
                 else:
                     bits = self.client_max_window_bits
                 if self._decompressor is None:
-                    self._decompressor = zlib.decompressobj(-bits)
+                    self._decompressor = zlib.decompressobj(-int(bits))
 
         return RsvBits(True, False, False)
 
@@ -217,7 +217,7 @@ class PerMessageDeflate(Extension):
             else:
                 bits = self.server_max_window_bits
             self._compressor = zlib.compressobj(zlib.Z_DEFAULT_COMPRESSION,
-                                                zlib.DEFLATED, -bits)
+                                                zlib.DEFLATED, -int(bits))
 
         data = self._compressor.compress(bytes(data))
 
