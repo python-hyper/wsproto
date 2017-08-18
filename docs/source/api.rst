@@ -23,3 +23,5 @@ Extensions
 
 .. autoclass:: wsproto.extensions.Extension
    :members:
+
+.. autodata:: wsproto.extensions.SUPPORTED_EXTENSIONS

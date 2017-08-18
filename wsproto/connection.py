@@ -424,7 +424,7 @@ class WSConnection(object):
                         accept = extension.accept(self, offer)
                         if accept is True:
                             accepts[extension.name] = True
-                        elif accept:
+                        elif accept is not False and accept is not None:
                             accepts[extension.name] = accept.encode('ascii')
 
         if accepts:
