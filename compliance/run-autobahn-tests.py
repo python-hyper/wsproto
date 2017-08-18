@@ -92,8 +92,7 @@ def coverage(command, coverage_settings):
         return [sys.executable] + command
 
     return ([sys.executable, "-m", "coverage", "run",
-             "--include", coverage_settings["wsproto-path"],
-             "--rcfile", coverage_settings["coveragerc"]]
+             "--include", coverage_settings["wsproto-path"]]
             + command)
 
 def summarize(report_path):

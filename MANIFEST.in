@@ -1,1 +1,5 @@
-include README.rst LICENSE
+include README.rst LICENSE CONTRIBUTORS.rst HISTORY.rst tox.ini Pipfile
+recursive-include test *.py
+recursive-include compliance *.py *.json
+graft docs
+prune docs/build
