@@ -1,39 +1,62 @@
-language: python
+dist: trusty
 sudo: false
-python:
-  - "2.7"
-  - "3.5"
-  - "3.6"
+language: python
 
 branches:
   only:
     - master
-
-env:
-  - MODE=pytest
-  - MODE=autobahn
-    SIDE=client
-  - MODE=autobahn
-    SIDE=server
-
-matrix:
-  include:
-  - python: 2.7
-    env: MODE=pytest WSACCEL=0
-  - python: 3.6
-    env: MODE=pytest WSACCEL=0
-  - os: linux
-    language: generic
-    env: MODE=pytest PYPY_VERSION=pypy-5.8
-  - os: linux
-    language: generic
-    env: MODE=pytest PYPY_VERSION=pypy3.5-5.8-beta
-  - python: 3.6
-    env: MODE=docs
-  - python: 3.6
-    env: MODE=prospector
+    - /^\d+\.\d+\.X$/
 
 cache: pip
 
+env:
+  global:
+    - CI_DEPS=codecov>=2.0.5
+    - CI_COMMANDS=codecov
+
+matrix:
+  include:
+    # Main tests on supported Python versions.
+    - python: 2.7
+      env: TOXENV=py27
+    - python: 3.5
+      env: TOXENV=py35
+    - python: 3.6
+      env: TOXENV=py36
+    - python: 2.7
+      env: TOXENV=py27 EXTRA_DEPS=wsaccel
+    - python: 3.5
+      env: TOXENV=py35 EXTRA_DEPS=wsaccel
+    - python: 3.6
+      env: TOXENV=py36 EXTRA_DEPS=wsaccel
+    - python: 2.7
+      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=client
+    - python: 3.5
+      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=client
+    - python: 3.6
+      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=client
+    - python: 2.7
+      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=server
+    - python: 3.5
+      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=server
+    - python: 3.6
+      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=server
+    - python: "pypy-5.7.1"
+      env: TOXENV=pypy
+    - python: "pypy3.5-5.7.1-beta"
+      env: TOXENV=pypy
+
+    # Linting, docs, and other non-test stuff.
+    - python: 3.6
+      env: TOXENV=lint
+    - python: 3.6
+      env: TOXENV=docs
+    # - python: "2.7"
+    #   env: TOXENV=packaging
+
+install:
+  - "pip install -U pip setuptools"
+  - "pip install -U tox"
+
 script:
-  - "./.travis/run.sh"
+  - tox -- --verbose
