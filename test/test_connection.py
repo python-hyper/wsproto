@@ -36,9 +36,9 @@ class TestConnection(object):
 
     def test_default_args(self):
         with pytest.raises(ValueError, match="Host must not be None"):
-            client = WSConnection(CLIENT, resource='/ws')
+            WSConnection(CLIENT, resource='/ws')
         with pytest.raises(ValueError, match="Resource must not be None"):
-            server = WSConnection(CLIENT, host='localhost')
+            WSConnection(CLIENT, host='localhost')
 
     @pytest.mark.parametrize('as_client,final', [
         (True, True),
@@ -136,7 +136,8 @@ class TestConnection(object):
         me.ping(payload)
         wire_data = me.bytes_to_send()
 
-        # Verify that the peer emits the PingReceive event with the correct payload
+        # Verify that the peer emits the PingReceive event with the correct
+        # payload.
         them.receive_bytes(wire_data)
         event = next(them.events())
         assert isinstance(event, PingReceived)
@@ -157,7 +158,8 @@ class TestConnection(object):
             data = wire_data[2:]
         assert data == payload
 
-        # Verify that connection emits the PongReceive event with the correct payload
+        # Verify that connection emits the PongReceive event with the correct
+        # payload.
         me.receive_bytes(wire_data)
         event = next(me.events())
         assert isinstance(event, PongReceived)
