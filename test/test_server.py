@@ -96,7 +96,6 @@ def test_connection_request_bad_upgrade_header():
 
 
 @pytest.mark.parametrize("version", ["12", "not-a-digit"])
-@pytest.mark.skip  # Will fix in a subsequent commit
 def test_connection_request_bad_version_header(version):
     with pytest.raises(RemoteProtocolError) as excinfo:
         event = _make_connection_request(
@@ -108,7 +107,7 @@ def test_connection_request_bad_version_header(version):
                 ("Sec-WebSocket-Key", generate_nonce()),
             ]
         )
-    assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
+    assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Version'"
 
 
 def test_connection_request_key_header():
