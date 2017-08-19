@@ -49,6 +49,11 @@ class ConnectionClosed(object):
 
 
 class ConnectionFailed(ConnectionClosed):
+    """
+    The ConnectionFailed event is fired when the upgrade handshake failed.
+    Users must handle this error by appropriate responses to deal with the
+    connection, e.g., sending a 400 HTTP response for a failed client handshake.
+    """
     pass
 
 
