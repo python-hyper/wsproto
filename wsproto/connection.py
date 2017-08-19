@@ -20,7 +20,7 @@ from .events import (
     ConnectionFailed, TextReceived, BytesReceived, PingReceived, PongReceived
 )
 from .frame_protocol import FrameProtocol, ParseFailed, CloseReason, Opcode
-
+from .utilities import normed_header_dict, split_comma_header
 
 # RFC6455, Section 1.3 - Opening Handshake
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -35,7 +35,6 @@ class ConnectionState(Enum):
     CLOSING = 2
     CLOSED = 3
 
-
 class ConnectionType(Enum):
     CLIENT = 1
     SERVER = 2
@@ -43,31 +42,6 @@ class ConnectionType(Enum):
 
 CLIENT = ConnectionType.CLIENT
 SERVER = ConnectionType.SERVER
-
-
-# Some convenience utilities for working with HTTP headers
-def _normed_header_dict(h11_headers):
-    # This mangles Set-Cookie headers. But it happens that we don't care about
-    # any of those, so it's OK. For every other HTTP header, if there are
-    # multiple instances then you're allowed to join them together with
-    # commas.
-    name_to_values = {}
-    for name, value in h11_headers:
-        name_to_values.setdefault(name, []).append(value)
-    name_to_normed_value = {}
-    for name, values in name_to_values.items():
-        name_to_normed_value[name] = b", ".join(values)
-    return name_to_normed_value
-
-
-# We use this for parsing the proposed protocol list, and for parsing the
-# proposed and accepted extension lists. For the proposed protocol list it's
-# fine, because the ABNF is just 1#token. But for the extension lists, it's
-# wrong, because those can contain quoted strings, which can in turn contain
-# commas. XX FIXME
-def _split_comma_header(value):
-    return [piece.decode('ascii').strip() for piece in value.split(b',')]
-
 
 class WSConnection(object):
     """
@@ -323,8 +297,8 @@ class WSConnection(object):
         if event.status_code != 101:
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Bad status code from server")
-        headers = _normed_header_dict(event.headers)
-        connection_tokens = _split_comma_header(headers[b'connection'])
+        headers = normed_header_dict(event.headers)
+        connection_tokens = split_comma_header(headers[b'connection'])
         if not any(token.lower() == 'upgrade' for token in connection_tokens):
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Connection: Upgrade header")
@@ -347,7 +321,7 @@ class WSConnection(object):
 
         extensions = headers.get(b'sec-websocket-extensions', None)
         if extensions:
-            accepts = _split_comma_header(extensions)
+            accepts = split_comma_header(extensions)
 
             for accept in accepts:
                 name = accept.split(';', 1)[0].strip()
@@ -368,8 +342,8 @@ class WSConnection(object):
         if event.method != b'GET':
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Request method must be GET")
-        headers = _normed_header_dict(event.headers)
-        connection_tokens = _split_comma_header(headers[b'connection'])
+        headers = normed_header_dict(event.headers)
+        connection_tokens = split_comma_header(headers[b'connection'])
         if not any(token.lower() == 'upgrade' for token in connection_tokens):
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Connection: Upgrade header")
@@ -384,7 +358,7 @@ class WSConnection(object):
         # 400 if it's not what we expect
 
         if b'sec-websocket-protocol' in headers:
-            proposed_subprotocols = _split_comma_header(
+            proposed_subprotocols = split_comma_header(
                 headers[b'sec-websocket-protocol'])
         else:
             proposed_subprotocols = []
@@ -397,7 +371,7 @@ class WSConnection(object):
 
     def _extension_accept(self, extensions_header):
         accepts = {}
-        offers = _split_comma_header(extensions_header)
+        offers = split_comma_header(extensions_header)
 
         for offer in offers:
             name = offer.split(';', 1)[0].strip()
@@ -425,7 +399,7 @@ class WSConnection(object):
 
     def accept(self, event, subprotocol=None):
         request = event.h11request
-        request_headers = _normed_header_dict(request.headers)
+        request_headers = normed_header_dict(request.headers)
 
         nonce = request_headers[b'sec-websocket-key']
         accept_token = self._generate_accept_token(nonce)
