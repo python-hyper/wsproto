@@ -60,8 +60,6 @@ Frame Protocol
 .. autoclass:: wsproto.frame_protocol.CloseReason
    :members:
 
-.. autoclass:: wsproto.frame_protocol.FrameProtocol
-   :members:
 
 Extensions
 ----------
