@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/events
-~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 Events that result from processing data on a WebSocket connection.
 """

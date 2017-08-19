@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/connection
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 An implementation of a WebSocket connection.
 """
