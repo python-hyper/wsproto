@@ -4,7 +4,7 @@ import itertools
 
 import pytest
 
-from wsproto.connection import WSConnection, CLIENT, SERVER, ConnectionState
+from wsproto.connection import WSConnection, ConnectionState
 from wsproto.events import (
     ConnectionClosed,
     ConnectionEstablished,
@@ -18,8 +18,8 @@ from wsproto.frame_protocol import CloseReason, FrameProtocol
 
 class TestConnection(object):
     def create_connection(self):
-        server = WSConnection(SERVER)
-        client = WSConnection(CLIENT, host='localhost', resource='foo')
+        server = WSConnection(client_side=False)
+        client = WSConnection(client_side=True, host='localhost', resource='foo')
 
         server.receive_bytes(client.bytes_to_send())
         event = next(server.events())
@@ -36,9 +36,9 @@ class TestConnection(object):
 
     def test_default_args(self):
         with pytest.raises(ValueError, match="Host must not be None"):
-            WSConnection(CLIENT, resource='/ws')
+            WSConnection(client_side=True, resource='/ws')
         with pytest.raises(ValueError, match="Resource must not be None"):
-            WSConnection(CLIENT, host='localhost')
+            WSConnection(client_side=True, host='localhost')
 
     @pytest.mark.parametrize('as_client,final', [
         (True, True),
@@ -91,12 +91,32 @@ class TestConnection(object):
     def test_normal_closure(self):
         client, server = self.create_connection()
 
-        for conn in (client, server):
-            conn.close()
-            conn.receive_bytes(None)
-            with pytest.raises(StopIteration):
-                print(repr(next(conn.events())))
-            assert conn.closed
+        # client sends CLOSE to server
+        client.close()
+        server.receive_bytes(client.bytes_to_send())
+
+        # server emits ConnectionClosed
+        assert isinstance(next(server.events()), ConnectionClosed)
+
+        # server enters CLOSED state
+        assert server.closed
+        with pytest.raises(StopIteration):
+            next(server.events())
+
+        # server sends CLOSE back to client
+        client.receive_bytes(server.bytes_to_send())
+
+        # client emits ConnectionClosed
+        assert isinstance(next(client.events()), ConnectionClosed)
+
+        # client enters CLOSED state
+        assert client.closed
+        with pytest.raises(StopIteration):
+            next(client.events())
+
+        server.ping()
+        with pytest.raises(ValueError):
+            client.receive_bytes(server.bytes_to_send())
 
     def test_abnormal_closure(self):
         client, server = self.create_connection()
@@ -109,13 +129,13 @@ class TestConnection(object):
             assert conn.closed
 
     def test_bytes_send_all(self):
-        connection = WSConnection(SERVER)
+        connection = WSConnection(client_side=False)
         connection._outgoing = b'fnord fnord'
         assert connection.bytes_to_send() == b'fnord fnord'
         assert connection.bytes_to_send() == b''
 
     def test_bytes_send_some(self):
-        connection = WSConnection(SERVER)
+        connection = WSConnection(client_side=False)
         connection._outgoing = b'fnord fnord'
         assert connection.bytes_to_send(5) == b'fnord'
         assert connection.bytes_to_send() == b' fnord'
@@ -209,7 +229,7 @@ class TestConnection(object):
 
         frame = opcode + length + encoded_payload
 
-        connection = WSConnection(CLIENT, host='localhost', resource='foo')
+        connection = WSConnection(client_side=True, host='localhost', resource='foo')
         connection._proto = FrameProtocol(True, [])
         connection._state = ConnectionState.OPEN
         connection.bytes_to_send()
@@ -237,7 +257,7 @@ class TestConnection(object):
             def received_frames(self):
                 return [FailFrame()]
 
-        connection = WSConnection(CLIENT, host='localhost', resource='foo')
+        connection = WSConnection(client_side=True, host='localhost', resource='foo')
         connection._proto = DoomProtocol()
         connection._state = ConnectionState.OPEN
         connection.bytes_to_send()

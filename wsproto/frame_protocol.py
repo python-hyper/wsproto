@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/frame_protocol
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 WebSocket frame protocol implementation.
 """
@@ -12,7 +12,7 @@ import struct
 from codecs import getincrementaldecoder
 from collections import namedtuple
 
-from enum import Enum, IntEnum
+from enum import IntEnum
 
 from .compat import unicode, Utf8Validator
 
@@ -231,8 +231,8 @@ class MessageDecoder(object):
 
 
 class FrameDecoder(object):
-    def __init__(self, client, extensions=None):
-        self.client = client
+    def __init__(self, client_side, extensions=None):
+        self.client_side = client_side
         self.extensions = extensions or []
 
         self.buffer = Buffer()
@@ -321,9 +321,9 @@ class FrameDecoder(object):
 
         self.extension_processing(opcode, rsv, payload_len)
 
-        if has_mask and self.client:
+        if has_mask and self.client_side:
             raise ParseFailed("client received unexpected masked frame")
-        if not has_mask and not self.client:
+        if not has_mask and not self.client_side:
             raise ParseFailed("server received unexpected unmasked frame")
         if has_mask:
             masking_key = self.buffer.consume_exactly(4)
@@ -386,20 +386,14 @@ class FrameDecoder(object):
 
 
 class FrameProtocol(object):
-    class State(Enum):
-        HEADER = 1
-        PAYLOAD = 2
-        FRAME_COMPLETE = 3
-        FAILED = 4
-
-    def __init__(self, client, extensions):
-        self.client = client
+    def __init__(self, client_side, extensions):
+        self.client_side = client_side
         self.extensions = [ext for ext in extensions if ext.enabled()]
 
         # Global state
-        self._frame_decoder = FrameDecoder(self.client, self.extensions)
+        self._frame_decoder = FrameDecoder(self.client_side, self.extensions)
         self._message_decoder = MessageDecoder()
-        self._parse_more = self.parse_more_gen()
+        self._parse_more = self._parse_more_gen()
 
         self._outbound_opcode = None
 
@@ -447,7 +441,7 @@ class FrameProtocol(object):
         return Frame(frame.opcode, data, frame.frame_finished,
                      frame.message_finished)
 
-    def parse_more_gen(self):
+    def _parse_more_gen(self):
         # Consume as much as we can from self._buffer, yielding events, and
         # then yield None when we need more data. Or raise ParseFailed.
 
@@ -548,7 +542,7 @@ class FrameProtocol(object):
             second_payload = payload_length
             quad_payload = True
 
-        if self.client:
+        if self.client_side:
             first_payload |= 1 << 7
 
         header = bytearray([fin_rsv_opcode, first_payload])
@@ -560,7 +554,7 @@ class FrameProtocol(object):
             else:
                 header += bytearray(struct.pack('!H', second_payload))
 
-        if self.client:
+        if self.client_side:
             # "The masking key is a 32-bit value chosen at random by the
             # client.  When preparing a masked frame, the client MUST pick a
             # fresh masking key from the set of allowed 32-bit values.  The
