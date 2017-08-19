@@ -36,15 +36,6 @@ class ConnectionState(Enum):
     CLOSED = 3
 
 
-class ConnectionType(Enum):
-    CLIENT = 1
-    SERVER = 2
-
-
-CLIENT = ConnectionType.CLIENT
-SERVER = ConnectionType.SERVER
-
-
 # Some convenience utilities for working with HTTP headers
 def _normed_header_dict(h11_headers):
     # This mangles Set-Cookie headers. But it happens that we don't care about
@@ -77,10 +68,9 @@ class WSConnection(object):
     to do the initial HTTP upgrade handshake and a WebSocket frame protocol
     object used to exchange messages and other control frames.
 
-    :param conn_type: Whether this object is on the client- or server-side of
-        a connection. To initialise as a client pass ``CLIENT`` otherwise
-        pass ``SERVER``.
-    :type conn_type: ``ConnectionType``
+    :param client_side: Whether this object is to be used on the client side of
+        a connection, or on the server side. Defaults to ``True``.
+    :type client_side: ``bool``
 
     :param host: The hostname to pass to the server when acting as a client.
     :type host: ``str``
@@ -99,9 +89,13 @@ class WSConnection(object):
     :type subprotocol: ``list`` of ``str``
     """
 
-    def __init__(self, conn_type, host=None, resource=None, extensions=None,
+    def __init__(self,
+                 client_side=True,
+                 host=None,
+                 resource=None,
+                 extensions=None,
                  subprotocols=None):
-        self.client = conn_type is ConnectionType.CLIENT
+        self.client_side = client_side
 
         self.host = host
         self.resource = resource
@@ -119,19 +113,17 @@ class WSConnection(object):
         self._events = deque()
         self._proto = None
 
-        if self.client:
-            self._upgrade_connection = h11.Connection(h11.CLIENT)
-        else:
-            self._upgrade_connection = h11.Connection(h11.SERVER)
-
-        if self.client:
+        if self.client_side:
             if self.host is None:
                 raise ValueError(
                     "Host must not be None for a client-side connection.")
             if self.resource is None:
                 raise ValueError(
                     "Resource must not be None for a client-side connection.")
+            self._upgrade_connection = h11.Connection(h11.CLIENT)
             self.initiate_connection()
+        else:
+            self._upgrade_connection = h11.Connection(h11.SERVER)
 
     def initiate_connection(self):
         self._generate_nonce()
@@ -249,11 +241,11 @@ class WSConnection(object):
                                         "Bad HTTP message"), b''
             if event is h11.NEED_DATA:
                 break
-            elif self.client and isinstance(event, (h11.InformationalResponse,
+            elif self.client_side and isinstance(event, (h11.InformationalResponse,
                                                     h11.Response)):
                 data = self._upgrade_connection.trailing_data[0]
                 return self._establish_client_connection(event), data
-            elif not self.client and isinstance(event, h11.Request):
+            elif not self.client_side and isinstance(event, h11.Request):
                 return self._process_connection_request(event), None
             else:
                 return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
@@ -359,7 +351,7 @@ class WSConnection(object):
                                             "unrecognized extension {!r}"
                                             .format(name))
 
-        self._proto = FrameProtocol(self.client, self.extensions)
+        self._proto = FrameProtocol(self.client_side, self.extensions)
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)
 
@@ -449,7 +441,7 @@ class WSConnection(object):
         response = h11.InformationalResponse(status_code=101,
                                              headers=headers.items())
         self._outgoing += self._upgrade_connection.send(response)
-        self._proto = FrameProtocol(self.client, self.extensions)
+        self._proto = FrameProtocol(self.client_side, self.extensions)
         self._state = ConnectionState.OPEN
 
     def ping(self, payload=None):

@@ -175,7 +175,7 @@ class TestPerMessageDeflate(object):
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=True, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=True, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.PING,
                                           fp.RsvBits(False, False, False),
@@ -192,7 +192,7 @@ class TestPerMessageDeflate(object):
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=True, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=True, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.PING,
                                           fp.RsvBits(True, False, False),
@@ -204,7 +204,7 @@ class TestPerMessageDeflate(object):
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=True, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=True, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.CONTINUATION,
                                           fp.RsvBits(True, False, False),
@@ -216,7 +216,7 @@ class TestPerMessageDeflate(object):
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=True, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=True, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.BINARY,
                                           fp.RsvBits(False, False, False),
@@ -228,14 +228,14 @@ class TestPerMessageDeflate(object):
 
         assert ext.frame_inbound_complete(proto, True) is None
 
-    @pytest.mark.parametrize('client', [True, False])
-    def test_client_inbound_compressed_single_data_frame(self, client):
+    @pytest.mark.parametrize('client_side', [True, False])
+    def test_client_inbound_compressed_single_data_frame(self, client_side):
         payload = b'x' * 23
         compressed_payload = b'\xaa\xa8\xc0\n\x00\x00'
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=client, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=client_side, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.BINARY,
                                           fp.RsvBits(True, False, False),
@@ -246,8 +246,8 @@ class TestPerMessageDeflate(object):
         data += ext.frame_inbound_complete(proto, True)
         assert data == payload
 
-    @pytest.mark.parametrize('client', [True, False])
-    def test_client_inbound_compressed_multiple_data_frames(self, client):
+    @pytest.mark.parametrize('client_side', [True, False])
+    def test_client_inbound_compressed_multiple_data_frames(self, client_side):
         payload = b'x' * 23
         compressed_payload = b'\xaa\xa8\xc0\n\x00\x00'
         split = 3
@@ -255,7 +255,7 @@ class TestPerMessageDeflate(object):
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=client, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=client_side, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.BINARY,
                                           fp.RsvBits(True, False, False),
@@ -287,7 +287,7 @@ class TestPerMessageDeflate(object):
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=True, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=True, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.BINARY,
                                           fp.RsvBits(True, False, False),
@@ -301,7 +301,7 @@ class TestPerMessageDeflate(object):
 
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=True, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=True, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.BINARY,
                                           fp.RsvBits(True, False, False),
@@ -320,20 +320,20 @@ class TestPerMessageDeflate(object):
         result = ext.frame_inbound_complete(proto, True)
         assert result is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
-    @pytest.mark.parametrize('client,no_context_takeover', [
+    @pytest.mark.parametrize('client_side, no_context_takeover', [
         (True, True),
         (True, False),
         (False, True),
         (False, False),
     ])
-    def test_decompressor_reset(self, client, no_context_takeover):
-        if client:
+    def test_decompressor_reset(self, client_side, no_context_takeover):
+        if client_side:
             args = {'server_no_context_takeover': no_context_takeover}
         else:
             args = {'client_no_context_takeover': no_context_takeover}
         ext = wpext.PerMessageDeflate(**args)
         ext._enabled = True
-        proto = fp.FrameProtocol(client=client, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=client_side, extensions=[ext])
 
         result = ext.frame_inbound_header(proto, fp.Opcode.BINARY,
                                           fp.RsvBits(True, False, False), 0)
@@ -358,7 +358,7 @@ class TestPerMessageDeflate(object):
     def test_outbound_uncompressible_opcode(self):
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=True, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=True, extensions=[ext])
 
         rsv = fp.RsvBits(False, False, False)
         payload = b'x' * 23
@@ -369,11 +369,11 @@ class TestPerMessageDeflate(object):
         assert rsv.rsv1 is False
         assert data == payload
 
-    @pytest.mark.parametrize('client', [True, False])
-    def test_outbound_compress_single_frame(self, client):
+    @pytest.mark.parametrize('client_side', [True, False])
+    def test_outbound_compress_single_frame(self, client_side):
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=client, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=client_side, extensions=[ext])
 
         rsv = fp.RsvBits(False, False, False)
         payload = b'x' * 23
@@ -385,11 +385,11 @@ class TestPerMessageDeflate(object):
         assert rsv.rsv1 is True
         assert data == compressed_payload
 
-    @pytest.mark.parametrize('client', [True, False])
-    def test_outbound_compress_multiple_frames(self, client):
+    @pytest.mark.parametrize('client_side', [True, False])
+    def test_outbound_compress_multiple_frames(self, client_side):
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
-        proto = fp.FrameProtocol(client=client, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=client_side, extensions=[ext])
 
         rsv = fp.RsvBits(False, False, False)
         payload = b'x' * 23
@@ -406,20 +406,20 @@ class TestPerMessageDeflate(object):
         assert rsv.rsv1 is False
         assert data + more_data == compressed_payload
 
-    @pytest.mark.parametrize('client,no_context_takeover', [
+    @pytest.mark.parametrize('client_side, no_context_takeover', [
         (True, True),
         (True, False),
         (False, True),
         (False, False),
     ])
-    def test_compressor_reset(self, client, no_context_takeover):
-        if client:
+    def test_compressor_reset(self, client_side, no_context_takeover):
+        if client_side:
             args = {'client_no_context_takeover': no_context_takeover}
         else:
             args = {'server_no_context_takeover': no_context_takeover}
         ext = wpext.PerMessageDeflate(**args)
         ext._enabled = True
-        proto = fp.FrameProtocol(client=client, extensions=[ext])
+        proto = fp.FrameProtocol(client_side=client_side, extensions=[ext])
         rsv = fp.RsvBits(False, False, False)
 
         rsv, data = ext.frame_outbound(proto, fp.Opcode.BINARY, rsv, b'',
