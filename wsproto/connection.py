@@ -212,29 +212,6 @@ class WSConnection(object):
         elif self._state is ConnectionState.CLOSED:
             raise ValueError('Connection already closed.')
 
-    def _process_upgrade(self, data):
-        self._upgrade_connection.receive_data(data)
-        while True:
-            try:
-                event = self._upgrade_connection.next_event()
-            except h11.RemoteProtocolError:
-                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                        "Bad HTTP message"), b''
-            if event is h11.NEED_DATA:
-                break
-            elif self.client and isinstance(event, (h11.InformationalResponse,
-                                                    h11.Response)):
-                data = self._upgrade_connection.trailing_data[0]
-                return self._establish_client_connection(event), data
-            elif not self.client and isinstance(event, h11.Request):
-                return self._process_connection_request(event), None
-            else:
-                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                        "Bad HTTP message"), b''
-
-        self._incoming = b''
-        return None, None
-
     def events(self):
         """
         Return a generator that provides any events that have been generated
@@ -284,6 +261,61 @@ class WSConnection(object):
             self.close(code=exc.code, reason=str(exc))
             yield ConnectionClosed(exc.code, reason=str(exc))
 
+    def accept(self, event, subprotocol=None):
+        request = event.h11request
+        request_headers = normed_header_dict(request.headers)
+
+        nonce = request_headers[b'sec-websocket-key']
+        accept_token = self._generate_accept_token(nonce)
+
+        headers = {
+            b"Upgrade": b'WebSocket',
+            b"Connection": b'Upgrade',
+            b"Sec-WebSocket-Accept": accept_token,
+        }
+
+        if subprotocol is not None:
+            if subprotocol not in event.proposed_subprotocols:
+                raise ValueError(
+                    "unexpected subprotocol {!r}".format(subprotocol))
+            headers[b'Sec-WebSocket-Protocol'] = subprotocol
+
+        extensions = request_headers.get(b'sec-websocket-extensions', None)
+        if extensions:
+            accepts = self._extension_accept(extensions)
+            if accepts:
+                headers[b"Sec-WebSocket-Extensions"] = accepts
+
+        response = h11.InformationalResponse(status_code=101,
+                                             headers=headers.items())
+        self._outgoing += self._upgrade_connection.send(response)
+        self._proto = FrameProtocol(self.client, self.extensions)
+        self._state = ConnectionState.OPEN
+
+    def ping(self, payload=None):
+        """
+        Send a PING message to the peer.
+
+        :param payload: an optional payload to send with the message
+        """
+
+        payload = bytes(payload or b'')
+        self._outgoing += self._proto.ping(payload)
+
+    def pong(self, payload=None):
+        """
+        Send a PONG message to the peer.
+
+        This method can be used to send an unsolicted PONG to the peer.
+        It is not needed otherwise since every received PING causes a
+        corresponding PONG to be sent automatically.
+
+        :param payload: an optional payload to send with the message
+        """
+
+        payload = bytes(payload or b'')
+        self._outgoing += self._proto.pong(payload)
+
     def _generate_nonce(self):
         # os.urandom may be overkill for this use case, but I don't think this
         # is a bottleneck, and better safe than sorry...
@@ -293,6 +325,29 @@ class WSConnection(object):
         accept_token = token + ACCEPT_GUID
         accept_token = hashlib.sha1(accept_token).digest()
         return base64.b64encode(accept_token)
+
+    def _process_upgrade(self, data):
+        self._upgrade_connection.receive_data(data)
+        while True:
+            try:
+                event = self._upgrade_connection.next_event()
+            except h11.RemoteProtocolError:
+                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                        "Bad HTTP message"), b''
+            if event is h11.NEED_DATA:
+                break
+            elif self.client and isinstance(event, (h11.InformationalResponse,
+                                                    h11.Response)):
+                data = self._upgrade_connection.trailing_data[0]
+                return self._establish_client_connection(event), data
+            elif not self.client and isinstance(event, h11.Request):
+                return self._process_connection_request(event), None
+            else:
+                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                        "Bad HTTP message"), b''
+
+        self._incoming = b''
+        return None, None
 
     def _establish_client_connection(self, event):
         if event.status_code != 101:
@@ -397,58 +452,3 @@ class WSConnection(object):
             return b', '.join(extensions)
 
         return None
-
-    def accept(self, event, subprotocol=None):
-        request = event.h11request
-        request_headers = normed_header_dict(request.headers)
-
-        nonce = request_headers[b'sec-websocket-key']
-        accept_token = self._generate_accept_token(nonce)
-
-        headers = {
-            b"Upgrade": b'WebSocket',
-            b"Connection": b'Upgrade',
-            b"Sec-WebSocket-Accept": accept_token,
-        }
-
-        if subprotocol is not None:
-            if subprotocol not in event.proposed_subprotocols:
-                raise ValueError(
-                    "unexpected subprotocol {!r}".format(subprotocol))
-            headers[b'Sec-WebSocket-Protocol'] = subprotocol
-
-        extensions = request_headers.get(b'sec-websocket-extensions', None)
-        if extensions:
-            accepts = self._extension_accept(extensions)
-            if accepts:
-                headers[b"Sec-WebSocket-Extensions"] = accepts
-
-        response = h11.InformationalResponse(status_code=101,
-                                             headers=headers.items())
-        self._outgoing += self._upgrade_connection.send(response)
-        self._proto = FrameProtocol(self.client, self.extensions)
-        self._state = ConnectionState.OPEN
-
-    def ping(self, payload=None):
-        """
-        Send a PING message to the peer.
-
-        :param payload: an optional payload to send with the message
-        """
-
-        payload = bytes(payload or b'')
-        self._outgoing += self._proto.ping(payload)
-
-    def pong(self, payload=None):
-        """
-        Send a PONG message to the peer.
-
-        This method can be used to send an unsolicted PONG to the peer.
-        It is not needed otherwise since every received PING causes a
-        corresponding PONG to be sent automatically.
-
-        :param payload: an optional payload to send with the message
-        """
-
-        payload = bytes(payload or b'')
-        self._outgoing += self._proto.pong(payload)
