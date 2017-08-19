@@ -168,29 +168,37 @@ class WSConnection(object):
     def closed(self):
         return self._state is ConnectionState.CLOSED
 
-    def bytes_to_send(self, amount=None):
+    def bytes_to_send(self, amt=None):
         """
-        Return any data that is to be sent to the remote peer.
+        Returns some data for sending out of the internal data buffer.
 
-        :param amount: (optional) The maximum number of bytes to be provided.
-            If ``None`` or not provided it will return all available bytes.
-        :type amount: ``int``
+        This method is analogous to ``read`` on a file-like object, but it
+        doesn't block. Instead, it returns as much data as the user asks for,
+        or less if that much data is not available. It does not perform any
+        I/O, and so uses a different name.
+
+        :param amt: (optional) The maximum amount of data to return. If not
+            set, or set to ``None``, will return as much data as possible.
+        :type amt: ``int``
+        :returns: A bytestring containing the data to send on the wire.
+        :rtype: ``bytes``
         """
-
-        if amount is None:
+        if amt is None:
             data = self._outgoing
             self._outgoing = b''
         else:
-            data = self._outgoing[:amount]
-            self._outgoing = self._outgoing[amount:]
-
+            data = self._outgoing[:amt]
+            self._outgoing = self._outgoing[amt:]
         return data
 
     def receive_bytes(self, data):
         """
-        Pass some received bytes to the connection for processing.
+        Pass some received data to the connection for handling.
 
-        :param data: The data received from the remote peer.
+        A list of events that the remote peer triggered by sending this data can
+        be retrieved with :meth:`events <wsproto.connection.WSConnection.events>`.
+
+        :param data: The data received from the remote peer on the network.
         :type data: ``bytes``
         """
 
@@ -242,7 +250,7 @@ class WSConnection(object):
         Return a generator that provides any events that have been generated
         by protocol activity.
 
-        :returns: generator
+        :returns: generator of :class:`Event <wsproto.events.Event>` subclasses
         """
 
         while self._events:
