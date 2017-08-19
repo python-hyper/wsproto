@@ -141,8 +141,8 @@ class WSConnection(object):
         self-contained message or the last part of a longer message.
 
         If ``payload`` is of type ``bytes`` then the message is flagged as
-        being binary If it is of type ``str`` encoded as UTF-8 and sent as
-        text.
+        being binary. If it is of type ``str`` the message is encoded as UTF-8
+        and sent as text.
 
         :param payload: The message body to send.
         :type payload: ``bytes`` or ``str``
@@ -154,6 +154,13 @@ class WSConnection(object):
         self._outgoing += self._proto.send_data(payload, final)
 
     def close(self, code=CloseReason.NORMAL_CLOSURE, reason=None):
+        """
+        Initiate the close handshake by sending a CLOSE control message.
+
+        A clean teardown requires a CLOSE control messages from the other
+        endpoint before the underlying TCP connection can be closed, see
+        :class:`ConnectionClosed <wsproto.events.ConnectionClosed>`.
+        """
         self._outgoing += self._proto.close(code, reason)
         self._state = ConnectionState.CLOSING
 

@@ -39,6 +39,9 @@ class ConnectionEstablished(object):
 
 
 class ConnectionClosed(object):
+    """
+    The ConnectionClosed event is fired after the close handshake is complete.
+    """
     def __init__(self, code, reason=None):
         self.code = code
         self.reason = reason
