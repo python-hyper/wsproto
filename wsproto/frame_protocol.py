@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/frame_protocol
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 WebSocket frame protocol implementation.
 """

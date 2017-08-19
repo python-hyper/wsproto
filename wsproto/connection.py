@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/connection
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 An implementation of a WebSocket connection.
 """
@@ -63,13 +63,13 @@ class WSConnection(object):
         as a client.
     :type resource: ``str``
 
-    :param extensions: A list of  extensions to use on this connection.
-        Extensions should be instances of a subclass of
-        :class:`Extension <wsproto.extensions.Extension>`.
+    :param extensions: A list of extensions to use on this connection.
+        Defaults to to an empty list. Extensions should be instances of a
+        subclass of :class:`Extension <wsproto.extensions.Extension>`.
 
     :param subprotocols: A list of subprotocols to request when acting as a
         client, ordered by preference. This has no impact on the connection
-        itself.
+        itself. Defaults to an empty list.
     :type subprotocol: ``list`` of ``str``
     """
 
@@ -147,8 +147,8 @@ class WSConnection(object):
         self-contained message or the last part of a longer message.
 
         If ``payload`` is of type ``bytes`` then the message is flagged as
-        being binary If it is of type ``str`` encoded as UTF-8 and sent as
-        text.
+        being binary. If it is of type ``str`` the message is encoded as UTF-8
+        and sent as text.
 
         :param payload: The message body to send.
         :type payload: ``bytes`` or ``str``
@@ -160,6 +160,13 @@ class WSConnection(object):
         self._outgoing += self._proto.send_data(payload, final)
 
     def close(self, code=CloseReason.NORMAL_CLOSURE, reason=None):
+        """
+        Initiate the close handshake by sending a CLOSE control message.
+
+        A clean teardown requires a CLOSE control messages from the other
+        endpoint before the underlying TCP connection can be closed, see
+        :class:`~wsproto.events.ConnectionClosed`.
+        """
         self._outgoing += self._proto.close(code, reason)
         self._state = ConnectionState.CLOSING
 
@@ -169,27 +176,35 @@ class WSConnection(object):
 
     def bytes_to_send(self, amount=None):
         """
-        Return any data that is to be sent to the remote peer.
+        Returns some data for sending out of the internal data buffer.
 
-        :param amount: (optional) The maximum number of bytes to be provided.
-            If ``None`` or not provided it will return all available bytes.
+        This method is analogous to ``read`` on a file-like object, but it
+        doesn't block. Instead, it returns as much data as the user asks for,
+        or less if that much data is not available. It does not perform any
+        I/O, and so uses a different name.
+
+        :param amount: (optional) The maximum amount of data to return. If not
+            set, or set to ``None``, will return as much data as possible.
         :type amount: ``int``
+        :returns: A bytestring containing the data to send on the wire.
+        :rtype: ``bytes``
         """
-
         if amount is None:
             data = self._outgoing
             self._outgoing = b''
         else:
             data = self._outgoing[:amount]
             self._outgoing = self._outgoing[amount:]
-
         return data
 
     def receive_bytes(self, data):
         """
-        Pass some received bytes to the connection for processing.
+        Pass some received data to the connection for handling.
 
-        :param data: The data received from the remote peer.
+        A list of events that the remote peer triggered by sending this data can
+        be retrieved with :meth:`~wsproto.connection.WSConnection.events`.
+
+        :param data: The data received from the remote peer on the network.
         :type data: ``bytes``
         """
 
@@ -217,7 +232,7 @@ class WSConnection(object):
         Return a generator that provides any events that have been generated
         by protocol activity.
 
-        :returns: generator
+        :returns: generator of :class:`Event <wsproto.events.Event>` subclasses
         """
 
         while self._events:
