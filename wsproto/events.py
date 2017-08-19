@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/events
-~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 Events that result from processing data on a WebSocket connection.
 """
@@ -46,7 +46,12 @@ class ConnectionEstablished(Event):
 
 
 class ConnectionClosed(Event):
+    """
+    The ConnectionClosed event is fired after the close handshake is complete.
+    """
     def __init__(self, code, reason=None):
+        #: The close status code, see :class:`CloseReason
+        #: <wsproto.frame_protocol.CloseReason>`.
         self.code = code
         self.reason = reason
 
