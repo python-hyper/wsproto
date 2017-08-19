@@ -155,7 +155,7 @@ class WSConnection(object):
 
     def close(self, code=CloseReason.NORMAL_CLOSURE, reason=None):
         """
-        Initiate the close handshake by sending a CLOSE control message.
+        Perform the close handshake by sending a CLOSE control message.
 
         A clean teardown requires a CLOSE control messages from the other
         endpoint before the underlying TCP connection can be closed, see
@@ -210,17 +210,16 @@ class WSConnection(object):
             self._events.append(ConnectionClosed(CloseReason.ABNORMAL_CLOSURE))
             self._state = ConnectionState.CLOSED
             return
-        elif data is None:
-            self._state = ConnectionState.CLOSED
-            return
 
         if self._state is ConnectionState.CONNECTING:
             event, data = self._process_upgrade(data)
             if event is not None:
                 self._events.append(event)
 
-        if self._state is ConnectionState.OPEN:
+        if self._state in (ConnectionState.OPEN, ConnectionState.CLOSING):
             self._proto.receive_bytes(data)
+        elif self._state is ConnectionState.CLOSED:
+            raise ValueError('Connection already closed.')
 
     def events(self):
         """
@@ -249,7 +248,9 @@ class WSConnection(object):
 
                 elif frame.opcode is Opcode.CLOSE:
                     code, reason = frame.payload
-                    self.close(code, reason)
+                    if self._state is ConnectionState.OPEN:
+                        self.close(code, reason)
+                    self._state = ConnectionState.CLOSED
                     yield ConnectionClosed(code, reason)
 
                 elif frame.opcode is Opcode.TEXT:

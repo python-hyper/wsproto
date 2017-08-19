@@ -91,12 +91,32 @@ class TestConnection(object):
     def test_normal_closure(self):
         client, server = self.create_connection()
 
-        for conn in (client, server):
-            conn.close()
-            conn.receive_bytes(None)
-            with pytest.raises(StopIteration):
-                print(repr(next(conn.events())))
-            assert conn.closed
+        # client sends CLOSE to server
+        client.close()
+        server.receive_bytes(client.bytes_to_send())
+
+        # server emits ConnectionClosed
+        assert isinstance(next(server.events()), ConnectionClosed)
+
+        # server enters CLOSED state
+        assert server.closed
+        with pytest.raises(StopIteration):
+            next(server.events())
+
+        # server sends CLOSE back to client
+        client.receive_bytes(server.bytes_to_send())
+
+        # client emits ConnectionClosed
+        assert isinstance(next(client.events()), ConnectionClosed)
+
+        # client enters CLOSED state
+        assert client.closed
+        with pytest.raises(StopIteration):
+            next(client.events())
+
+        server.ping()
+        with pytest.raises(ValueError):
+            client.receive_bytes(server.bytes_to_send())
 
     def test_abnormal_closure(self):
         client, server = self.create_connection()
