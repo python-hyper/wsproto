@@ -55,13 +55,13 @@ class WSConnection(object):
         as a client.
     :type resource: ``str``
 
-    :param extensions: A list of  extensions to use on this connection.
-        Extensions should be instances of a subclass of
-        :class:`Extension <wsproto.extensions.Extension>`.
+    :param extensions: A list of extensions to use on this connection.
+        Defaults to to an empty list. Extensions should be instances of a
+        subclass of :class:`Extension <wsproto.extensions.Extension>`.
 
     :param subprotocols: A list of subprotocols to request when acting as a
         client, ordered by preference. This has no impact on the connection
-        itself.
+        itself. Defaults to an empty list.
     :type subprotocol: ``list`` of ``str``
     """
 
