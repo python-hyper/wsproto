@@ -138,10 +138,7 @@ class TestPerMessageDeflate(object):
         assert not ext.enabled()
 
         offer = self.make_offer_string(params)
-        print(repr(offer))
-
         response = ext.accept(None, offer)
-        print(repr(response))
 
         if ext.client_no_context_takeover:
             assert 'client_no_context_takeover' in response

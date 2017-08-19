@@ -55,9 +55,6 @@ class TestClientUpgrade(object):
         method, path, version = request.strip().split()
         headers = parse_headers(headers)
 
-        print(method, path, version)
-        print(repr(headers))
-
         return ws, method, path, version, headers
 
     def test_initiate_connection(self):
