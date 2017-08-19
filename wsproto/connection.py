@@ -33,6 +33,9 @@ from .utilities import (
     split_comma_header,
 )
 
+# RFC6455, Section 4.2.1/6 - Reading the Client's Opening Handshake
+WEBSOCKET_VERSION = b"13"
+
 
 class ConnectionState(Enum):
     """
@@ -74,8 +77,6 @@ class WSConnection(object):
 
     def __init__(self, conn_type):
         self.client = conn_type is ConnectionType.CLIENT
-
-        self.version = b"13"
 
         self._state = ConnectionState.CONNECTING
         self._close_reason = None
@@ -133,7 +134,7 @@ class WSConnection(object):
             (b"Upgrade", b"WebSocket"),
             (b"Connection", b"Upgrade"),
             (b"Sec-WebSocket-Key", self._nonce),
-            (b"Sec-WebSocket-Version", self.version),
+            (b"Sec-WebSocket-Version", WEBSOCKET_VERSION),
         ]
 
         if request.subprotocols:
@@ -461,8 +462,8 @@ class WSConnection(object):
             token.lower() == "upgrade" for token in connection_tokens
         ):
             raise RemoteProtocolError("Missing header, 'Connection: Upgrade'")
-        # XX FIXME: need to check Sec-Websocket-Version, and respond with a
-        # 400 if it's not what we expect
+        if version != WEBSOCKET_VERSION:
+            raise RemoteProtocolError("Missing header, 'Sec-WebSocket-Version'")
         if key is None:
             raise RemoteProtocolError("Missing header, 'Sec-WebSocket-Key'")
         if upgrade.lower() != b"websocket":
