@@ -25,6 +25,8 @@ from .utilities import normed_header_dict, split_comma_header
 # RFC6455, Section 1.3 - Opening Handshake
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
+# RFC6455, Section 4.2.1/6 - Reading the Client's Opening Handshake
+WEBSOCKET_VERSION = '13'
 
 class ConnectionState(Enum):
     """
@@ -79,8 +81,6 @@ class WSConnection(object):
         self.subprotocols = subprotocols or []
         self.extensions = extensions or []
 
-        self.version = b'13'
-
         self._state = ConnectionState.CONNECTING
         self._close_reason = None
 
@@ -109,7 +109,7 @@ class WSConnection(object):
             b"Upgrade": b'WebSocket',
             b"Connection": b'Upgrade',
             b"Sec-WebSocket-Key": self._nonce,
-            b"Sec-WebSocket-Version": self.version,
+            b"Sec-WebSocket-Version": WEBSOCKET_VERSION,
         }
 
         if self.subprotocols:
@@ -346,8 +346,10 @@ class WSConnection(object):
         if b'sec-websocket-version' not in headers:
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Sec-WebSocket-Version header")
-        # XX FIXME: need to check Sec-Websocket-Version, and respond with a
-        # 400 if it's not what we expect
+        versions = split_comma_header(headers[b'sec-websocket-version'])
+        if WEBSOCKET_VERSION not in versions:
+            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
+                                    "Unsupported Sec-WebSocket-Version")
 
         if b'sec-websocket-protocol' in headers:
             proposed_subprotocols = split_comma_header(

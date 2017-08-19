@@ -410,6 +410,35 @@ class TestServerUpgrade(object):
         event = next(ws.events())
         assert isinstance(event, ConnectionFailed)
 
+    @pytest.mark.parametrize('versions', [
+        b'',
+        b'12',
+        b'14',
+        b'10,11,12',
+        b'10, 11, 12',
+        b'10-12',
+    ])
+    def test_unsupported_version(self, versions):
+        test_host = 'frob.nitz'
+        test_path = '/fnord'
+
+        ws = WSConnection(client_side=False)
+
+        nonce = bytes(random.getrandbits(8) for x in range(0, 16))
+        nonce = base64.b64encode(nonce)
+
+        request = b'GET ' + test_path.encode('ascii') + b' HTTP/1.1\r\n'
+        request += b'Host: ' + test_host.encode('ascii') + b'\r\n'
+        request += b'Connection: Upgrade\r\n'
+        request += b'Upgrade: WebSocket\r\n'
+        request += b'Sec-WebSocket-Version: ' + versions + b'\r\n'
+        request += b'Sec-WebSocket-Key: ' + nonce + b'\r\n'
+        request += b'\r\n'
+
+        ws.receive_bytes(request)
+        event = next(ws.events())
+        assert isinstance(event, ConnectionFailed)
+
     def test_bad_connection(self):
         test_host = 'frob.nitz'
         test_path = '/fnord'
