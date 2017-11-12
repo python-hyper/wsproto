@@ -20,7 +20,7 @@ from .events import (
     ConnectionFailed, TextReceived, BytesReceived, PingReceived, PongReceived
 )
 from .frame_protocol import FrameProtocol, ParseFailed, CloseReason, Opcode
-
+from . import ConnectionRole
 
 # RFC6455, Section 1.3 - Opening Handshake
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -34,15 +34,6 @@ class ConnectionState(Enum):
     OPEN = 1
     CLOSING = 2
     CLOSED = 3
-
-
-class ConnectionType(Enum):
-    CLIENT = 1
-    SERVER = 2
-
-
-CLIENT = ConnectionType.CLIENT
-SERVER = ConnectionType.SERVER
 
 
 # Some convenience utilities for working with HTTP headers
@@ -77,10 +68,9 @@ class WSConnection(object):
     to do the initial HTTP upgrade handshake and a WebSocket frame protocol
     object used to exchange messages and other control frames.
 
-    :param conn_type: Whether this object is on the client- or server-side of
-        a connection. To initialise as a client pass ``CLIENT`` otherwise
-        pass ``SERVER``.
-    :type conn_type: ``ConnectionType``
+    :param our_role: Whether this object behaves like a client or a server.
+        Defaults to ``ConnectionRole.CLIENT``.
+    :type our_role: `~wsproto.ConnectionRole`
 
     :param host: The hostname to pass to the server when acting as a client.
     :type host: ``str``
@@ -91,7 +81,7 @@ class WSConnection(object):
 
     :param extensions: A list of  extensions to use on this connection.
         Extensions should be instances of a subclass of
-        :class:`Extension <wsproto.extensions.Extension>`.
+        :class:`~wsproto.extensions.Extension`.
 
     :param subprotocols: A list of subprotocols to request when acting as a
         client, ordered by preference. This has no impact on the connection
@@ -99,9 +89,13 @@ class WSConnection(object):
     :type subprotocol: ``list`` of ``str``
     """
 
-    def __init__(self, conn_type, host=None, resource=None, extensions=None,
+    def __init__(self,
+                 our_role=ConnectionRole.CLIENT,
+                 host=None,
+                 resource=None,
+                 extensions=None,
                  subprotocols=None):
-        self.client = conn_type is ConnectionType.CLIENT
+        self.our_role = our_role
 
         self.host = host
         self.resource = resource
@@ -119,19 +113,17 @@ class WSConnection(object):
         self._events = deque()
         self._proto = None
 
-        if self.client:
-            self._upgrade_connection = h11.Connection(h11.CLIENT)
-        else:
-            self._upgrade_connection = h11.Connection(h11.SERVER)
-
-        if self.client:
+        if self.our_role == ConnectionRole.CLIENT:
             if self.host is None:
                 raise ValueError(
                     "Host must not be None for a client-side connection.")
             if self.resource is None:
                 raise ValueError(
                     "Resource must not be None for a client-side connection.")
+            self._upgrade_connection = h11.Connection(h11.CLIENT)
             self.initiate_connection()
+        else:
+            self._upgrade_connection = h11.Connection(h11.SERVER)
 
     def initiate_connection(self):
         self._generate_nonce()
@@ -249,11 +241,11 @@ class WSConnection(object):
                                         "Bad HTTP message"), b''
             if event is h11.NEED_DATA:
                 break
-            elif self.client and isinstance(event, (h11.InformationalResponse,
+            elif self.our_role == ConnectionRole.CLIENT and isinstance(event, (h11.InformationalResponse,
                                                     h11.Response)):
                 data = self._upgrade_connection.trailing_data[0]
                 return self._establish_client_connection(event), data
-            elif not self.client and isinstance(event, h11.Request):
+            elif self.our_role == ConnectionRole.SERVER and isinstance(event, h11.Request):
                 return self._process_connection_request(event), None
             else:
                 return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
@@ -359,7 +351,7 @@ class WSConnection(object):
                                             "unrecognized extension {!r}"
                                             .format(name))
 
-        self._proto = FrameProtocol(self.client, self.extensions)
+        self._proto = FrameProtocol(self.our_role, self.extensions)
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)
 
@@ -449,7 +441,7 @@ class WSConnection(object):
         response = h11.InformationalResponse(status_code=101,
                                              headers=headers.items())
         self._outgoing += self._upgrade_connection.send(response)
-        self._proto = FrameProtocol(self.client, self.extensions)
+        self._proto = FrameProtocol(self.our_role, self.extensions)
         self._state = ConnectionState.OPEN
 
     def ping(self, payload=None):

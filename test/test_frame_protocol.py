@@ -9,6 +9,7 @@ import pytest
 
 import wsproto.frame_protocol as fp
 import wsproto.extensions as wpext
+from wsproto.connection import ConnectionRole
 
 
 class FakeValidator(object):
@@ -398,9 +399,9 @@ class TestMessageDecoder(object):
 
 
 class TestFrameDecoder(object):
-    def _single_frame_test(self, client, frame_bytes, opcode, payload,
+    def _single_frame_test(self, our_role, frame_bytes, opcode, payload,
                            frame_finished, message_finished):
-        decoder = fp.FrameDecoder(client=client)
+        decoder = fp.FrameDecoder(our_role=our_role)
         decoder.receive_bytes(frame_bytes)
         frame = decoder.process_buffer()
         assert frame is not None
@@ -409,9 +410,9 @@ class TestFrameDecoder(object):
         assert frame.frame_finished is frame_finished
         assert frame.message_finished is message_finished
 
-    def _split_frame_test(self, client, frame_bytes, opcode, payload,
+    def _split_frame_test(self, our_role, frame_bytes, opcode, payload,
                           frame_finished, message_finished, split):
-        decoder = fp.FrameDecoder(client=client)
+        decoder = fp.FrameDecoder(our_role=our_role)
         decoder.receive_bytes(frame_bytes[:split])
         assert decoder.process_buffer() is None
         decoder.receive_bytes(frame_bytes[split:])
@@ -422,8 +423,8 @@ class TestFrameDecoder(object):
         assert frame.frame_finished is frame_finished
         assert frame.message_finished is message_finished
 
-    def _split_message_test(self, client, frame_bytes, opcode, payload, split):
-        decoder = fp.FrameDecoder(client=client)
+    def _split_message_test(self, our_role, frame_bytes, opcode, payload, split):
+        decoder = fp.FrameDecoder(our_role=our_role)
 
         decoder.receive_bytes(frame_bytes[:split])
         frame = decoder.process_buffer()
@@ -441,8 +442,8 @@ class TestFrameDecoder(object):
         assert frame.frame_finished is True
         assert frame.message_finished is True
 
-    def _parse_failure_test(self, client, frame_bytes, close_reason):
-        decoder = fp.FrameDecoder(client=client)
+    def _parse_failure_test(self, our_role, frame_bytes, close_reason):
+        decoder = fp.FrameDecoder(our_role=our_role)
         with pytest.raises(fp.ParseFailed) as excinfo:
             decoder.receive_bytes(frame_bytes)
             decoder.process_buffer()
@@ -450,7 +451,7 @@ class TestFrameDecoder(object):
 
     def test_zero_length_message(self):
         self._single_frame_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\x81\x00',
             opcode=fp.Opcode.TEXT,
             payload=b'',
@@ -460,7 +461,7 @@ class TestFrameDecoder(object):
 
     def test_short_server_message_frame(self):
         self._single_frame_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\x81\x02xy',
             opcode=fp.Opcode.TEXT,
             payload=b'xy',
@@ -468,9 +469,9 @@ class TestFrameDecoder(object):
             message_finished=True,
         )
 
-    def test_short_client_message_frame(self):
+    def test_short_client_side_message_frame(self):
         self._single_frame_test(
-            client=False,
+            our_role=ConnectionRole.SERVER,
             frame_bytes=b'\x81\x82abcd\x19\x1b',
             opcode=fp.Opcode.TEXT,
             payload=b'xy',
@@ -480,45 +481,45 @@ class TestFrameDecoder(object):
 
     def test_reject_masked_server_frame(self):
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\x81\x82abcd\x19\x1b',
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
 
-    def test_reject_unmasked_client_frame(self):
+    def test_reject_unmasked_client_side_frame(self):
         self._parse_failure_test(
-            client=False,
+            our_role=ConnectionRole.SERVER,
             frame_bytes=b'\x81\x02xy',
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
 
     def test_reject_bad_opcode(self):
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\x8e\x02xy',
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
 
     def test_reject_unfinished_control_frame(self):
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\x09\x02xy',
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
 
     def test_reject_reserved_bits(self):
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\x91\x02xy',
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\xa1\x02xy',
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=b'\xc1\x02xy',
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
@@ -529,7 +530,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7e' + payload_len + payload
 
         self._single_frame_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             opcode=fp.Opcode.TEXT,
             payload=payload,
@@ -543,7 +544,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7f' + payload_len + payload
 
         self._single_frame_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             opcode=fp.Opcode.TEXT,
             payload=payload,
@@ -557,7 +558,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7e' + payload_len + payload
 
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
@@ -568,7 +569,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7f' + payload_len + payload
 
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
@@ -579,7 +580,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7f' + payload_len + payload
 
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
@@ -589,7 +590,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x02' + payload
 
         self._split_frame_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             opcode=fp.Opcode.TEXT,
             payload=payload,
@@ -604,7 +605,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7e' + payload_len + payload
 
         self._split_frame_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             opcode=fp.Opcode.TEXT,
             payload=payload,
@@ -619,7 +620,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7f' + payload_len + payload
 
         self._split_frame_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             opcode=fp.Opcode.TEXT,
             payload=payload,
@@ -632,7 +633,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7f\x80\x80\x80\x80\x80\x80\x80\x80'
 
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
@@ -647,7 +648,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x82' + mask + masked_payload
 
         self._split_frame_test(
-            client=False,
+            our_role=ConnectionRole.SERVER,
             frame_bytes=frame_bytes,
             opcode=fp.Opcode.TEXT,
             payload=payload,
@@ -663,7 +664,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7f' + payload_len + payload
         header_len = len(frame_bytes) - len(payload)
 
-        decoder = fp.FrameDecoder(client=True)
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT)
         decoder.receive_bytes(frame_bytes[:header_len])
         assert decoder.process_buffer() is None
         frame_bytes = frame_bytes[header_len:]
@@ -688,7 +689,7 @@ class TestFrameDecoder(object):
         payload = b'x' * 64
         frame_bytes = b'\x89' + bytearray([len(payload)]) + payload
 
-        decoder = fp.FrameDecoder(client=True)
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT)
 
         for offset in range(0, len(frame_bytes) - chunk_size, chunk_size):
             chunk = frame_bytes[offset:offset + chunk_size]
@@ -709,7 +710,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x81\x7e' + payload_len + payload
 
         self._split_message_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             opcode=fp.Opcode.TEXT,
             payload=payload,
@@ -722,7 +723,7 @@ class TestFrameDecoder(object):
         frame_bytes = b'\x89\x7e' + payload_len + payload
 
         self._parse_failure_test(
-            client=True,
+            our_role=ConnectionRole.CLIENT,
             frame_bytes=frame_bytes,
             close_reason=fp.CloseReason.PROTOCOL_ERROR,
         )
@@ -778,7 +779,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_rsv_bit(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         frame_bytes = b'\x91\x00'
 
@@ -790,7 +791,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_wrong_rsv_bit(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         frame_bytes = b'\xa1\x00'
 
@@ -802,7 +803,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_header_error_handling(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         frame_bytes = b'\x9a\x00'
 
@@ -814,7 +815,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_payload_processing(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         payload = u'fñör∂'
         expected_payload = payload.upper().encode('utf-8')
@@ -831,7 +832,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_no_payload_processing_when_not_wanted(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         payload = u'fñör∂'
         expected_payload = payload.encode('utf-8')
@@ -848,7 +849,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_payload_error_handling(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         payload = b'party time'
         frame_bytes = b'\x91' + bytearray([len(payload)]) + payload
@@ -861,7 +862,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_frame_completion(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         payload = u'fñör∂'
         expected_payload = (payload + u'™').upper().encode('utf-8')
@@ -879,7 +880,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_no_frame_completion_when_not_wanted(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         payload = u'fñör∂'
         expected_payload = payload.encode('utf-8')
@@ -897,7 +898,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_completion_error_handling(self):
         ext = self.FakeExtension()
-        decoder = fp.FrameDecoder(client=True, extensions=[ext])
+        decoder = fp.FrameDecoder(our_role=ConnectionRole.CLIENT, extensions=[ext])
 
         payload = b'ragequit'
         frame_bytes = b'\x91' + bytearray([len(payload)]) + payload
@@ -910,7 +911,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_outbound_handling_single_frame(self):
         ext = self.FakeExtension()
-        proto = fp.FrameProtocol(client=False, extensions=[ext])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[ext])
         payload = u'😃😄🙃😉'
         data = proto.send_data(payload, fin=True)
         payload = (payload + u'®').encode('utf8')
@@ -918,7 +919,7 @@ class TestFrameDecoderExtensions(object):
 
     def test_outbound_handling_multiple_frames(self):
         ext = self.FakeExtension()
-        proto = fp.FrameProtocol(client=False, extensions=[ext])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[ext])
         payload = u'😃😄🙃😉'
         data = proto.send_data(payload, fin=False)
         payload = payload.encode('utf8')
@@ -937,7 +938,7 @@ class TestFrameProtocolReceive(object):
         payload_len = struct.pack('!H', len(encoded_payload))
         frame_bytes = b'\x81\x7e' + payload_len + encoded_payload
 
-        protocol = fp.FrameProtocol(client=True, extensions=[])
+        protocol = fp.FrameProtocol(our_role=ConnectionRole.CLIENT, extensions=[])
         protocol.receive_bytes(frame_bytes)
         frames = list(protocol.received_frames())
         assert len(frames) == 1
@@ -957,7 +958,7 @@ class TestFrameProtocolReceive(object):
 
         frame_bytes = b'\x88' + bytearray([len(payload)]) + payload
 
-        protocol = fp.FrameProtocol(client=True, extensions=[])
+        protocol = fp.FrameProtocol(our_role=ConnectionRole.CLIENT, extensions=[])
         protocol.receive_bytes(frame_bytes)
         frames = list(protocol.received_frames())
         assert len(frames) == 1
@@ -974,7 +975,7 @@ class TestFrameProtocolReceive(object):
 
     def test_close_one_byte_code(self):
         frame_bytes = b'\x88\x01\x0e'
-        protocol = fp.FrameProtocol(client=True, extensions=[])
+        protocol = fp.FrameProtocol(our_role=ConnectionRole.CLIENT, extensions=[])
 
         with pytest.raises(fp.ParseFailed) as exc:
             protocol.receive_bytes(frame_bytes)
@@ -1023,7 +1024,7 @@ class TestFrameProtocolReceive(object):
         payload = b'give me one ping vasily'
         frame_bytes = b'\x89' + bytearray([len(payload)]) + payload
 
-        protocol = fp.FrameProtocol(client=True, extensions=[])
+        protocol = fp.FrameProtocol(our_role=ConnectionRole.CLIENT, extensions=[])
         protocol.receive_bytes(frame_bytes)
         frames = list(protocol.received_frames())
         assert len(frames) == 1
@@ -1081,17 +1082,17 @@ class TestFrameProtocolReceive(object):
 
 class TestFrameProtocolSend(object):
     def test_simplest_possible_close(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         data = proto.close()
         assert data == b'\x88\x00'
 
     def test_unreasoning_close(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE)
         assert data == b'\x88\x02\x03\xe8'
 
     def test_reasoned_close(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         reason = u'¯\_(ツ)_/¯'
         expected_payload = struct.pack('!H', fp.CloseReason.NORMAL_CLOSURE) + \
             reason.encode('utf8')
@@ -1100,7 +1101,7 @@ class TestFrameProtocolSend(object):
             expected_payload
 
     def test_overly_reasoned_close(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         reason = u'¯\_(ツ)_/¯' * 10
         data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE, reason=reason)
         assert bytes(data[0:1]) == b'\x88'
@@ -1108,52 +1109,52 @@ class TestFrameProtocolSend(object):
         assert data[4:].decode('utf8')
 
     def test_reasoned_but_uncoded_close(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         with pytest.raises(TypeError):
             proto.close(reason='termites')
 
     def test_local_only_close_reason(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         data = proto.close(code=fp.CloseReason.NO_STATUS_RCVD)
         assert data == b'\x88\x02\x03\xe8'
 
     def test_ping_without_payload(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         data = proto.ping()
         assert data == b'\x89\x00'
 
     def test_ping_with_payload(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = u'¯\_(ツ)_/¯'.encode('utf8')
         data = proto.ping(payload)
         assert data == b'\x89' + bytearray([len(payload)]) + payload
 
     def test_pong_without_payload(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         data = proto.pong()
         assert data == b'\x8a\x00'
 
     def test_pong_with_payload(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = u'¯\_(ツ)_/¯'.encode('utf8')
         data = proto.pong(payload)
         assert data == b'\x8a' + bytearray([len(payload)]) + payload
 
     def test_single_short_binary_data(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b"it's all just ascii, right?"
         data = proto.send_data(payload, fin=True)
         assert data == b'\x82' + bytearray([len(payload)]) + payload
 
     def test_single_short_text_data(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = u'😃😄🙃😉'
         data = proto.send_data(payload, fin=True)
         payload = payload.encode('utf8')
         assert data == b'\x81' + bytearray([len(payload)]) + payload
 
     def test_multiple_short_binary_data(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b"it's all just ascii, right?"
         data = proto.send_data(payload, fin=False)
         assert data == b'\x02' + bytearray([len(payload)]) + payload
@@ -1163,7 +1164,7 @@ class TestFrameProtocolSend(object):
         assert data == b'\x80' + bytearray([len(payload)]) + payload
 
     def test_multiple_short_text_data(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = u'😃😄🙃😉'
         data = proto.send_data(payload, fin=False)
         payload = payload.encode('utf8')
@@ -1175,7 +1176,7 @@ class TestFrameProtocolSend(object):
         assert data == b'\x80' + bytearray([len(payload)]) + payload
 
     def test_mismatched_data_messages1(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = u'😃😄🙃😉'
         data = proto.send_data(payload, fin=False)
         payload = payload.encode('utf8')
@@ -1186,7 +1187,7 @@ class TestFrameProtocolSend(object):
             proto.send_data(payload)
 
     def test_mismatched_data_messages2(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b"it's all just ascii, right?"
         data = proto.send_data(payload, fin=False)
         assert data == b'\x02' + bytearray([len(payload)]) + payload
@@ -1196,31 +1197,31 @@ class TestFrameProtocolSend(object):
             proto.send_data(payload)
 
     def test_message_length_max_short(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b'x' * 125
         data = proto.send_data(payload, fin=True)
         assert data == b'\x82' + bytearray([len(payload)]) + payload
 
     def test_message_length_min_two_byte(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b'x' * 126
         data = proto.send_data(payload, fin=True)
         assert data == b'\x82\x7e' + struct.pack('!H', len(payload)) + payload
 
     def test_message_length_max_two_byte(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b'x' * (2 ** 16 - 1)
         data = proto.send_data(payload, fin=True)
         assert data == b'\x82\x7e' + struct.pack('!H', len(payload)) + payload
 
     def test_message_length_min_eight_byte(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b'x' * (2 ** 16)
         data = proto.send_data(payload, fin=True)
         assert data == b'\x82\x7f' + struct.pack('!Q', len(payload)) + payload
 
-    def test_client_side_masking_short_frame(self):
-        proto = fp.FrameProtocol(client=True, extensions=[])
+    def test_client_side_side_masking_short_frame(self):
+        proto = fp.FrameProtocol(our_role=ConnectionRole.CLIENT, extensions=[])
         payload = b'x' * 125
         data = proto.send_data(payload, fin=True)
         assert data[0] == 0x82
@@ -1230,8 +1231,8 @@ class TestFrameProtocolSend(object):
         assert data[6:] == \
             bytearray(b ^ next(maskbytes) for b in bytearray(payload))
 
-    def test_client_side_masking_two_byte_frame(self):
-        proto = fp.FrameProtocol(client=True, extensions=[])
+    def test_client_side_side_masking_two_byte_frame(self):
+        proto = fp.FrameProtocol(our_role=ConnectionRole.CLIENT, extensions=[])
         payload = b'x' * 126
         data = proto.send_data(payload, fin=True)
         assert data[0] == 0x82
@@ -1242,8 +1243,8 @@ class TestFrameProtocolSend(object):
         assert data[8:] == \
             bytearray(b ^ next(maskbytes) for b in bytearray(payload))
 
-    def test_client_side_masking_eight_byte_frame(self):
-        proto = fp.FrameProtocol(client=True, extensions=[])
+    def test_client_side_side_masking_eight_byte_frame(self):
+        proto = fp.FrameProtocol(our_role=ConnectionRole.CLIENT, extensions=[])
         payload = b'x' * 65536
         data = proto.send_data(payload, fin=True)
         assert data[0] == 0x82
@@ -1255,14 +1256,14 @@ class TestFrameProtocolSend(object):
             bytearray(b ^ next(maskbytes) for b in bytearray(payload))
 
     def test_control_frame_with_overly_long_payload(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = b'x' * 126
 
         with pytest.raises(ValueError):
             proto.pong(payload)
 
     def test_data_we_have_no_idea_what_to_do_with(self):
-        proto = fp.FrameProtocol(client=False, extensions=[])
+        proto = fp.FrameProtocol(our_role=ConnectionRole.SERVER, extensions=[])
         payload = dict()
 
         with pytest.raises(ValueError):
