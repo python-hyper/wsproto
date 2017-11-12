@@ -2,7 +2,7 @@ import json
 import socket
 
 from wsproto.compat import PY2
-from wsproto.connection import WSConnection
+from wsproto.connection import WSConnection, ConnectionRole
 from wsproto.events import ConnectionEstablished, ConnectionClosed, TextReceived, DataReceived
 from wsproto.extensions import PerMessageDeflate
 
@@ -21,7 +21,7 @@ else:
 
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')
-    connection = WSConnection(client_side=True, host=uri.netloc, resource=uri.path)
+    connection = WSConnection(our_role=ConnectionRole.CLIENT, host=uri.netloc, resource=uri.path)
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
@@ -48,7 +48,7 @@ def get_case_count(server):
 
 def run_case(server, case, agent):
     uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
-    connection = WSConnection(client_side=True,
+    connection = WSConnection(our_role=ConnectionRole.CLIENT,
                               host=uri.netloc,
                               resource='%s?%s' % (uri.path, uri.query),
                               extensions=[PerMessageDeflate()])
@@ -82,7 +82,7 @@ def run_case(server, case, agent):
 
 def update_reports(server, agent):
     uri = urlparse(server + '/updateReports?agent=%s' % agent)
-    connection = WSConnection(client_side=True,
+    connection = WSConnection(our_role=ConnectionRole.CLIENT,
                               host=uri.netloc,
                               resource='%s?%s' % (uri.path, uri.query))
     sock = socket.socket()

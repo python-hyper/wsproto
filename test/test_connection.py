@@ -4,7 +4,7 @@ import itertools
 
 import pytest
 
-from wsproto.connection import WSConnection, ConnectionState
+from wsproto.connection import WSConnection, ConnectionRole, ConnectionState
 from wsproto.events import (
     ConnectionClosed,
     ConnectionEstablished,
@@ -18,8 +18,8 @@ from wsproto.frame_protocol import CloseReason, FrameProtocol
 
 class TestConnection(object):
     def create_connection(self):
-        server = WSConnection(client_side=False)
-        client = WSConnection(client_side=True, host='localhost', resource='foo')
+        server = WSConnection(our_role=ConnectionRole.SERVER)
+        client = WSConnection(our_role=ConnectionRole.CLIENT, host='localhost', resource='foo')
 
         server.receive_bytes(client.bytes_to_send())
         event = next(server.events())
@@ -36,9 +36,9 @@ class TestConnection(object):
 
     def test_default_args(self):
         with pytest.raises(ValueError, match="Host must not be None"):
-            WSConnection(client_side=True, resource='/ws')
+            WSConnection(our_role=ConnectionRole.CLIENT, resource='/ws')
         with pytest.raises(ValueError, match="Resource must not be None"):
-            WSConnection(client_side=True, host='localhost')
+            WSConnection(our_role=ConnectionRole.CLIENT, host='localhost')
 
     @pytest.mark.parametrize('as_client,final', [
         (True, True),
@@ -109,13 +109,13 @@ class TestConnection(object):
             assert conn.closed
 
     def test_bytes_send_all(self):
-        connection = WSConnection(client_side=False)
+        connection = WSConnection(our_role=ConnectionRole.SERVER)
         connection._outgoing = b'fnord fnord'
         assert connection.bytes_to_send() == b'fnord fnord'
         assert connection.bytes_to_send() == b''
 
     def test_bytes_send_some(self):
-        connection = WSConnection(client_side=False)
+        connection = WSConnection(our_role=ConnectionRole.SERVER)
         connection._outgoing = b'fnord fnord'
         assert connection.bytes_to_send(5) == b'fnord'
         assert connection.bytes_to_send() == b' fnord'
@@ -209,7 +209,7 @@ class TestConnection(object):
 
         frame = opcode + length + encoded_payload
 
-        connection = WSConnection(client_side=True, host='localhost', resource='foo')
+        connection = WSConnection(our_role=ConnectionRole.CLIENT, host='localhost', resource='foo')
         connection._proto = FrameProtocol(True, [])
         connection._state = ConnectionState.OPEN
         connection.bytes_to_send()
@@ -237,7 +237,7 @@ class TestConnection(object):
             def received_frames(self):
                 return [FailFrame()]
 
-        connection = WSConnection(client_side=True, host='localhost', resource='foo')
+        connection = WSConnection(our_role=ConnectionRole.CLIENT, host='localhost', resource='foo')
         connection._proto = DoomProtocol()
         connection._state = ConnectionState.OPEN
         connection.bytes_to_send()

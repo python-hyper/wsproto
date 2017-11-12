@@ -1,7 +1,7 @@
 import select
 import socket
 
-from wsproto.connection import WSConnection
+from wsproto.connection import WSConnection, ConnectionRole
 from wsproto.events import ConnectionRequested, ConnectionClosed, DataReceived
 from wsproto.extensions import PerMessageDeflate
 
@@ -11,7 +11,7 @@ def new_conn(sock):
     global count
     print("test_server.py received connection {}".format(count))
     count += 1
-    ws = WSConnection(client_side=False, extensions=[PerMessageDeflate()])
+    ws = WSConnection(our_role=ConnectionRole.SERVER, extensions=[PerMessageDeflate()])
     closed = False
     while not closed:
         try:

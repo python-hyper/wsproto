@@ -15,6 +15,7 @@ from collections import namedtuple
 from enum import Enum, IntEnum
 
 from .compat import unicode, Utf8Validator
+from . import ConnectionRole
 
 try:
     from wsaccel.xormask import XorMaskerSimple
@@ -231,8 +232,8 @@ class MessageDecoder(object):
 
 
 class FrameDecoder(object):
-    def __init__(self, client_side, extensions=None):
-        self.client_side = client_side
+    def __init__(self, our_role, extensions=None):
+        self.our_role = our_role
         self.extensions = extensions or []
 
         self.buffer = Buffer()
@@ -321,9 +322,9 @@ class FrameDecoder(object):
 
         self.extension_processing(opcode, rsv, payload_len)
 
-        if has_mask and self.client_side:
+        if has_mask and self.our_role == ConnectionRole.CLIENT:
             raise ParseFailed("client received unexpected masked frame")
-        if not has_mask and not self.client_side:
+        if not has_mask and self.our_role == ConnectionRole.SERVER:
             raise ParseFailed("server received unexpected unmasked frame")
         if has_mask:
             masking_key = self.buffer.consume_exactly(4)
@@ -392,12 +393,12 @@ class FrameProtocol(object):
         FRAME_COMPLETE = 3
         FAILED = 4
 
-    def __init__(self, client_side, extensions):
-        self.client_side = client_side
+    def __init__(self, our_role, extensions):
+        self.our_role = our_role
         self.extensions = [ext for ext in extensions if ext.enabled()]
 
         # Global state
-        self._frame_decoder = FrameDecoder(self.client_side, self.extensions)
+        self._frame_decoder = FrameDecoder(self.our_role, self.extensions)
         self._message_decoder = MessageDecoder()
         self._parse_more = self.parse_more_gen()
 
@@ -548,7 +549,7 @@ class FrameProtocol(object):
             second_payload = payload_length
             quad_payload = True
 
-        if self.client_side:
+        if self.our_role == ConnectionRole.CLIENT:
             first_payload |= 1 << 7
 
         header = bytearray([fin_rsv_opcode, first_payload])
@@ -560,7 +561,7 @@ class FrameProtocol(object):
             else:
                 header += bytearray(struct.pack('!H', second_payload))
 
-        if self.client_side:
+        if self.our_role == ConnectionRole.CLIENT:
             # "The masking key is a 32-bit value chosen at random by the
             # client.  When preparing a masked frame, the client MUST pick a
             # fresh masking key from the set of allowed 32-bit values.  The

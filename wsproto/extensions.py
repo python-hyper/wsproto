@@ -9,6 +9,7 @@ WebSocket extensions.
 import zlib
 
 from .frame_protocol import CloseReason, Opcode, RsvBits
+from .connection import ConnectionRole
 
 
 class Extension(object):
@@ -159,7 +160,7 @@ class PerMessageDeflate(Extension):
             self._inbound_compressed = rsv.rsv1
             if self._inbound_compressed:
                 assert self._inbound_is_compressible
-                if proto.client_side:
+                if proto.our_role == ConnectionRole.CLIENT:
                     bits = self.server_max_window_bits
                 else:
                     bits = self.client_max_window_bits
@@ -191,7 +192,7 @@ class PerMessageDeflate(Extension):
         except zlib.error:
             return CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
-        if proto.client_side:
+        if proto.our_role == ConnectionRole.CLIENT:
             no_context_takeover = self.server_no_context_takeover
         else:
             no_context_takeover = self.client_no_context_takeover
@@ -212,7 +213,7 @@ class PerMessageDeflate(Extension):
 
         if self._compressor is None:
             assert opcode is not Opcode.CONTINUATION
-            if proto.client_side:
+            if proto.our_role == ConnectionRole.CLIENT:
                 bits = self.client_max_window_bits
             else:
                 bits = self.server_max_window_bits
@@ -225,7 +226,7 @@ class PerMessageDeflate(Extension):
             data += self._compressor.flush(zlib.Z_SYNC_FLUSH)
             data = data[:-4]
 
-            if proto.client_side:
+            if proto.our_role == ConnectionRole.CLIENT:
                 no_context_takeover = self.client_no_context_takeover
             else:
                 no_context_takeover = self.server_no_context_takeover

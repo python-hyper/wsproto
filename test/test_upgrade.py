@@ -10,7 +10,7 @@ import random
 import pytest
 
 from wsproto.compat import PY3
-from wsproto.connection import WSConnection
+from wsproto.connection import WSConnection, ConnectionRole
 from wsproto.events import (
     ConnectionEstablished, ConnectionFailed, ConnectionRequested
 )
@@ -48,7 +48,7 @@ class FakeExtension(Extension):
 
 class TestClientUpgrade(object):
     def initiate(self, host, path, **kwargs):
-        ws = WSConnection(client_side=True, host=host, resource=path, **kwargs)
+        ws = WSConnection(our_role=ConnectionRole.CLIENT, host=host, resource=path, **kwargs)
 
         data = ws.bytes_to_send()
         request, headers = data.split(b'\r\n', 1)
@@ -356,7 +356,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -390,7 +390,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -411,7 +411,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -432,7 +432,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -453,7 +453,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -473,7 +473,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         request = b'GET ' + test_path.encode('ascii') + b' HTTP/1.1\r\n'
         request += b'Host: ' + test_host.encode('ascii') + b'\r\n'
@@ -490,7 +490,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -513,7 +513,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -546,7 +546,7 @@ class TestServerUpgrade(object):
         test_host = 'frob.nitz'
         test_path = '/fnord'
 
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -573,7 +573,7 @@ class TestServerUpgrade(object):
         test_path = '/fnord'
         ext = FakeExtension(accept_response=True)
 
-        ws = WSConnection(client_side=False, extensions=[ext])
+        ws = WSConnection(our_role=ConnectionRole.SERVER, extensions=[ext])
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -608,7 +608,7 @@ class TestServerUpgrade(object):
         ext_params = 'parameter1=value1; parameter2=value2'
         ext = FakeExtension(accept_response=ext_params)
 
-        ws = WSConnection(client_side=False, extensions=[ext])
+        ws = WSConnection(our_role=ConnectionRole.SERVER, extensions=[ext])
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -644,7 +644,7 @@ class TestServerUpgrade(object):
         test_path = '/fnord'
         ext = FakeExtension(accept_response=accept_response)
 
-        ws = WSConnection(client_side=False, extensions=[ext])
+        ws = WSConnection(our_role=ConnectionRole.SERVER, extensions=[ext])
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -677,7 +677,7 @@ class TestServerUpgrade(object):
         test_path = '/fnord'
         ext = FakeExtension(accept_response='')
 
-        ws = WSConnection(client_side=False, extensions=[ext])
+        ws = WSConnection(our_role=ConnectionRole.SERVER, extensions=[ext])
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -710,7 +710,7 @@ class TestServerUpgrade(object):
         test_path = '/fnord'
         ext = FakeExtension(accept_response=False)
 
-        ws = WSConnection(client_side=False, extensions=[ext])
+        ws = WSConnection(our_role=ConnectionRole.SERVER, extensions=[ext])
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -737,7 +737,7 @@ class TestServerUpgrade(object):
         assert 'sec-websocket-extensions' not in headers
 
     def test_not_an_http_request_at_all(self):
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
 
         request = b'<xml>Good god, what is this?</xml>\r\n\r\n'
 
@@ -745,7 +745,7 @@ class TestServerUpgrade(object):
         assert isinstance(next(ws.events()), ConnectionFailed)
 
     def test_h11_somehow_loses_its_mind(self):
-        ws = WSConnection(client_side=False)
+        ws = WSConnection(our_role=ConnectionRole.SERVER)
         ws._upgrade_connection.next_event = lambda: object()
 
         ws.receive_bytes(b'')
