@@ -179,11 +179,11 @@ class PerMessageDeflate(Extension):
 
     def frame_inbound_complete(self, proto, fin):
         if not fin:
-            return
+            return None
         elif not self._inbound_is_compressible:
-            return
+            return None
         elif not self._inbound_compressed:
-            return
+            return None
 
         try:
             data = self._decompressor.decompress(b'\x00\x00\xff\xff')
