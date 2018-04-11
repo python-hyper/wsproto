@@ -324,7 +324,8 @@ class WSConnection(object):
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Bad status code from server")
         headers = _normed_header_dict(event.headers)
-        if headers[b'connection'].lower() != b'upgrade':
+        connection_tokens = _split_comma_header(headers[b'connection'])
+        if not any(token.lower() == 'upgrade' for token in connection_tokens):
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Connection: Upgrade header")
         if headers[b'upgrade'].lower() != b'websocket':
@@ -368,7 +369,8 @@ class WSConnection(object):
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Request method must be GET")
         headers = _normed_header_dict(event.headers)
-        if headers[b'connection'].lower() != b'upgrade':
+        connection_tokens = _split_comma_header(headers[b'connection'])
+        if not any(token.lower() == 'upgrade' for token in connection_tokens):
             return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
                                     "Missing Connection: Upgrade header")
         if headers[b'upgrade'].lower() != b'websocket':
