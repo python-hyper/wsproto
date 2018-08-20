@@ -462,8 +462,12 @@ class WSConnection(object):
                 else:
                     # py34 annoyance: doesn't support bytestring formatting
                     params = params.decode("ascii")
-                    extensions.append(('%s; %s' % (name, params))
-                                      .encode("ascii"))
+                    if params == '':
+                        extensions.append(('%s' % (name))
+                                          .encode("ascii"))
+                    else:
+                        extensions.append(('%s; %s' % (name, params))
+                                          .encode("ascii"))
             return b', '.join(extensions)
 
         return None

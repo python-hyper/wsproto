@@ -55,7 +55,7 @@ setup(
         'Programming Language :: Python :: Implementation :: PyPy',
     ],
     install_requires=[
-        'h11 ~= 0.7.0',  # means: 0.7.x where x >= 0
+        'h11 ~= 0.8.1',  # means: 0.8.x where x >= 1
     ],
     extras_require={
         ':python_version == "2.7"':
