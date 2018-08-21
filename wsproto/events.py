@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/events
-~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 Events that result from processing data on a WebSocket connection.
 """
 
 
-class ConnectionRequested(object):
+class Event(object):
+    """
+    Base class for wsproto events.
+    """
+    pass
+
+
+class ConnectionRequested(Event):
     def __init__(self, proposed_subprotocols, h11request):
         self.proposed_subprotocols = proposed_subprotocols
         self.h11request = h11request
@@ -26,7 +33,7 @@ class ConnectionRequested(object):
                       subprotocol, extensions)
 
 
-class ConnectionEstablished(object):
+class ConnectionEstablished(Event):
     def __init__(self, subprotocol=None, extensions=None):
         self.subprotocol = subprotocol
         self.extensions = extensions
@@ -38,8 +45,13 @@ class ConnectionEstablished(object):
                (self.subprotocol, self.extensions)
 
 
-class ConnectionClosed(object):
+class ConnectionClosed(Event):
+    """
+    The ConnectionClosed event is fired after the close handshake is complete.
+    """
     def __init__(self, code, reason=None):
+        #: The close status code, see :class:`CloseReason
+        #: <wsproto.frame_protocol.CloseReason>`.
         self.code = code
         self.reason = reason
 
@@ -57,7 +69,7 @@ class ConnectionFailed(ConnectionClosed):
     pass
 
 
-class DataReceived(object):
+class DataReceived(Event):
     def __init__(self, data, frame_finished, message_finished):
         self.data = data
         # This has no semantic content, but is provided just in case some
@@ -76,11 +88,11 @@ class BytesReceived(DataReceived):
     pass
 
 
-class PingReceived(object):
+class PingReceived(Event):
     def __init__(self, payload):
         self.payload = payload
 
 
-class PongReceived(object):
+class PongReceived(Event):
     def __init__(self, payload):
         self.payload = payload
