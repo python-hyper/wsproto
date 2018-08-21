@@ -47,7 +47,9 @@ class ConnectionEstablished(Event):
 
 class ConnectionClosed(Event):
     """
-    The ConnectionClosed event is fired after the close handshake is complete.
+    The ConnectionClosed event is fired after the connection is considered closed.
+
+    wsproto automatically emits a CLOSE frame when it receives one, to complete the close-handshake.
     """
     def __init__(self, code, reason=None):
         #: The close status code, see :class:`CloseReason
