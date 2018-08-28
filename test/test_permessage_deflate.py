@@ -279,6 +279,34 @@ class TestPerMessageDeflate(object):
 
         assert data == payload
 
+    @pytest.mark.parametrize('client', [True, False])
+    def test_client_decompress_after_uncompressible_frame(self, client):
+        ext = wpext.PerMessageDeflate()
+        ext._enabled = True
+        proto = fp.FrameProtocol(client=client, extensions=[ext])
+
+        # A PING frame
+        result = ext.frame_inbound_header(proto, fp.Opcode.PING,
+                                          fp.RsvBits(False, False, False),
+                                          0)
+        result = ext.frame_inbound_payload_data(proto, b'')
+        assert not isinstance(result, fp.CloseReason)
+        assert ext.frame_inbound_complete(proto, True) is None
+
+        # A compressed TEXT frame
+        payload = b'x' * 23
+        compressed_payload = b'\xaa\xa8\xc0\n\x00\x00'
+
+        result = ext.frame_inbound_header(proto, fp.Opcode.TEXT,
+                                          fp.RsvBits(True, False, False),
+                                          len(compressed_payload))
+        assert result.rsv1
+        result = ext.frame_inbound_payload_data(proto, compressed_payload)
+        assert result == payload
+
+        result = ext.frame_inbound_complete(proto, True)
+        assert not isinstance(result, fp.CloseReason)
+
     def test_inbound_bad_zlib_payload(self):
         compressed_payload = b'x' * 23
 
