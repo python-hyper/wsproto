@@ -197,6 +197,7 @@ def main():
 
     coverage_settings["enabled"] = args.cov
     cases = args.cases
+    #pylint: disable=consider-using-get
     if cases in CASES:
         cases = CASES[cases]
     else:
@@ -220,6 +221,7 @@ def main():
         sys.exit(1)
     else:
         say("SUCCESS!")
+
 
 if __name__ == "__main__":
     main()

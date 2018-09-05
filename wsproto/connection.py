@@ -227,7 +227,7 @@ class WSConnection(object):
             self._events.append(ConnectionClosed(CloseReason.ABNORMAL_CLOSURE))
             self._state = ConnectionState.CLOSED
             return
-        elif data is None:
+        if data is None:
             self._state = ConnectionState.CLOSED
             return
 

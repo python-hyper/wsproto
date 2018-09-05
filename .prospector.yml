@@ -1,6 +1,7 @@
 pylint:
   disable:
     - unused-argument
+    - useless-object-inheritance
 
   options:
     max-args: 6
