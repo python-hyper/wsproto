@@ -6,6 +6,8 @@ __pycache__
 .coverage
 *.pyc
 *.pyo
+.pytest_cache
+*~
 docs/build
 build
 dist

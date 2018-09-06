@@ -28,6 +28,7 @@ setup(
     description='WebSockets state-machine based protocol implementation',
     author='Benno Rice',
     author_email='benno@jeamland.net',
+    url='https://github.com/python-hyper/wsproto/',
     packages=find_packages(),
     package_data={'': ['LICENSE', 'README.rst']},
     package_dir={'wsproto': 'wsproto'},

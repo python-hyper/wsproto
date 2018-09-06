@@ -3,3 +3,4 @@ recursive-include test *.py
 recursive-include compliance *.py *.json
 graft docs
 prune docs/build
+exclude .codecov.yml coverage.sh .prospector.yml
