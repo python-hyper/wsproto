@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 wsproto/frame_protocol
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 WebSocket frame protocol implementation.
 """
@@ -12,7 +12,7 @@ import struct
 from codecs import getincrementaldecoder
 from collections import namedtuple
 
-from enum import Enum, IntEnum
+from enum import IntEnum
 
 from .compat import unicode, Utf8Validator
 
@@ -386,12 +386,6 @@ class FrameDecoder(object):
 
 
 class FrameProtocol(object):
-    class State(Enum):
-        HEADER = 1
-        PAYLOAD = 2
-        FRAME_COMPLETE = 3
-        FAILED = 4
-
     def __init__(self, client, extensions):
         self.client = client
         self.extensions = [ext for ext in extensions if ext.enabled()]
@@ -399,7 +393,7 @@ class FrameProtocol(object):
         # Global state
         self._frame_decoder = FrameDecoder(self.client, self.extensions)
         self._message_decoder = MessageDecoder()
-        self._parse_more = self.parse_more_gen()
+        self._parse_more = self._parse_more_gen()
 
         self._outbound_opcode = None
 
@@ -447,7 +441,7 @@ class FrameProtocol(object):
         return Frame(frame.opcode, data, frame.frame_finished,
                      frame.message_finished)
 
-    def parse_more_gen(self):
+    def _parse_more_gen(self):
         # Consume as much as we can from self._buffer, yielding events, and
         # then yield None when we need more data. Or raise ParseFailed.
 
