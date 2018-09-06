@@ -88,15 +88,42 @@ class TestConnection(object):
         assert event.code is code
         assert event.reason == reason
 
-    def test_normal_closure(self):
-        client, server = self.create_connection()
+    @pytest.mark.parametrize('swap', [
+        True,
+        False
+    ])
+    def test_normal_closure(self, swap):
+        if swap:
+            completor, initiator = self.create_connection()
+        else:
+            initiator, completor = self.create_connection()
 
-        for conn in (client, server):
-            conn.close()
-            conn.receive_bytes(None)
-            with pytest.raises(StopIteration):
-                repr(next(conn.events()))
-            assert conn.closed
+        # initiator sends CLOSE to completor
+        initiator.close()
+        completor.receive_bytes(initiator.bytes_to_send())
+
+        # completor emits ConnectionClosed
+        assert isinstance(next(completor.events()), ConnectionClosed)
+
+        # completor enters CLOSED state
+        assert completor.closed
+        with pytest.raises(StopIteration):
+            next(completor.events())
+
+        # completor sends CLOSE back to initiator
+        initiator.receive_bytes(completor.bytes_to_send())
+
+        # initiator emits ConnectionClosed
+        assert isinstance(next(initiator.events()), ConnectionClosed)
+
+        # initiator enters CLOSED state
+        assert initiator.closed
+        with pytest.raises(StopIteration):
+            next(initiator.events())
+
+        completor.ping()
+        with pytest.raises(ValueError):
+            initiator.receive_bytes(completor.bytes_to_send())
 
     def test_abnormal_closure(self):
         client, server = self.create_connection()
