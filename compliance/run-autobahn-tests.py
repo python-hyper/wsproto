@@ -71,7 +71,7 @@ def setup_venv():
         subprocess.check_call(
             ["virtualenv", "-p", "python2.7", "autobahntestsuite-venv"])
         subprocess.check_call(
-            ["autobahntestsuite-venv/bin/pip", "install", "autobahntestsuite"])
+            ["autobahntestsuite-venv/bin/pip", "install", "autobahntestsuite>=0.8.0"])
 
 def wait_for_listener(port):
     while True:

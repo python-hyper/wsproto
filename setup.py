@@ -6,10 +6,15 @@ import sys
 
 from setuptools import setup, find_packages
 
+PROJECT_ROOT = os.path.dirname(__file__)
+
+with open(os.path.join(PROJECT_ROOT, 'README.rst')) as file_:
+    long_description = file_.read()
+
 # Get the version
 version_regex = r'__version__ = ["\']([^"\']*)["\']'
-with open('wsproto/__init__.py', 'r') as f:
-    text = f.read()
+with open(os.path.join(PROJECT_ROOT, 'wsproto/__init__.py')) as file_:
+    text = file_.read()
     match = re.search(version_regex, text)
 
     if match:
@@ -26,8 +31,10 @@ setup(
     name='wsproto',
     version=version,
     description='WebSockets state-machine based protocol implementation',
+    long_description=long_description,
     author='Benno Rice',
     author_email='benno@jeamland.net',
+    url='https://github.com/python-hyper/wsproto/',
     packages=find_packages(),
     package_data={'': ['LICENSE', 'README.rst']},
     package_dir={'wsproto': 'wsproto'},
@@ -48,7 +55,7 @@ setup(
         'Programming Language :: Python :: Implementation :: PyPy',
     ],
     install_requires=[
-        'h11 ~= 0.7.0',  # means: 0.7.x where x >= 0
+        'h11 ~= 0.8.1',  # means: 0.8.x where x >= 1
     ],
     extras_require={
         ':python_version == "2.7"':
