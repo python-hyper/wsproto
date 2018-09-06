@@ -43,6 +43,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
     ],
@@ -50,7 +51,7 @@ setup(
         'h11 ~= 0.7.0',  # means: 0.7.x where x >= 0
     ],
     extras_require={
-        ':python_version == "2.7" or python_version == "3.3"':
+        ':python_version == "2.7"':
             ['enum34>=1.0.4, <2'],
     }
 )
