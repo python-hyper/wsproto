@@ -1,5 +1,6 @@
-include README.rst LICENSE CONTRIBUTORS.rst HISTORY.rst tox.ini Pipfile
+include README.rst LICENSE CHANGELOG.rst CONTRIBUTORS.rst HISTORY.rst tox.ini Pipfile
 recursive-include test *.py
 recursive-include compliance *.py *.json
 graft docs
 prune docs/build
+exclude .codecov.yml coverage.sh .prospector.yml
