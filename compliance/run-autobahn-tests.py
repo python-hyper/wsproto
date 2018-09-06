@@ -4,7 +4,6 @@
 from __future__ import print_function
 
 import sys
-import os
 import os.path
 import argparse
 import errno
@@ -203,12 +202,6 @@ def main():
         cases = CASES[cases]
     else:
         cases = json.loads(cases)
-
-    # The autobahn test suite currently requires hash randomization to be
-    # disabled:
-    #   https://github.com/python-hyper/wsproto/issues/55
-    #   https://github.com/crossbario/autobahn-testsuite/issues/80
-    os.environ["PYTHONHASHSEED"] = "0"
 
     setup_venv()
 
