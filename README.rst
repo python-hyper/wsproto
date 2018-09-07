@@ -19,12 +19,11 @@ paradigm.
 
 This repository does not provide a parsing layer, a network layer, or any rules
 about concurrency. Instead, it's a purely in-memory solution, defined in terms
-of data actions and WebSocket frames. RFC6455 and
+of data actions and WebSocket frames. RFC6455 and Compression Extensions for
+WebSocket via `RFC7692 <https://tools.ietf.org/html/rfc7692>`_ are fully
+supported.
 
-Compression Extensions for WebSocket via
-`RFC7692 <https://tools.ietf.org/html/rfc7692>`_ are fully supported.
-
-wsproto supports Python 2.7, 3.5 or higher.
+wsproto supports Python 2.7 and 3.5 or higher.
 
 To install it, just run:
 
@@ -35,6 +34,56 @@ To install it, just run:
 
 Usage
 =====
+
+Let's assume you have some form of network socket available. wsproto client
+connections automatically generate a HTTP request to initiate the WebSocket
+handshake. To create a WebSocket client connection:
+
+.. code-block:: python
+
+  from wsproto.connection import WSConnection, ConnectionType
+  ws = WSConnection(ConnectionType.CLIENT, host='echo.websocket.org', resource='/')
+
+To create a WebSocket server connection:
+
+.. code-block:: python
+
+  from wsproto.connection import WSConnection, ConnectionType
+  ws = WSConnection(ConnectionType.SERVER)
+
+Every time you send a message, or call a ping, or simply if you receive incoming
+data, wsproto might respond with some outgoing data that you have to send:
+
+.. code-block:: python
+
+  some_socket.send(ws.bytes_to_send())
+
+Both connection types need to receive incoming data:
+
+.. code-block:: python
+
+  ws.receive_bytes(some_byte_string_of_data)
+
+And wsproto will issue events if the data contains any WebSocket messages or state changes:
+
+.. code-block:: python
+
+  for event in ws.events():
+      if isinstance(event, ConnectionRequested):
+          # only client connections get this event
+          ws.accept(event)
+      elif isinstance(event, ConnectionClosed):
+          # guess nobody wants to talk to us any more...
+      elif isinstance(event, TextReceived):
+          print('We got a text!', event.data)
+      elif isinstance(event, TextReceived):
+          print('We got a text!', event.data)
+
+Take a look at our docs for a `full list of events
+<https://wsproto.readthedocs.io/en/latest/api.html#events>`!
+
+Testing
+=======
 
 It passes the autobahn test suite completely and strictly in both client and
 server modes and using permessage-deflate.
