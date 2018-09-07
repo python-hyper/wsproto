@@ -1,6 +1,9 @@
-include README.rst LICENSE CHANGELOG.rst CONTRIBUTORS.rst HISTORY.rst tox.ini Pipfile
-recursive-include test *.py
-recursive-include compliance *.py *.json
+graft compliance
 graft docs
+graft test
+graft wsproto
 prune docs/build
-exclude .codecov.yml coverage.sh .prospector.yml
+prune compliance/autobahntestsuite-venv
+prune compliance/reports
+include README.rst LICENSE CHANGELOG.rst tox.ini
+recursive-exclude * *.pyc *.pyo *.swo *.swp *.map *.DS_Store 
