@@ -36,7 +36,10 @@ class ConnectionState(Enum):
     CLOSED = 3
 
 class ConnectionType(Enum):
+    #: This connection will act as client and talk to a remote server
     CLIENT = 1
+
+    #: This connection will as as server and waits for client connections
     SERVER = 2
 
 
