@@ -109,7 +109,13 @@ And to receive WebSocket events::
             print('Connection closed: code={} reason={}'.format(
                 event.code, event.reason))
         elif isinstance(event, TextReceived):
-            print('Received message: {}'.format(event.data))
+            print('Received TEXT data: {}'.format(event.data))
+            if event.message_finished:
+                print('Message finished.')
+        elif isinstance(event, BinaryReceived):
+            print('Received BINARY data: {}'.format(event.data))
+            if event.message_finished:
+                print('BINARY Message finished.')
         else:
             print('Unknown event: {!r}'.format(event))
 
@@ -139,7 +145,13 @@ A server also needs to explicitly call the ``accept`` method after it receives a
             print('Connection closed: code={} reason={}'.format(
                 event.code, event.reason))
         elif isinstance(event, TextReceived):
-            print('Received message: {}'.format(event.data))
+            print('Received TEXT data: {}'.format(event.data))
+            if event.message_finished:
+                print('TEXT Message finished.')
+        elif isinstance(event, BinaryReceived):
+            print('Received BINARY data: {}'.format(event.data))
+            if event.message_finished:
+                print('BINARY Message finished.')
         else:
             print('Unknown event: {!r}'.format(event))
 

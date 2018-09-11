@@ -15,6 +15,10 @@ class Event(object):
 
 
 class ConnectionRequested(Event):
+    """
+    The ConnectionRequested event is fired when a SERVER connection receives a
+    WebSocket handshake request (HTTP with upgrade header).
+    """
     def __init__(self, proposed_subprotocols, h11request):
         self.proposed_subprotocols = proposed_subprotocols
         self.h11request = h11request
@@ -34,6 +38,10 @@ class ConnectionRequested(Event):
 
 
 class ConnectionEstablished(Event):
+    """
+    The ConnectionEstablished event is fired when a CLIENT connection completes
+    the WebSocket handshake and is ready to send & receive messages.
+    """
     def __init__(self, subprotocol=None, extensions=None):
         self.subprotocol = subprotocol
         self.extensions = extensions
@@ -68,28 +76,50 @@ class ConnectionFailed(ConnectionClosed):
 
 class DataReceived(Event):
     def __init__(self, data, frame_finished, message_finished):
+        #: The message data as byte string, can be decoded as UTF-8 for TEXT messages.
+        #: This only represents a single chunk of data and not a full WebSocket message.
+        #: You need to buffer and reassemble these chunks to get the full message.
         self.data = data
-        # This has no semantic content, but is provided just in case some
-        # weird edge case user wants to be able to reconstruct the
-        # fragmentation pattern of the original stream. You don't want it:
+
+        #: This has no semantic content, but is provided just in case some
+        #: weird edge case user wants to be able to reconstruct the
+        #: fragmentation pattern of the original stream. You don't want it:
         self.frame_finished = frame_finished
-        # This is the field that you almost certainly want:
+
+        #: True if this frame is the last one of this message, False if more frames are expected.
         self.message_finished = message_finished
 
 
 class TextReceived(DataReceived):
+    """
+    The TextReceived event is fired when a data frame with TEXT payload is received.
+    """
     pass
 
 
 class BytesReceived(DataReceived):
+    """
+    The BytesReceived event is fired when a data frame with BINARY payload is received.
+    """
     pass
 
 
 class PingReceived(Event):
+    """
+    The PingReceived event is fired when a Ping is received.
+
+    wsproto automatically emits a PONG frame with the same payload.
+    """
     def __init__(self, payload):
+        #: Optional "Application data", i.e., binary payload.
         self.payload = payload
 
 
 class PongReceived(Event):
+    """
+    The PongReceived event is fired when a Pong is received.
+    """
     def __init__(self, payload):
+        #: Optional "Application data", i.e., binary payload.
+        #: Make sure to verify against the orignal PING payload.
         self.payload = payload
