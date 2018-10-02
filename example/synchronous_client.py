@@ -111,7 +111,7 @@ def net_send(ws, conn):
 def net_recv(ws, conn):
     ''' Read pending data from network into websocket. '''
     in_data = conn.recv(RECEIVE_BYTES)
-    if in_data:
+    if not in_data:
         # A receive of zero bytes indicates the TCP socket has been closed. We
         # need to pass None to wsproto to update its internal state.
         print('Received 0 bytes (connection closed)')
