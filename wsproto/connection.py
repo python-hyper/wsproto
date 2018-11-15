@@ -6,20 +6,25 @@ wsproto/connection
 An implementation of a WebSocket connection.
 """
 
-import os
 import base64
 import hashlib
+import os
 from collections import deque
-
 from enum import Enum
 
 import h11
 
 from .events import (
-    ConnectionRequested, ConnectionEstablished, ConnectionClosed,
-    ConnectionFailed, TextReceived, BytesReceived, PingReceived, PongReceived
+    BytesReceived,
+    ConnectionClosed,
+    ConnectionEstablished,
+    ConnectionFailed,
+    ConnectionRequested,
+    PingReceived,
+    PongReceived,
+    TextReceived,
 )
-from .frame_protocol import FrameProtocol, ParseFailed, CloseReason, Opcode
+from .frame_protocol import CloseReason, FrameProtocol, Opcode, ParseFailed
 from .utilities import normed_header_dict, split_comma_header
 
 # RFC6455, Section 1.3 - Opening Handshake
@@ -30,10 +35,12 @@ class ConnectionState(Enum):
     """
     RFC 6455, Section 4 - Opening Handshake
     """
+
     CONNECTING = 0
     OPEN = 1
     CLOSING = 2
     CLOSED = 3
+
 
 class ConnectionType(Enum):
     #: This connection will act as client and talk to a remote server
@@ -45,6 +52,7 @@ class ConnectionType(Enum):
 
 CLIENT = ConnectionType.CLIENT
 SERVER = ConnectionType.SERVER
+
 
 class WSConnection(object):
     """
@@ -76,8 +84,9 @@ class WSConnection(object):
     :type subprotocol: ``list`` of ``str``
     """
 
-    def __init__(self, conn_type, host=None, resource=None, extensions=None,
-                 subprotocols=None):
+    def __init__(
+        self, conn_type, host=None, resource=None, extensions=None, subprotocols=None
+    ):
         self.client = conn_type is ConnectionType.CLIENT
 
         self.host = host
@@ -86,13 +95,13 @@ class WSConnection(object):
         self.subprotocols = subprotocols or []
         self.extensions = extensions or []
 
-        self.version = b'13'
+        self.version = b"13"
 
         self._state = ConnectionState.CONNECTING
         self._close_reason = None
 
         self._nonce = None
-        self._outgoing = b''
+        self._outgoing = b""
         self._events = deque()
         self._proto = None
 
@@ -103,20 +112,20 @@ class WSConnection(object):
 
         if self.client:
             if self.host is None:
-                raise ValueError(
-                    "Host must not be None for a client-side connection.")
+                raise ValueError("Host must not be None for a client-side connection.")
             if self.resource is None:
                 raise ValueError(
-                    "Resource must not be None for a client-side connection.")
+                    "Resource must not be None for a client-side connection."
+                )
             self.initiate_connection()
 
     def initiate_connection(self):
         self._generate_nonce()
 
         headers = {
-            b"Host": self.host.encode('ascii'),
-            b"Upgrade": b'WebSocket',
-            b"Connection": b'Upgrade',
+            b"Host": self.host.encode("ascii"),
+            b"Upgrade": b"WebSocket",
+            b"Connection": b"Upgrade",
             b"Sec-WebSocket-Key": self._nonce,
             b"Sec-WebSocket-Version": self.version,
         }
@@ -129,16 +138,16 @@ class WSConnection(object):
             extensions = []
             for name, params in offers.items():
                 if params is True:
-                    extensions.append(name.encode('ascii'))
+                    extensions.append(name.encode("ascii"))
                 elif params:
                     # py34 annoyance: doesn't support bytestring formatting
-                    extensions.append(('%s; %s' % (name, params))
-                                      .encode("ascii"))
+                    extensions.append(("%s; %s" % (name, params)).encode("ascii"))
             if extensions:
-                headers[b'Sec-WebSocket-Extensions'] = b', '.join(extensions)
+                headers[b"Sec-WebSocket-Extensions"] = b", ".join(extensions)
 
-        upgrade = h11.Request(method=b'GET', target=self.resource,
-                              headers=headers.items())
+        upgrade = h11.Request(
+            method=b"GET", target=self.resource, headers=headers.items()
+        )
         self._outgoing += self._upgrade_connection.send(upgrade)
 
     def send_data(self, payload, final=True):
@@ -194,7 +203,7 @@ class WSConnection(object):
         """
         if amount is None:
             data = self._outgoing
-            self._outgoing = b''
+            self._outgoing = b""
         else:
             data = self._outgoing[:amount]
             self._outgoing = self._outgoing[amount:]
@@ -228,7 +237,7 @@ class WSConnection(object):
         if self._state in (ConnectionState.OPEN, ConnectionState.CLOSING):
             self._proto.receive_bytes(data)
         elif self._state is ConnectionState.CLOSED:
-            raise ValueError('Connection already closed.')
+            raise ValueError("Connection already closed.")
 
     def events(self):
         """
@@ -263,14 +272,14 @@ class WSConnection(object):
                     yield ConnectionClosed(code, reason)
 
                 elif frame.opcode is Opcode.TEXT:
-                    yield TextReceived(frame.payload,
-                                       frame.frame_finished,
-                                       frame.message_finished)
+                    yield TextReceived(
+                        frame.payload, frame.frame_finished, frame.message_finished
+                    )
 
                 elif frame.opcode is Opcode.BINARY:
-                    yield BytesReceived(frame.payload,
-                                        frame.frame_finished,
-                                        frame.message_finished)
+                    yield BytesReceived(
+                        frame.payload, frame.frame_finished, frame.message_finished
+                    )
         except ParseFailed as exc:
             # XX FIXME: apparently autobahn intentionally deviates from the
             # spec in that on protocol errors it just closes the connection
@@ -283,29 +292,27 @@ class WSConnection(object):
         request = event.h11request
         request_headers = normed_header_dict(request.headers)
 
-        nonce = request_headers[b'sec-websocket-key']
+        nonce = request_headers[b"sec-websocket-key"]
         accept_token = self._generate_accept_token(nonce)
 
         headers = {
-            b"Upgrade": b'WebSocket',
-            b"Connection": b'Upgrade',
+            b"Upgrade": b"WebSocket",
+            b"Connection": b"Upgrade",
             b"Sec-WebSocket-Accept": accept_token,
         }
 
         if subprotocol is not None:
             if subprotocol not in event.proposed_subprotocols:
-                raise ValueError(
-                    "unexpected subprotocol {!r}".format(subprotocol))
-            headers[b'Sec-WebSocket-Protocol'] = subprotocol
+                raise ValueError("unexpected subprotocol {!r}".format(subprotocol))
+            headers[b"Sec-WebSocket-Protocol"] = subprotocol
 
-        extensions = request_headers.get(b'sec-websocket-extensions', None)
+        extensions = request_headers.get(b"sec-websocket-extensions", None)
         if extensions:
             accepts = self._extension_accept(extensions)
             if accepts:
                 headers[b"Sec-WebSocket-Extensions"] = accepts
 
-        response = h11.InformationalResponse(status_code=101,
-                                             headers=headers.items())
+        response = h11.InformationalResponse(status_code=101, headers=headers.items())
         self._outgoing += self._upgrade_connection.send(response)
         self._proto = FrameProtocol(self.client, self.extensions)
         self._state = ConnectionState.OPEN
@@ -317,7 +324,7 @@ class WSConnection(object):
         :param payload: an optional payload to send with the message
         """
 
-        payload = bytes(payload or b'')
+        payload = bytes(payload or b"")
         self._outgoing += self._proto.ping(payload)
 
     def pong(self, payload=None):
@@ -331,7 +338,7 @@ class WSConnection(object):
         :param payload: an optional payload to send with the message
         """
 
-        payload = bytes(payload or b'')
+        payload = bytes(payload or b"")
         self._outgoing += self._proto.pong(payload)
 
     def _generate_nonce(self):
@@ -350,96 +357,111 @@ class WSConnection(object):
             try:
                 event = self._upgrade_connection.next_event()
             except h11.RemoteProtocolError:
-                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                        "Bad HTTP message"), b''
+                return (
+                    ConnectionFailed(CloseReason.PROTOCOL_ERROR, "Bad HTTP message"),
+                    b"",
+                )
             if event is h11.NEED_DATA:
                 break
-            elif self.client and isinstance(event, (h11.InformationalResponse,
-                                                    h11.Response)):
+            elif self.client and isinstance(
+                event, (h11.InformationalResponse, h11.Response)
+            ):
                 data = self._upgrade_connection.trailing_data[0]
                 return self._establish_client_connection(event), data
             elif not self.client and isinstance(event, h11.Request):
                 return self._process_connection_request(event), None
             else:
-                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                        "Bad HTTP message"), b''
+                return (
+                    ConnectionFailed(CloseReason.PROTOCOL_ERROR, "Bad HTTP message"),
+                    b"",
+                )
 
-        self._incoming = b''
+        self._incoming = b""
         return None, None
 
     def _establish_client_connection(self, event):
         if event.status_code != 101:
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Bad status code from server")
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Bad status code from server"
+            )
         headers = normed_header_dict(event.headers)
-        connection_tokens = split_comma_header(headers[b'connection'])
-        if not any(token.lower() == 'upgrade' for token in connection_tokens):
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Missing Connection: Upgrade header")
-        if headers[b'upgrade'].lower() != b'websocket':
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Missing Upgrade: WebSocket header")
+        connection_tokens = split_comma_header(headers[b"connection"])
+        if not any(token.lower() == "upgrade" for token in connection_tokens):
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Missing Connection: Upgrade header"
+            )
+        if headers[b"upgrade"].lower() != b"websocket":
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Missing Upgrade: WebSocket header"
+            )
 
         accept_token = self._generate_accept_token(self._nonce)
-        if headers[b'sec-websocket-accept'] != accept_token:
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Bad accept token")
+        if headers[b"sec-websocket-accept"] != accept_token:
+            return ConnectionFailed(CloseReason.PROTOCOL_ERROR, "Bad accept token")
 
-        subprotocol = headers.get(b'sec-websocket-protocol', None)
+        subprotocol = headers.get(b"sec-websocket-protocol", None)
         if subprotocol is not None:
-            subprotocol = subprotocol.decode('ascii')
+            subprotocol = subprotocol.decode("ascii")
             if subprotocol not in self.subprotocols:
-                return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                        "unrecognized subprotocol {!r}"
-                                        .format(subprotocol))
+                return ConnectionFailed(
+                    CloseReason.PROTOCOL_ERROR,
+                    "unrecognized subprotocol {!r}".format(subprotocol),
+                )
 
-        extensions = headers.get(b'sec-websocket-extensions', None)
+        extensions = headers.get(b"sec-websocket-extensions", None)
         if extensions:
             accepts = split_comma_header(extensions)
 
             for accept in accepts:
-                name = accept.split(';', 1)[0].strip()
+                name = accept.split(";", 1)[0].strip()
                 for extension in self.extensions:
                     if extension.name == name:
                         extension.finalize(self, accept)
                         break
                 else:
-                    return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                            "unrecognized extension {!r}"
-                                            .format(name))
+                    return ConnectionFailed(
+                        CloseReason.PROTOCOL_ERROR,
+                        "unrecognized extension {!r}".format(name),
+                    )
 
         self._proto = FrameProtocol(self.client, self.extensions)
         self._state = ConnectionState.OPEN
         return ConnectionEstablished(subprotocol, extensions)
 
     def _process_connection_request(self, event):
-        if event.method != b'GET':
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Request method must be GET")
+        if event.method != b"GET":
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Request method must be GET"
+            )
         headers = normed_header_dict(event.headers)
-        connection_tokens = split_comma_header(headers[b'connection'])
-        if not any(token.lower() == 'upgrade' for token in connection_tokens):
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Missing Connection: Upgrade header")
-        if headers[b'upgrade'].lower() != b'websocket':
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Missing Upgrade: WebSocket header")
+        connection_tokens = split_comma_header(headers[b"connection"])
+        if not any(token.lower() == "upgrade" for token in connection_tokens):
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Missing Connection: Upgrade header"
+            )
+        if headers[b"upgrade"].lower() != b"websocket":
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Missing Upgrade: WebSocket header"
+            )
 
-        if b'sec-websocket-version' not in headers:
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Missing Sec-WebSocket-Version header")
+        if b"sec-websocket-version" not in headers:
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Missing Sec-WebSocket-Version header"
+            )
         # XX FIXME: need to check Sec-Websocket-Version, and respond with a
         # 400 if it's not what we expect
 
-        if b'sec-websocket-protocol' in headers:
+        if b"sec-websocket-protocol" in headers:
             proposed_subprotocols = split_comma_header(
-                headers[b'sec-websocket-protocol'])
+                headers[b"sec-websocket-protocol"]
+            )
         else:
             proposed_subprotocols = []
 
-        if b'sec-websocket-key' not in headers:
-            return ConnectionFailed(CloseReason.PROTOCOL_ERROR,
-                                    "Missing Sec-WebSocket-Key header")
+        if b"sec-websocket-key" not in headers:
+            return ConnectionFailed(
+                CloseReason.PROTOCOL_ERROR, "Missing Sec-WebSocket-Key header"
+            )
 
         return ConnectionRequested(proposed_subprotocols, event)
 
@@ -448,29 +470,27 @@ class WSConnection(object):
         offers = split_comma_header(extensions_header)
 
         for offer in offers:
-            name = offer.split(';', 1)[0].strip()
+            name = offer.split(";", 1)[0].strip()
             for extension in self.extensions:
                 if extension.name == name:
                     accept = extension.accept(self, offer)
                     if accept is True:
                         accepts[extension.name] = True
                     elif accept is not False and accept is not None:
-                        accepts[extension.name] = accept.encode('ascii')
+                        accepts[extension.name] = accept.encode("ascii")
 
         if accepts:
             extensions = []
             for name, params in accepts.items():
                 if params is True:
-                    extensions.append(name.encode('ascii'))
+                    extensions.append(name.encode("ascii"))
                 else:
                     # py34 annoyance: doesn't support bytestring formatting
                     params = params.decode("ascii")
-                    if params == '':
-                        extensions.append(('%s' % (name))
-                                          .encode("ascii"))
+                    if params == "":
+                        extensions.append(("%s" % (name)).encode("ascii"))
                     else:
-                        extensions.append(('%s; %s' % (name, params))
-                                          .encode("ascii"))
-            return b', '.join(extensions)
+                        extensions.append(("%s; %s" % (name, params)).encode("ascii"))
+            return b", ".join(extensions)
 
         return None

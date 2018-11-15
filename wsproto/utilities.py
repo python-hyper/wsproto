@@ -27,4 +27,4 @@ def normed_header_dict(h11_headers):
 # wrong, because those can contain quoted strings, which can in turn contain
 # commas. XX FIXME
 def split_comma_header(value):
-    return [piece.decode('ascii').strip() for piece in value.split(b',')]
+    return [piece.decode("ascii").strip() for piece in value.split(b",")]
