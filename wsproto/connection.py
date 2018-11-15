@@ -150,6 +150,12 @@ class WSConnection(object):
         )
         self._outgoing += self._upgrade_connection.send(upgrade)
 
+    def initiate_upgrade_connection(self, headers, path):
+        # type: (List[Tuple[bytes, bytes]], str) -> None
+        upgrade_request = h11.Request(method=b"GET", target=path, headers=headers)
+        h11_client = h11.Connection(h11.CLIENT)
+        self.receive_bytes(h11_client.send(upgrade_request))
+
     def send_data(self, payload, final=True):
         """
         Send a message or part of a message to the remote peer.

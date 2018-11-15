@@ -395,6 +395,36 @@ class TestServerUpgrade(object):
         assert headers["upgrade"].lower() == "websocket"
         assert headers["sec-websocket-accept"] == accept_token.decode("ascii")
 
+    def test_initiate_upgrade_request(self):
+        ws = WSConnection(SERVER)
+
+        nonce = bytes(random.getrandbits(8) for x in range(0, 16))
+        nonce = base64.b64encode(nonce)
+        headers = [
+            (b"Host", b"frob.nitz"),
+            (b"Connection", b"Upgrade"),
+            (b"Upgrade", b"WebSocket"),
+            (b"Sec-WebSocket-Version", b"13"),
+            (b"Sec-WebSocket-Key", nonce),
+        ]
+
+        ws.initiate_upgrade_connection(headers, "/fnord")
+        event = next(ws.events())
+        assert isinstance(event, ConnectionRequested)
+        ws.accept(event)
+
+        data = ws.bytes_to_send()
+        response, headers = data.split(b"\r\n", 1)
+        version, code, reason = response.split(b" ")
+        headers = parse_headers(headers)
+
+        accept_token = ws._generate_accept_token(nonce)
+
+        assert int(code) == 101
+        assert headers["connection"].lower() == "upgrade"
+        assert headers["upgrade"].lower() == "websocket"
+        assert headers["sec-websocket-accept"] == accept_token.decode("ascii")
+
     def test_correct_request_expanded_connection_header(self):
         test_host = "frob.nitz"
         test_path = "/fnord"
