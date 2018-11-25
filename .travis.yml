@@ -67,8 +67,8 @@ matrix:
       env: TOXENV=lint
     - python: 3.6
       env: TOXENV=docs
-    # - python: "2.7"
-    #   env: TOXENV=packaging
+    - python: "3.6"
+      env: TOXENV=packaging
 
 install:
   - "pip install -U pip setuptools"
