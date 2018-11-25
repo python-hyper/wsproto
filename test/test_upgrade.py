@@ -11,7 +11,7 @@ import pytest
 
 from wsproto.compat import PY3
 from wsproto.connection import CLIENT, SERVER, WSConnection
-from wsproto.events import ConnectionEstablished, ConnectionFailed, ConnectionRequested
+from wsproto.events import AcceptConnection, Fail, Request
 from wsproto.extensions import Extension
 
 
@@ -93,7 +93,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionEstablished)
+        assert isinstance(next(ws.events()), AcceptConnection)
 
     def test_incorrect_accept_token(self):
         _host = "frob.nitz"
@@ -111,7 +111,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)
 
     def test_bad_connection_header(self):
         _host = "frob.nitz"
@@ -129,7 +129,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)
 
     def test_bad_upgrade_header(self):
         _host = "frob.nitz"
@@ -147,7 +147,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)
 
     def test_simple_extension_offer(self):
         _host = "frob.nitz"
@@ -207,7 +207,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionEstablished)
+        assert isinstance(next(ws.events()), AcceptConnection)
         assert _ext.name in _ext.accepted_offer
 
     def test_extension_accept_with_parameters(self):
@@ -232,7 +232,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionEstablished)
+        assert isinstance(next(ws.events()), AcceptConnection)
         assert _ext.accepted_offer == extensions
 
     def test_accept_an_extension_we_do_not_recognise(self):
@@ -255,7 +255,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)
 
     def test_wrong_status_code_in_response(self):
         _host = "frob.nitz"
@@ -273,7 +273,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)
 
     def test_response_takes_a_few_goes(self):
         _host = "frob.nitz"
@@ -297,7 +297,7 @@ class TestClientUpgrade(object):
             next(ws.events())
 
         ws.receive_bytes(response[split:])
-        assert isinstance(next(ws.events()), ConnectionEstablished)
+        assert isinstance(next(ws.events()), AcceptConnection)
 
     def test_subprotocol_offer(self):
         _host = "frob.nitz"
@@ -334,7 +334,7 @@ class TestClientUpgrade(object):
 
         ws.receive_bytes(response)
         event = next(ws.events())
-        assert isinstance(event, ConnectionEstablished)
+        assert isinstance(event, AcceptConnection)
         assert event.subprotocol == subprotocols[0]
 
     def test_subprotocol_accept_unoffered(self):
@@ -357,7 +357,7 @@ class TestClientUpgrade(object):
         response += b"\r\n"
 
         ws.receive_bytes(response)
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)
 
 
 class TestServerUpgrade(object):
@@ -380,7 +380,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
         ws.accept(event)
 
         data = ws.bytes_to_send()
@@ -410,7 +410,7 @@ class TestServerUpgrade(object):
 
         ws.initiate_upgrade_connection(headers, "/fnord")
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
         ws.accept(event)
 
         data = ws.bytes_to_send()
@@ -444,7 +444,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
 
     def test_wrong_method(self):
         test_host = "frob.nitz"
@@ -465,7 +465,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionFailed)
+        assert isinstance(event, Fail)
 
     def test_bad_connection(self):
         test_host = "frob.nitz"
@@ -486,7 +486,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionFailed)
+        assert isinstance(event, Fail)
 
     def test_bad_upgrade(self):
         test_host = "frob.nitz"
@@ -507,7 +507,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionFailed)
+        assert isinstance(event, Fail)
 
     def test_missing_version(self):
         test_host = "frob.nitz"
@@ -527,7 +527,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionFailed)
+        assert isinstance(event, Fail)
 
     def test_missing_key(self):
         test_host = "frob.nitz"
@@ -544,7 +544,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionFailed)
+        assert isinstance(event, Fail)
 
     def test_subprotocol_offers(self):
         test_host = "frob.nitz"
@@ -566,8 +566,8 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
-        assert event.proposed_subprotocols == ["one", "two"]
+        assert isinstance(event, Request)
+        assert event.subprotocols == ["one", "two"]
 
     def test_accept_subprotocol(self):
         test_host = "frob.nitz"
@@ -589,8 +589,8 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
-        assert event.proposed_subprotocols == ["one", "two"]
+        assert isinstance(event, Request)
+        assert event.subprotocols == ["one", "two"]
 
         ws.accept(event, "two")
 
@@ -622,8 +622,8 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
-        assert event.proposed_subprotocols == ["one", "two"]
+        assert isinstance(event, Request)
+        assert event.subprotocols == ["one", "two"]
 
         with pytest.raises(ValueError):
             ws.accept(event, "three")
@@ -649,7 +649,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
         ws.accept(event)
 
         data = ws.bytes_to_send()
@@ -689,7 +689,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
         ws.accept(event)
 
         data = ws.bytes_to_send()
@@ -722,7 +722,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
         ws.accept(event)
 
         data = ws.bytes_to_send()
@@ -754,7 +754,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
         ws.accept(event)
 
         data = ws.bytes_to_send()
@@ -786,7 +786,7 @@ class TestServerUpgrade(object):
 
         ws.receive_bytes(request)
         event = next(ws.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
         ws.accept(event)
 
         data = ws.bytes_to_send()
@@ -802,11 +802,11 @@ class TestServerUpgrade(object):
         request = b"<xml>Good god, what is this?</xml>\r\n\r\n"
 
         ws.receive_bytes(request)
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)
 
     def test_h11_somehow_loses_its_mind(self):
         ws = WSConnection(SERVER)
         ws._upgrade_connection.next_event = lambda: object()
 
         ws.receive_bytes(b"")
-        assert isinstance(next(ws.events()), ConnectionFailed)
+        assert isinstance(next(ws.events()), Fail)

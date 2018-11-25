@@ -24,31 +24,31 @@ Events
 .. autoclass:: wsproto.events.Event
    :members:
 
-.. autoclass:: wsproto.events.ConnectionRequested
+.. autoclass:: wsproto.events.Request
    :members:
 
-.. autoclass:: wsproto.events.ConnectionEstablished
+.. autoclass:: wsproto.events.AcceptConnection
    :members:
 
-.. autoclass:: wsproto.events.ConnectionClosed
+.. autoclass:: wsproto.events.CloseConnection
    :members:
 
-.. autoclass:: wsproto.events.ConnectionFailed
+.. autoclass:: wsproto.events.Fail
    :members:
 
-.. autoclass:: wsproto.events.DataReceived
+.. autoclass:: wsproto.events.Data
    :members:
 
-.. autoclass:: wsproto.events.TextReceived
+.. autoclass:: wsproto.events.TextMessage
    :members:
 
-.. autoclass:: wsproto.events.BytesReceived
+.. autoclass:: wsproto.events.BytesMessage
    :members:
 
-.. autoclass:: wsproto.events.PingReceived
+.. autoclass:: wsproto.events.Ping
    :members:
 
-.. autoclass:: wsproto.events.PongReceived
+.. autoclass:: wsproto.events.Pong
    :members:
 
 Frame Protocol
