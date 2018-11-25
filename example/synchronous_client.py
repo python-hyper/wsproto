@@ -8,7 +8,7 @@ import socket
 import sys
 
 from wsproto.connection import ConnectionType, WSConnection
-from wsproto.events import ConnectionEstablished, TextReceived, PongReceived
+from wsproto.events import AcceptConnection, TextMessage, Pong
 
 
 RECEIVE_BYTES = 4096
@@ -63,10 +63,10 @@ def wsproto_demo(host, port):
     # a handshake, and we need to send it and wait for a response.
     net_send_recv(ws, conn)
     event = next(events)
-    if isinstance(event, ConnectionEstablished):
+    if isinstance(event, AcceptConnection):
         print('WebSocket negotiation complete')
     else:
-        raise Exception('Expected ConnectionEstablished event!')
+        raise Exception('Expected AcceptConnection event!')
 
     # 2) Send a message and display response
     message = "wsproto is great"
@@ -74,10 +74,10 @@ def wsproto_demo(host, port):
     ws.send_data(message)
     net_send_recv(ws, conn)
     event = next(events)
-    if isinstance(event, TextReceived):
+    if isinstance(event, TextMessage):
         print('Received message: {}'.format(event.data))
     else:
-        raise Exception('Expected TextReceived event!')
+        raise Exception('Expected TextMessage event!')
 
     # 3) Send ping and display pong
     payload = b"table tennis"
@@ -85,10 +85,10 @@ def wsproto_demo(host, port):
     ws.ping(payload)
     net_send_recv(ws, conn)
     event = next(events)
-    if isinstance(event, PongReceived):
+    if isinstance(event, Pong):
         print('Received pong: {}'.format(event.payload))
     else:
-        raise Exception('Expected PongReceived event!')
+        raise Exception('Expected Pong event!')
 
     # 4) Negotiate WebSocket closing handshake
     print('Closing WebSocket')

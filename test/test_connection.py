@@ -6,13 +6,13 @@ import pytest
 
 from wsproto.connection import CLIENT, ConnectionState, SERVER, WSConnection
 from wsproto.events import (
-    BytesReceived,
-    ConnectionClosed,
-    ConnectionEstablished,
-    ConnectionRequested,
-    PingReceived,
-    PongReceived,
-    TextReceived,
+    AcceptConnection,
+    BytesMessage,
+    CloseConnection,
+    Ping,
+    Pong,
+    Request,
+    TextMessage,
 )
 from wsproto.frame_protocol import CloseReason, FrameProtocol
 
@@ -24,11 +24,11 @@ class TestConnection(object):
 
         server.receive_bytes(client.bytes_to_send())
         event = next(server.events())
-        assert isinstance(event, ConnectionRequested)
+        assert isinstance(event, Request)
 
         server.accept(event)
         client.receive_bytes(server.bytes_to_send())
-        assert isinstance(next(client.events()), ConnectionEstablished)
+        assert isinstance(next(client.events()), AcceptConnection)
 
         return client, server
 
@@ -59,7 +59,7 @@ class TestConnection(object):
         them.receive_bytes(me.bytes_to_send())
 
         event = next(them.events())
-        assert isinstance(event, BytesReceived)
+        assert isinstance(event, BytesMessage)
         assert event.data == data
         assert event.message_finished is final
 
@@ -85,7 +85,7 @@ class TestConnection(object):
         them.receive_bytes(me.bytes_to_send())
 
         event = next(them.events())
-        assert isinstance(event, ConnectionClosed)
+        assert isinstance(event, CloseConnection)
         assert event.code is code
         assert event.reason == reason
 
@@ -100,8 +100,8 @@ class TestConnection(object):
         initiator.close()
         completor.receive_bytes(initiator.bytes_to_send())
 
-        # completor emits ConnectionClosed
-        assert isinstance(next(completor.events()), ConnectionClosed)
+        # completor emits Close
+        assert isinstance(next(completor.events()), CloseConnection)
 
         # completor enters CLOSED state
         assert completor.closed
@@ -111,8 +111,8 @@ class TestConnection(object):
         # completor sends CLOSE back to initiator
         initiator.receive_bytes(completor.bytes_to_send())
 
-        # initiator emits ConnectionClosed
-        assert isinstance(next(initiator.events()), ConnectionClosed)
+        # initiator emits Close
+        assert isinstance(next(initiator.events()), CloseConnection)
 
         # initiator enters CLOSED state
         assert initiator.closed
@@ -129,7 +129,7 @@ class TestConnection(object):
         for conn in (client, server):
             conn.receive_bytes(None)
             event = next(conn.events())
-            assert isinstance(event, ConnectionClosed)
+            assert isinstance(event, CloseConnection)
             assert event.code is CloseReason.ABNORMAL_CLOSURE
             assert conn.closed
 
@@ -161,11 +161,11 @@ class TestConnection(object):
         me.ping(payload)
         wire_data = me.bytes_to_send()
 
-        # Verify that the peer emits the PingReceive event with the correct
+        # Verify that the peer emits the Ping event with the correct
         # payload.
         them.receive_bytes(wire_data)
         event = next(them.events())
-        assert isinstance(event, PingReceived)
+        assert isinstance(event, Ping)
         assert event.payload == payload
         with pytest.raises(StopIteration):
             repr(next(them.events()))
@@ -182,11 +182,11 @@ class TestConnection(object):
             data = wire_data[2:]
         assert data == payload
 
-        # Verify that connection emits the PongReceive event with the correct
+        # Verify that connection emits the Pong event with the correct
         # payload.
         me.receive_bytes(wire_data)
         event = next(me.events())
-        assert isinstance(event, PongReceived)
+        assert isinstance(event, Pong)
         assert event.payload == payload
         with pytest.raises(StopIteration):
             repr(next(me.events()))
@@ -203,7 +203,7 @@ class TestConnection(object):
         server.receive_bytes(wire_data)
         events = list(server.events())
         assert len(events) == 1
-        assert isinstance(events[0], PongReceived)
+        assert isinstance(events[0], Pong)
         assert events[0].payload == expected_payload
 
     @pytest.mark.parametrize(
@@ -245,9 +245,9 @@ class TestConnection(object):
         connection.receive_bytes(frame)
         event = next(connection.events())
         if text:
-            assert isinstance(event, TextReceived)
+            assert isinstance(event, TextMessage)
         else:
-            assert isinstance(event, BytesReceived)
+            assert isinstance(event, BytesMessage)
         assert event.data == payload
         assert event.frame_finished is full_frame
         assert event.message_finished is full_message
@@ -283,7 +283,7 @@ class TestConnection(object):
 
         client.receive_bytes(frame)
         event = next(client.events())
-        assert isinstance(event, ConnectionClosed)
+        assert isinstance(event, CloseConnection)
         assert event.code == CloseReason.PROTOCOL_ERROR
 
         output = client.bytes_to_send()

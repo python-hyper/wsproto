@@ -9,8 +9,7 @@ import socket
 import sys
 
 from wsproto.connection import ConnectionType, WSConnection
-from wsproto.events import ConnectionClosed, ConnectionRequested, \
-    PingReceived, TextReceived
+from wsproto.events import CloseConnection, Ping, Request, TextMessage
 
 
 MAX_CONNECTS = 5
@@ -79,20 +78,20 @@ def handle_connection(stream):
             return
 
         # 3) Handle event
-        if isinstance(event, ConnectionRequested):
+        if isinstance(event, Request):
             # Negotiate new WebSocket connection
             print('Accepting WebSocket upgrade')
             ws.accept(event)
-        elif isinstance(event, ConnectionClosed):
+        elif isinstance(event, CloseConnection):
             # Print log message and break out
             print('Connection closed: code={}/{} reason={}'.format(
                 event.code.value, event.code.name, event.reason))
             running = False
-        elif isinstance(event, TextReceived):
+        elif isinstance(event, TextMessage):
             # Reverse text and send it back to wsproto
             print('Received request and sending response')
             ws.send_data(event.data[::-1])
-        elif isinstance(event, PingReceived):
+        elif isinstance(event, Ping):
             # wsproto handles ping events for you by placing a pong frame in
             # the outgoing buffer. You should not call pong() unless you want to
             # send an unsolicited pong frame.

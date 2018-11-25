@@ -2,9 +2,8 @@ import json
 import socket
 
 from wsproto.compat import PY2
-from wsproto.connection import WSConnection, CLIENT, ConnectionEstablished, \
-                               ConnectionClosed
-from wsproto.events import TextReceived, DataReceived
+from wsproto.connection import WSConnection, CLIENT
+from wsproto.events import AcceptConnection, CloseConnection, TextMessage, Data
 from wsproto.extensions import PerMessageDeflate
 
 if PY2:
@@ -34,7 +33,7 @@ def get_case_count(server):
         connection.receive_bytes(data)
         data = ""
         for event in connection.events():
-            if isinstance(event, TextReceived):
+            if isinstance(event, TextMessage):
                 data += event.data
                 if event.message_finished:
                     case_count = json.loads(data)
@@ -65,9 +64,9 @@ def run_case(server, case, agent):
             data = None
         connection.receive_bytes(data or None)
         for event in connection.events():
-            if isinstance(event, DataReceived):
+            if isinstance(event, Data):
                 connection.send_data(event.data, event.message_finished)
-            elif isinstance(event, ConnectionClosed):
+            elif isinstance(event, CloseConnection):
                 closed = True
             # else:
             #     print("??", event)
@@ -94,7 +93,7 @@ def update_reports(server, agent):
         data = sock.recv(65535)
         connection.receive_bytes(data)
         for event in connection.events():
-            if isinstance(event, ConnectionEstablished):
+            if isinstance(event, AcceptConnection):
                 connection.close()
                 sock.sendall(connection.bytes_to_send())
                 try:

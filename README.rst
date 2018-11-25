@@ -69,14 +69,14 @@ And wsproto will issue events if the data contains any WebSocket messages or sta
 .. code-block:: python
 
   for event in ws.events():
-      if isinstance(event, ConnectionRequested):
+      if isinstance(event, Request):
           # only client connections get this event
           ws.accept(event)
-      elif isinstance(event, ConnectionClosed):
+      elif isinstance(event, CloseConnection):
           # guess nobody wants to talk to us any more...
-      elif isinstance(event, TextReceived):
+      elif isinstance(event, TextMessage):
           print('We got a text!', event.data)
-      elif isinstance(event, TextReceived):
+      elif isinstance(event, TextMessage):
           print('We got a text!', event.data)
 
 Take a look at our docs for a `full list of events

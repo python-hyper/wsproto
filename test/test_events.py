@@ -1,82 +1,46 @@
 import pytest
-from h11 import Request
 
-from wsproto.events import ConnectionClosed, ConnectionEstablished, ConnectionRequested
-from wsproto.frame_protocol import CloseReason
+from wsproto.events import Event
 
 
-def test_connection_requested_repr_no_subprotocol():
-    method = b"GET"
-    target = b"/foo"
-    headers = {b"host": b"localhost", b"sec-websocket-version": b"13"}
-    http_version = b"1.1"
-
-    req = Request(
-        method=method,
-        target=target,
-        headers=list(headers.items()),
-        http_version=http_version,
-    )
-
-    event = ConnectionRequested([], req)
-    r = repr(event)
-
-    assert "ConnectionRequested" in r
-    assert target.decode("ascii") in r
+class SimpleEvent(Event):
+    _fields = ["a", "b", "c", "d"]
+    _defaults = {"c": None, "d": []}
 
 
-def test_connection_requested_repr_with_subprotocol():
-    method = b"GET"
-    target = b"/foo"
-    headers = {
-        b"host": b"localhost",
-        b"sec-websocket-version": b"13",
-        b"sec-websocket-protocol": b"fnord",
-    }
-    http_version = b"1.1"
-
-    req = Request(
-        method=method,
-        target=target,
-        headers=list(headers.items()),
-        http_version=http_version,
-    )
-
-    event = ConnectionRequested([], req)
-    r = repr(event)
-
-    assert "ConnectionRequested" in r
-    assert target.decode("ascii") in r
-    assert headers[b"sec-websocket-protocol"].decode("ascii") in r
+def test_event_construction():
+    event = SimpleEvent(a=1, b=0)
+    assert event.a == 1
+    assert event.b == 0
+    assert event.c is None
+    assert event.d == []
 
 
-@pytest.mark.parametrize(
-    "subprotocol,extensions",
-    [("sproto", None), (None, ["fake"]), ("sprout", ["pretend"])],
-)
-def test_connection_established_repr(subprotocol, extensions):
-    event = ConnectionEstablished(subprotocol, extensions)
-    r = repr(event)
-
-    if subprotocol:
-        assert subprotocol in r
-    if extensions:
-        for extension in extensions:
-            assert extension in r
+def test_event_construction_unknown():
+    with pytest.raises(TypeError):
+        SimpleEvent(a=1, b=0, e=2)
 
 
-@pytest.mark.parametrize(
-    "code,reason",
-    [
-        (CloseReason.NORMAL_CLOSURE, None),
-        (CloseReason.NORMAL_CLOSURE, "because i felt like it"),
-        (CloseReason.INVALID_FRAME_PAYLOAD_DATA, "GOOD GOD WHAT DID YOU DO"),
-    ],
-)
-def test_connection_closed_repr(code, reason):
-    event = ConnectionClosed(code, reason)
-    r = repr(event)
+def test_event_construction_missing():
+    with pytest.raises(TypeError):
+        SimpleEvent(a=1)
 
-    assert repr(code) in r
-    if reason:
-        assert reason in r
+
+def test_event_defaults():
+    event = SimpleEvent(a=1, b=0, d=[2])
+    event2 = SimpleEvent(a=1, b=0)
+    assert event.d == [2]
+    assert event2.d == []
+
+
+def test_event_repr():
+    event = SimpleEvent(a=1, b=0)
+    assert repr(event) == "SimpleEvent(a=1, b=0, c=None, d=[])"
+
+
+def test_event_equality():
+    event = SimpleEvent(a=1, b=0)
+    event2 = SimpleEvent(a=1, b=0)
+    event3 = SimpleEvent(a=1, b=1)
+    assert event == event2
+    assert event != event3

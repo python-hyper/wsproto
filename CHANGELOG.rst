@@ -1,6 +1,18 @@
 0.13.0 Unreleased
 -----------------
 
+* The Event structure is altered to allow for events to be sent and
+  received, this requires the following name changes in existing code,
+  ConnectionRequested -> Request
+  ConnectionEstablished -> AcceptConnection
+  ConnectionClosed -> CloseConnection
+  ConnectionFailed -> Fail
+  DataReceived -> Data
+  TextReceived -> TextMessage
+  BytesReceived -> BytesMessage
+  PingReceived -> Ping
+  PongReceived -> Pong
+
 0.12.0 2018-09-23
 -----------------
 
