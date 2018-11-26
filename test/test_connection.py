@@ -9,6 +9,7 @@ from wsproto.events import (
     AcceptConnection,
     BytesMessage,
     CloseConnection,
+    Data,
     Ping,
     Pong,
     Request,
@@ -20,13 +21,14 @@ from wsproto.frame_protocol import CloseReason, FrameProtocol
 class TestConnection(object):
     def create_connection(self):
         server = WSConnection(SERVER)
-        client = WSConnection(CLIENT, host="localhost", resource="foo")
+        client = WSConnection(CLIENT)
+        client.send(Request(host="localhost", target="foo"))
 
         server.receive_bytes(client.bytes_to_send())
         event = next(server.events())
         assert isinstance(event, Request)
 
-        server.accept(event)
+        server.send(AcceptConnection())
         client.receive_bytes(server.bytes_to_send())
         assert isinstance(next(client.events()), AcceptConnection)
 
@@ -34,12 +36,6 @@ class TestConnection(object):
 
     def test_negotiation(self):
         self.create_connection()
-
-    def test_default_args(self):
-        with pytest.raises(ValueError, match="Host must not be None"):
-            WSConnection(CLIENT, resource="/ws")
-        with pytest.raises(ValueError, match="Resource must not be None"):
-            WSConnection(CLIENT, host="localhost")
 
     @pytest.mark.parametrize(
         "as_client,final", [(True, True), (True, False), (False, True), (False, False)]
@@ -55,7 +51,7 @@ class TestConnection(object):
 
         data = b"x" * 23
 
-        me.send_data(data, final)
+        me.send(Data(data=data, message_finished=final))
         them.receive_bytes(me.bytes_to_send())
 
         event = next(them.events())
@@ -81,7 +77,7 @@ class TestConnection(object):
             me = server
             them = client
 
-        me.close(code, reason)
+        me.send(CloseConnection(code=code, reason=reason))
         them.receive_bytes(me.bytes_to_send())
 
         event = next(them.events())
@@ -97,7 +93,7 @@ class TestConnection(object):
             initiator, completor = self.create_connection()
 
         # initiator sends CLOSE to completor
-        initiator.close()
+        initiator.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
         completor.receive_bytes(initiator.bytes_to_send())
 
         # completor emits Close
@@ -119,7 +115,7 @@ class TestConnection(object):
         with pytest.raises(StopIteration):
             next(initiator.events())
 
-        completor.ping()
+        completor.send(Ping())
         with pytest.raises(ValueError):
             initiator.receive_bytes(completor.bytes_to_send())
 
@@ -158,7 +154,7 @@ class TestConnection(object):
         payload = b"x" * 23
 
         # Send a PING message
-        me.ping(payload)
+        me.send(Ping(payload=payload))
         wire_data = me.bytes_to_send()
 
         # Verify that the peer emits the Ping event with the correct
@@ -192,13 +188,13 @@ class TestConnection(object):
             repr(next(me.events()))
 
     @pytest.mark.parametrize(
-        "args, expected_payload",
-        [((), b""), ((b"abcdef",), b"abcdef")],
+        "payload, expected_payload",
+        [(b"", b""), (b"abcdef", b"abcdef")],
         ids=["nopayload", "payload"],
     )
-    def test_unsolicited_pong(self, args, expected_payload):
+    def test_unsolicited_pong(self, payload, expected_payload):
         client, server = self.create_connection()
-        client.pong(*args)
+        client.send(Pong(payload=payload))
         wire_data = client.bytes_to_send()
         server.receive_bytes(wire_data)
         events = list(server.events())
@@ -237,7 +233,8 @@ class TestConnection(object):
 
         frame = opcode + length + encoded_payload
 
-        connection = WSConnection(CLIENT, host="localhost", resource="foo")
+        connection = WSConnection(CLIENT)
+        connection.send(Request(host="localhost", target="foo"))
         connection._proto = FrameProtocol(True, [])
         connection._state = ConnectionState.OPEN
         connection.bytes_to_send()
@@ -265,7 +262,8 @@ class TestConnection(object):
             def received_frames(self):
                 return [FailFrame()]
 
-        connection = WSConnection(CLIENT, host="localhost", resource="foo")
+        connection = WSConnection(CLIENT)
+        connection.send(Request(host="localhost", target="foo"))
         connection._proto = DoomProtocol()
         connection._state = ConnectionState.OPEN
         connection.bytes_to_send()

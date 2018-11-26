@@ -8,7 +8,7 @@ import socket
 import sys
 
 from wsproto.connection import ConnectionType, WSConnection
-from wsproto.events import AcceptConnection, TextMessage, Pong
+from wsproto.events import AcceptConnection, CloseConnection, Data, Ping, Pong, Request, TextMessage
 
 
 RECEIVE_BYTES = 4096
@@ -49,7 +49,8 @@ def wsproto_demo(host, port):
 
     # 1) Negotiate WebSocket opening handshake
     print('Opening WebSocket')
-    ws = WSConnection(ConnectionType.CLIENT, host=host, resource='server')
+    ws = WSConnection(ConnectionType.CLIENT)
+    ws.send(Request(host=host, target='server'))
 
     # events is a generator that yields websocket event objects. Usually you
     # would say `for event in ws.events()`, but the synchronous nature of this
@@ -71,7 +72,7 @@ def wsproto_demo(host, port):
     # 2) Send a message and display response
     message = "wsproto is great"
     print('Sending message: {}'.format(message))
-    ws.send_data(message)
+    ws.send(Data(data=message))
     net_send_recv(ws, conn)
     event = next(events)
     if isinstance(event, TextMessage):
@@ -82,7 +83,7 @@ def wsproto_demo(host, port):
     # 3) Send ping and display pong
     payload = b"table tennis"
     print('Sending ping: {}'.format(payload))
-    ws.ping(payload)
+    ws.send(Ping(payload=payload))
     net_send_recv(ws, conn)
     event = next(events)
     if isinstance(event, Pong):
@@ -92,7 +93,7 @@ def wsproto_demo(host, port):
 
     # 4) Negotiate WebSocket closing handshake
     print('Closing WebSocket')
-    ws.close(code=1000, reason='sample reason')
+    ws.send(CloseConnection(code=1000, reason='sample reason'))
     # After sending the closing frame, we won't get any more events. The server
     # should send a reply and then close the connection, so we need to receive
     # twice:

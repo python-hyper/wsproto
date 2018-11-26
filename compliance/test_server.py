@@ -2,7 +2,7 @@ import select
 import socket
 
 from wsproto.connection import WSConnection, SERVER
-from wsproto.events import Accept, Close, Data, Request
+from wsproto.events import AcceptConnection, CloseConnection, Data, Request
 from wsproto.extensions import PerMessageDeflate
 
 count = 0
@@ -11,7 +11,7 @@ def new_conn(sock):
     global count
     print("test_server.py received connection {}".format(count))
     count += 1
-    ws = WSConnection(SERVER, extensions=[PerMessageDeflate()])
+    ws = WSConnection(SERVER)
     closed = False
     while not closed:
         try:
@@ -23,10 +23,10 @@ def new_conn(sock):
 
         for event in ws.events():
             if isinstance(event, Request):
-                ws.accept(event)
+                ws.send(AcceptConnection(extensions=[PerMessageDeflate()]))
             elif isinstance(event, Data):
-                ws.send_data(event.data, event.message_finished)
-            elif isinstance(event, Close):
+                ws.send(Data(data=event.data, message_finished=event.message_finished))
+            elif isinstance(event, CloseConnection):
                 closed = True
 
         if not data:
