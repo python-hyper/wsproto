@@ -46,7 +46,8 @@ class FakeExtension(Extension):
 
 class TestClientUpgrade(object):
     def initiate(self, host, path, **kwargs):
-        ws = WSConnection(CLIENT, host, path, **kwargs)
+        ws = WSConnection(CLIENT)
+        ws.send(Request(host=host, target=path, **kwargs))
 
         data = ws.bytes_to_send()
         request, headers = data.split(b"\r\n", 1)
@@ -381,7 +382,7 @@ class TestServerUpgrade(object):
         ws.receive_bytes(request)
         event = next(ws.events())
         assert isinstance(event, Request)
-        ws.accept(event)
+        ws.send(AcceptConnection())
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)
@@ -411,7 +412,7 @@ class TestServerUpgrade(object):
         ws.initiate_upgrade_connection(headers, "/fnord")
         event = next(ws.events())
         assert isinstance(event, Request)
-        ws.accept(event)
+        ws.send(AcceptConnection())
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)
@@ -592,7 +593,7 @@ class TestServerUpgrade(object):
         assert isinstance(event, Request)
         assert event.subprotocols == ["one", "two"]
 
-        ws.accept(event, "two")
+        ws.send(AcceptConnection(subprotocol="two"))
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)
@@ -626,14 +627,14 @@ class TestServerUpgrade(object):
         assert event.subprotocols == ["one", "two"]
 
         with pytest.raises(ValueError):
-            ws.accept(event, "three")
+            ws.send(AcceptConnection(subprotocol="three"))
 
     def test_simple_extension_negotiation(self):
         test_host = "frob.nitz"
         test_path = "/fnord"
         ext = FakeExtension(accept_response=True)
 
-        ws = WSConnection(SERVER, extensions=[ext])
+        ws = WSConnection(SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -650,7 +651,7 @@ class TestServerUpgrade(object):
         ws.receive_bytes(request)
         event = next(ws.events())
         assert isinstance(event, Request)
-        ws.accept(event)
+        ws.send(AcceptConnection(extensions=[ext]))
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)
@@ -667,7 +668,7 @@ class TestServerUpgrade(object):
         ext_params = "parameter1=value1; parameter2=value2"
         ext = FakeExtension(accept_response=ext_params)
 
-        ws = WSConnection(SERVER, extensions=[ext])
+        ws = WSConnection(SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -690,7 +691,7 @@ class TestServerUpgrade(object):
         ws.receive_bytes(request)
         event = next(ws.events())
         assert isinstance(event, Request)
-        ws.accept(event)
+        ws.send(AcceptConnection(extensions=[ext]))
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)
@@ -706,7 +707,7 @@ class TestServerUpgrade(object):
         test_path = "/fnord"
         ext = FakeExtension(accept_response=accept_response)
 
-        ws = WSConnection(SERVER, extensions=[ext])
+        ws = WSConnection(SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -723,7 +724,7 @@ class TestServerUpgrade(object):
         ws.receive_bytes(request)
         event = next(ws.events())
         assert isinstance(event, Request)
-        ws.accept(event)
+        ws.send(AcceptConnection(extensions=[ext]))
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)
@@ -738,7 +739,7 @@ class TestServerUpgrade(object):
         test_path = "/fnord"
         ext = FakeExtension(accept_response="")
 
-        ws = WSConnection(SERVER, extensions=[ext])
+        ws = WSConnection(SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -755,7 +756,7 @@ class TestServerUpgrade(object):
         ws.receive_bytes(request)
         event = next(ws.events())
         assert isinstance(event, Request)
-        ws.accept(event)
+        ws.send(AcceptConnection(extensions=[ext]))
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)
@@ -770,7 +771,7 @@ class TestServerUpgrade(object):
         test_path = "/fnord"
         ext = FakeExtension(accept_response=False)
 
-        ws = WSConnection(SERVER, extensions=[ext])
+        ws = WSConnection(SERVER)
 
         nonce = bytes(random.getrandbits(8) for x in range(0, 16))
         nonce = base64.b64encode(nonce)
@@ -787,7 +788,7 @@ class TestServerUpgrade(object):
         ws.receive_bytes(request)
         event = next(ws.events())
         assert isinstance(event, Request)
-        ws.accept(event)
+        ws.send(AcceptConnection(extensions=[ext]))
 
         data = ws.bytes_to_send()
         response, headers = data.split(b"\r\n", 1)

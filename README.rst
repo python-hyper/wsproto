@@ -42,13 +42,17 @@ handshake. To create a WebSocket client connection:
 .. code-block:: python
 
   from wsproto.connection import WSConnection, ConnectionType
-  ws = WSConnection(ConnectionType.CLIENT, host='echo.websocket.org', resource='/')
+  from wsproto.events import Request
+
+  ws = WSConnection(ConnectionType.CLIENT)
+  ws.send(Request(host='echo.websocket.org', target='/'))
 
 To create a WebSocket server connection:
 
 .. code-block:: python
 
   from wsproto.connection import WSConnection, ConnectionType
+
   ws = WSConnection(ConnectionType.SERVER)
 
 Every time you send a message, or call a ping, or simply if you receive incoming
@@ -71,7 +75,7 @@ And wsproto will issue events if the data contains any WebSocket messages or sta
   for event in ws.events():
       if isinstance(event, Request):
           # only client connections get this event
-          ws.accept(event)
+          ws.send(AcceptConnection())
       elif isinstance(event, CloseConnection):
           # guess nobody wants to talk to us any more...
       elif isinstance(event, TextMessage):

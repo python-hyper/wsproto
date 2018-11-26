@@ -1,17 +1,24 @@
 0.13.0 Unreleased
 -----------------
 
+* Introduce a send method on the conenction which accepts the new
+  events. This requires the following usage changes,
+    connection.accept(subprotocol=subprotocol) -> connection.send(AcceptConnection(subprotocol=subprotocol))
+    connection.send_data(data) -> connection.send(Data(payload=payload))
+    connection.close(code) -> connection.send(CloseConnection(code=code))
+    connection.ping() -> connection.send(Ping())
+    connection.pong() -> connection.send(Pong())
 * The Event structure is altered to allow for events to be sent and
   received, this requires the following name changes in existing code,
-  ConnectionRequested -> Request
-  ConnectionEstablished -> AcceptConnection
-  ConnectionClosed -> CloseConnection
-  ConnectionFailed -> Fail
-  DataReceived -> Data
-  TextReceived -> TextMessage
-  BytesReceived -> BytesMessage
-  PingReceived -> Ping
-  PongReceived -> Pong
+    ConnectionRequested -> Request
+    ConnectionEstablished -> AcceptConnection
+    ConnectionClosed -> CloseConnection
+    ConnectionFailed -> Fail
+    DataReceived -> Data
+    TextReceived -> TextMessage
+    BytesReceived -> BytesMessage
+    PingReceived -> Ping
+    PongReceived -> Pong
 
 0.12.0 2018-09-23
 -----------------

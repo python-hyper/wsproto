@@ -18,6 +18,7 @@ from .events import (
     AcceptConnection,
     BytesMessage,
     CloseConnection,
+    Data,
     Fail,
     Ping,
     Pong,
@@ -66,34 +67,10 @@ class WSConnection(object):
         a connection. To initialise as a client pass ``CLIENT`` otherwise
         pass ``SERVER``.
     :type conn_type: ``ConnectionType``
-
-    :param host: The hostname to pass to the server when acting as a client.
-    :type host: ``str``
-
-    :param resource: The resource (aka path) to pass to the server when acting
-        as a client.
-    :type resource: ``str``
-
-    :param extensions: A list of extensions to use on this connection.
-        Defaults to to an empty list. Extensions should be instances of a
-        subclass of :class:`Extension <wsproto.extensions.Extension>`.
-
-    :param subprotocols: A list of subprotocols to request when acting as a
-        client, ordered by preference. This has no impact on the connection
-        itself. Defaults to an empty list.
-    :type subprotocol: ``list`` of ``str``
     """
 
-    def __init__(
-        self, conn_type, host=None, resource=None, extensions=None, subprotocols=None
-    ):
+    def __init__(self, conn_type):
         self.client = conn_type is ConnectionType.CLIENT
-
-        self.host = host
-        self.resource = resource
-
-        self.subprotocols = subprotocols or []
-        self.extensions = extensions or []
 
         self.version = b"13"
 
@@ -110,31 +87,49 @@ class WSConnection(object):
         else:
             self._upgrade_connection = h11.Connection(h11.SERVER)
 
-        if self.client:
-            if self.host is None:
-                raise ValueError("Host must not be None for a client-side connection.")
-            if self.resource is None:
-                raise ValueError(
-                    "Resource must not be None for a client-side connection."
-                )
-            self.initiate_connection()
+        # The request that initiated the websocket connection
+        self._initiating_request = None  # type: Optional[Request]
 
-    def initiate_connection(self):
+    def initiate_upgrade_connection(self, headers, path):
+        # type: (List[Tuple[bytes, bytes]], str) -> None
+        upgrade_request = h11.Request(method=b"GET", target=path, headers=headers)
+        h11_client = h11.Connection(h11.CLIENT)
+        self.receive_bytes(h11_client.send(upgrade_request))
+
+    def send(self, event):
+        # type: (wsproto.events.Event) -> None:
+        if isinstance(event, Request):
+            self._initiate_connection(event)
+        if isinstance(event, AcceptConnection):
+            self._accept(event)
+        elif isinstance(event, Data):
+            self._outgoing += self._proto.send_data(event.data, event.message_finished)
+        elif isinstance(event, Ping):
+            self._outgoing += self._proto.ping(event.payload)
+        elif isinstance(event, Pong):
+            self._outgoing += self._proto.pong(event.payload)
+        elif isinstance(event, CloseConnection):
+            self._outgoing += self._proto.close(event.code, event.reason)
+            self._state = ConnectionState.CLOSING
+
+    def _initiate_connection(self, request):
+        # type: (Request) -> None
+        self._initiating_request = request
         self._generate_nonce()
 
         headers = {
-            b"Host": self.host.encode("ascii"),
+            b"Host": request.host.encode("ascii"),
             b"Upgrade": b"WebSocket",
             b"Connection": b"Upgrade",
             b"Sec-WebSocket-Key": self._nonce,
             b"Sec-WebSocket-Version": self.version,
         }
 
-        if self.subprotocols:
-            headers[b"Sec-WebSocket-Protocol"] = ", ".join(self.subprotocols)
+        if request.subprotocols:
+            headers[b"Sec-WebSocket-Protocol"] = ", ".join(request.subprotocols)
 
-        if self.extensions:
-            offers = {e.name: e.offer(self) for e in self.extensions}
+        if request.extensions:
+            offers = {e.name: e.offer(self) for e in request.extensions}
             extensions = []
             for name, params in offers.items():
                 if params is True:
@@ -146,47 +141,41 @@ class WSConnection(object):
                 headers[b"Sec-WebSocket-Extensions"] = b", ".join(extensions)
 
         upgrade = h11.Request(
-            method=b"GET", target=self.resource, headers=headers.items()
+            method=b"GET",
+            target=request.target.encode("ascii"),
+            headers=headers.items(),
         )
         self._outgoing += self._upgrade_connection.send(upgrade)
 
-    def initiate_upgrade_connection(self, headers, path):
-        # type: (List[Tuple[bytes, bytes]], str) -> None
-        upgrade_request = h11.Request(method=b"GET", target=path, headers=headers)
-        h11_client = h11.Connection(h11.CLIENT)
-        self.receive_bytes(h11_client.send(upgrade_request))
+    def _accept(self, event):
+        # type: (Accept) -> None
+        request_headers = normed_header_dict(self._initiating_request.extra_headers)
 
-    def send_data(self, payload, final=True):
-        """
-        Send a message or part of a message to the remote peer.
+        nonce = request_headers[b"sec-websocket-key"]
+        accept_token = self._generate_accept_token(nonce)
 
-        If ``final`` is ``False`` it indicates that this is part of a longer
-        message. If ``final`` is ``True`` it indicates that this is either a
-        self-contained message or the last part of a longer message.
+        headers = {
+            b"Upgrade": b"WebSocket",
+            b"Connection": b"Upgrade",
+            b"Sec-WebSocket-Accept": accept_token,
+        }
 
-        If ``payload`` is of type ``bytes`` then the message is flagged as
-        being binary. If it is of type ``str`` the message is encoded as UTF-8
-        and sent as text.
+        if event.subprotocol is not None:
+            if event.subprotocol not in self._initiating_request.subprotocols:
+                raise ValueError(
+                    "unexpected subprotocol {!r}".format(event.subprotocol)
+                )
+            headers[b"Sec-WebSocket-Protocol"] = event.subprotocol
 
-        :param payload: The message body to send.
-        :type payload: ``bytes`` or ``str``
+        if event.extensions:
+            accepts = self._extension_accept(event.extensions)
+            if accepts:
+                headers[b"Sec-WebSocket-Extensions"] = accepts
 
-        :param final: Whether there are more parts to this message to be sent.
-        :type final: ``bool``
-        """
-
-        self._outgoing += self._proto.send_data(payload, final)
-
-    def close(self, code=CloseReason.NORMAL_CLOSURE, reason=None):
-        """
-        Initiate the close handshake by sending a CLOSE control message.
-
-        A clean teardown requires a CLOSE control messages from the other
-        endpoint before the underlying TCP connection can be closed, see
-        :class:`~wsproto.events.CloseConnection`.
-        """
-        self._outgoing += self._proto.close(code, reason)
-        self._state = ConnectionState.CLOSING
+        response = h11.InformationalResponse(status_code=101, headers=headers.items())
+        self._outgoing += self._upgrade_connection.send(response)
+        self._proto = FrameProtocol(self.client, event.extensions)
+        self._state = ConnectionState.OPEN
 
     @property
     def closed(self):
@@ -273,7 +262,7 @@ class WSConnection(object):
                 elif frame.opcode is Opcode.CLOSE:
                     code, reason = frame.payload
                     if self._state is ConnectionState.OPEN:
-                        self.close(code, reason)
+                        self.send(CloseConnection(code=code, reason=reason))
                     self._state = ConnectionState.CLOSED
                     yield CloseConnection(code=code, reason=reason)
 
@@ -295,59 +284,8 @@ class WSConnection(object):
             # spec in that on protocol errors it just closes the connection
             # rather than trying to send a CLOSE frame. Investigate whether we
             # should do the same.
-            self.close(code=exc.code, reason=str(exc))
+            self.send(CloseConnection(code=exc.code, reason=str(exc)))
             yield CloseConnection(code=exc.code, reason=str(exc))
-
-    def accept(self, event, subprotocol=None):
-        request_headers = normed_header_dict(event.extra_headers)
-
-        nonce = request_headers[b"sec-websocket-key"]
-        accept_token = self._generate_accept_token(nonce)
-
-        headers = {
-            b"Upgrade": b"WebSocket",
-            b"Connection": b"Upgrade",
-            b"Sec-WebSocket-Accept": accept_token,
-        }
-
-        if subprotocol is not None:
-            if subprotocol not in event.subprotocols:
-                raise ValueError("unexpected subprotocol {!r}".format(subprotocol))
-            headers[b"Sec-WebSocket-Protocol"] = subprotocol
-
-        if event.extensions:
-            accepts = self._extension_accept(event.extensions)
-            if accepts:
-                headers[b"Sec-WebSocket-Extensions"] = accepts
-
-        response = h11.InformationalResponse(status_code=101, headers=headers.items())
-        self._outgoing += self._upgrade_connection.send(response)
-        self._proto = FrameProtocol(self.client, self.extensions)
-        self._state = ConnectionState.OPEN
-
-    def ping(self, payload=None):
-        """
-        Send a PING message to the peer.
-
-        :param payload: an optional payload to send with the message
-        """
-
-        payload = bytes(payload or b"")
-        self._outgoing += self._proto.ping(payload)
-
-    def pong(self, payload=None):
-        """
-        Send a PONG message to the peer.
-
-        This method can be used to send an unsolicted PONG to the peer.
-        It is not needed otherwise since every received PING causes a
-        corresponding PONG to be sent automatically.
-
-        :param payload: an optional payload to send with the message
-        """
-
-        payload = bytes(payload or b"")
-        self._outgoing += self._proto.pong(payload)
 
     def _generate_nonce(self):
         # os.urandom may be overkill for this use case, but I don't think this
@@ -412,7 +350,7 @@ class WSConnection(object):
         subprotocol = headers.get(b"sec-websocket-protocol", None)
         if subprotocol is not None:
             subprotocol = subprotocol.decode("ascii")
-            if subprotocol not in self.subprotocols:
+            if subprotocol not in self._initiating_request.subprotocols:
                 return Fail(
                     code=CloseReason.PROTOCOL_ERROR,
                     reason="unrecognized subprotocol {!r}".format(subprotocol),
@@ -424,7 +362,7 @@ class WSConnection(object):
 
             for accept in accepts:
                 name = accept.split(";", 1)[0].strip()
-                for extension in self.extensions:
+                for extension in self._initiating_request.extensions:
                     if extension.name == name:
                         extension.finalize(self, accept)
                         break
@@ -434,7 +372,7 @@ class WSConnection(object):
                         reason="unrecognized extension {!r}".format(name),
                     )
 
-        self._proto = FrameProtocol(self.client, self.extensions)
+        self._proto = FrameProtocol(self.client, self._initiating_request.extensions)
         self._state = ConnectionState.OPEN
         return AcceptConnection(extensions=extensions, subprotocol=subprotocol)
 
@@ -495,20 +433,21 @@ class WSConnection(object):
                 reason="Missing Sec-WebSocket-Version header",
             )
 
-        return Request(
+        self._initiating_request = Request(
             extensions=extensions,
             extra_headers=headers,
             host=host,
             subprotocols=subprotocols,
             target=event.target.decode("ascii"),
         )
+        return self._initiating_request
 
-    def _extension_accept(self, offers):
+    def _extension_accept(self, supported):
         accepts = {}
 
-        for offer in offers:
+        for offer in self._initiating_request.extensions:
             name = offer.split(";", 1)[0].strip()
-            for extension in self.extensions:
+            for extension in supported:
                 if extension.name == name:
                     accept = extension.accept(self, offer)
                     if accept is True:
