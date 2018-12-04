@@ -79,9 +79,9 @@ And wsproto will issue events if the data contains any WebSocket messages or sta
       elif isinstance(event, CloseConnection):
           # guess nobody wants to talk to us any more...
       elif isinstance(event, TextMessage):
-          print('We got a text!', event.data)
-      elif isinstance(event, TextMessage):
-          print('We got a text!', event.data)
+          print('We got text!', event.data)
+      elif isinstance(event, BytesMessage):
+          print('We got bytes!', event.data)
 
 Take a look at our docs for a `full list of events
 <https://wsproto.readthedocs.io/en/latest/api.html#events>`!
