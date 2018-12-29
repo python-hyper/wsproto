@@ -124,7 +124,9 @@ def test_connection_request_key_header():
     )
 
 
-def _make_handshake(request_headers, subprotocol=None, extensions=None):
+def _make_handshake(
+    request_headers, accept_headers=None, subprotocol=None, extensions=None
+):
     client = h11.Connection(h11.CLIENT)
     server = WSConnection(SERVER)
     nonce = generate_nonce()
@@ -144,7 +146,13 @@ def _make_handshake(request_headers, subprotocol=None, extensions=None):
             )
         )
     )
-    server.send(AcceptConnection(subprotocol=subprotocol, extensions=extensions or []))
+    server.send(
+        AcceptConnection(
+            extra_headers=accept_headers or [],
+            subprotocol=subprotocol,
+            extensions=extensions or [],
+        )
+    )
     client.receive_data(server.bytes_to_send())
     event = client.next_event()
     return event, nonce
@@ -164,10 +172,25 @@ def test_handshake():
     )
 
 
+def test_handshake_extra_headers():
+    response, nonce = _make_handshake([], accept_headers=[(b"X-Foo", b"bar")])
+
+    response.headers = sorted(response.headers)  # For test determinism
+    assert response == h11.InformationalResponse(
+        status_code=101,
+        headers=[
+            ("connection", "Upgrade"),
+            ("sec-websocket-accept", generate_accept_token(nonce)),
+            ("upgrade", "WebSocket"),
+            ("x-foo", "bar"),
+        ],
+    )
+
+
 @pytest.mark.parametrize("accept_subprotocol", ["one", "two"])
 def test_handshake_with_subprotocol(accept_subprotocol):
     response, _ = _make_handshake(
-        [("Sec-Websocket-Protocol", "one, two")], accept_subprotocol
+        [("Sec-Websocket-Protocol", "one, two")], subprotocol=accept_subprotocol
     )
 
     headers = normed_header_dict(response.headers)
