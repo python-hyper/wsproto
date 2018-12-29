@@ -88,8 +88,23 @@ class Request(Event):
 
 
 class AcceptConnection(Event):
-    _fields = ["extensions", "subprotocol"]
-    _defaults = {"extensions": [], "subprotocol": None}
+    """The acceptance of a Websocket upgrade request.
+
+    This event is fired when a CLIENT receives an acceptance response
+    from a server. It is also used to accept an upgrade request when
+    acting as a SERVER.
+
+    Fields:
+
+    .. attribute: extra_headers (List[Tuple[bytes, bytes]])
+
+       Any additional (non websocket related) headers present in the
+       acceptance response.
+
+    """
+
+    _fields = ["extensions", "extra_headers", "subprotocol"]
+    _defaults = {"extensions": [], "extra_headers": [], "subprotocol": None}
 
 
 class RejectConnection(Event):
