@@ -4,7 +4,7 @@ import itertools
 
 import pytest
 
-from wsproto.connection import CLIENT, ConnectionState, SERVER, WSConnection
+from wsproto.connection import CLIENT, ConnectionState, SERVER, WSConnection, ConnectionStateError
 from wsproto.events import (
     AcceptConnection,
     BytesMessage,
@@ -35,7 +35,11 @@ class TestConnection(object):
         return client, server
 
     def test_negotiation(self):
-        self.create_connection()
+        client, server = self.create_connection()
+        assert client.opened
+        assert server.opened
+        assert not client.closed
+        assert not server.closed
 
     @pytest.mark.parametrize(
         "as_client,final", [(True, True), (True, False), (False, True), (False, False)]
@@ -128,6 +132,33 @@ class TestConnection(object):
             assert isinstance(event, CloseConnection)
             assert event.code is CloseReason.ABNORMAL_CLOSURE
             assert conn.closed
+
+    def test_close_before_open_state(self):
+        server = WSConnection(SERVER)
+        client = WSConnection(CLIENT)
+
+        assert not server.opened
+        assert not client.opened
+
+        with pytest.raises(ConnectionStateError):
+            server.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+
+        with pytest.raises(ConnectionStateError):
+            client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+
+    def test_close_already_closing(self):
+        client, server = self.create_connection()
+
+        client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+        server.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+        assert not server.opened
+        assert not client.opened
+
+        with pytest.raises(ConnectionStateError):
+            client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+
+        with pytest.raises(ConnectionStateError):
+            server.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
 
     def test_bytes_send_all(self):
         connection = WSConnection(SERVER)

@@ -55,6 +55,12 @@ CLIENT = ConnectionType.CLIENT
 SERVER = ConnectionType.SERVER
 
 
+class ConnectionStateError(Exception):
+    def __init__(self, msg, state):
+        super(ConnectionStateError, self).__init__(msg)
+        self.state = state
+
+
 class WSConnection(object):
     """
     A low-level WebSocket connection object.
@@ -109,6 +115,9 @@ class WSConnection(object):
         elif isinstance(event, Pong):
             self._outgoing += self._proto.pong(event.payload)
         elif isinstance(event, CloseConnection):
+            if not self.opened:
+                raise ConnectionStateError(
+                    'Must be in OPEN state to perform a CloseConnection', self._state)
             self._outgoing += self._proto.close(event.code, event.reason)
             self._state = ConnectionState.CLOSING
 
@@ -180,6 +189,10 @@ class WSConnection(object):
     @property
     def closed(self):
         return self._state is ConnectionState.CLOSED
+
+    @property
+    def opened(self):
+        return self._state is ConnectionState.OPEN
 
     def bytes_to_send(self, amount=None):
         """
