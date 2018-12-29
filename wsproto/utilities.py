@@ -5,6 +5,13 @@ wsproto/utilities
 
 Utility functions that do not belong in a separate module.
 """
+import base64
+import hashlib
+import os
+
+# RFC6455, Section 1.3 - Opening Handshake
+ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
 
 # Some convenience utilities for working with HTTP headers
 def normed_header_dict(h11_headers):
@@ -28,3 +35,15 @@ def normed_header_dict(h11_headers):
 # commas. XX FIXME
 def split_comma_header(value):
     return [piece.decode("ascii").strip() for piece in value.split(b",")]
+
+
+def generate_nonce():
+    # os.urandom may be overkill for this use case, but I don't think this
+    # is a bottleneck, and better safe than sorry...
+    return base64.b64encode(os.urandom(16))
+
+
+def generate_accept_token(token):
+    accept_token = token + ACCEPT_GUID
+    accept_token = hashlib.sha1(accept_token).digest()
+    return base64.b64encode(accept_token)
