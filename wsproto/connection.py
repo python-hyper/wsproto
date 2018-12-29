@@ -6,9 +6,6 @@ wsproto/connection
 An implementation of a WebSocket connection.
 """
 
-import base64
-import hashlib
-import os
 from collections import deque
 from enum import Enum
 
@@ -26,10 +23,12 @@ from .events import (
     TextMessage,
 )
 from .frame_protocol import CloseReason, FrameProtocol, Opcode, ParseFailed
-from .utilities import normed_header_dict, split_comma_header
-
-# RFC6455, Section 1.3 - Opening Handshake
-ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+from .utilities import (
+    generate_accept_token,
+    generate_nonce,
+    normed_header_dict,
+    split_comma_header,
+)
 
 
 class ConnectionState(Enum):
@@ -115,18 +114,18 @@ class WSConnection(object):
     def _initiate_connection(self, request):
         # type: (Request) -> None
         self._initiating_request = request
-        self._generate_nonce()
+        self._nonce = generate_nonce()
 
-        headers = {
-            b"Host": request.host.encode("ascii"),
-            b"Upgrade": b"WebSocket",
-            b"Connection": b"Upgrade",
-            b"Sec-WebSocket-Key": self._nonce,
-            b"Sec-WebSocket-Version": self.version,
-        }
+        headers = [
+            (b"Host", request.host.encode("ascii")),
+            (b"Upgrade", b"WebSocket"),
+            (b"Connection", b"Upgrade"),
+            (b"Sec-WebSocket-Key", self._nonce),
+            (b"Sec-WebSocket-Version", self.version),
+        ]
 
         if request.subprotocols:
-            headers[b"Sec-WebSocket-Protocol"] = ", ".join(request.subprotocols)
+            headers.append((b"Sec-WebSocket-Protocol", ", ".join(request.subprotocols)))
 
         if request.extensions:
             offers = {e.name: e.offer(self) for e in request.extensions}
@@ -138,12 +137,12 @@ class WSConnection(object):
                     # py34 annoyance: doesn't support bytestring formatting
                     extensions.append(("%s; %s" % (name, params)).encode("ascii"))
             if extensions:
-                headers[b"Sec-WebSocket-Extensions"] = b", ".join(extensions)
+                headers.append((b"Sec-WebSocket-Extensions", b", ".join(extensions)))
 
         upgrade = h11.Request(
             method=b"GET",
             target=request.target.encode("ascii"),
-            headers=headers.items(),
+            headers=headers + request.extra_headers,
         )
         self._outgoing += self._upgrade_connection.send(upgrade)
 
@@ -152,7 +151,7 @@ class WSConnection(object):
         request_headers = normed_header_dict(self._initiating_request.extra_headers)
 
         nonce = request_headers[b"sec-websocket-key"]
-        accept_token = self._generate_accept_token(nonce)
+        accept_token = generate_accept_token(nonce)
 
         headers = {
             b"Upgrade": b"WebSocket",
@@ -287,16 +286,6 @@ class WSConnection(object):
             self.send(CloseConnection(code=exc.code, reason=str(exc)))
             yield CloseConnection(code=exc.code, reason=str(exc))
 
-    def _generate_nonce(self):
-        # os.urandom may be overkill for this use case, but I don't think this
-        # is a bottleneck, and better safe than sorry...
-        self._nonce = base64.b64encode(os.urandom(16))
-
-    def _generate_accept_token(self, token):
-        accept_token = token + ACCEPT_GUID
-        accept_token = hashlib.sha1(accept_token).digest()
-        return base64.b64encode(accept_token)
-
     def _process_upgrade(self, data):
         self._upgrade_connection.receive_data(data)
         while True:
@@ -331,20 +320,20 @@ class WSConnection(object):
                 code=CloseReason.PROTOCOL_ERROR, reason="Bad status code from server"
             )
         headers = normed_header_dict(event.headers)
-        connection_tokens = split_comma_header(headers[b"connection"])
+        connection_tokens = split_comma_header(headers.get(b"connection", b""))
         if not any(token.lower() == "upgrade" for token in connection_tokens):
             return Fail(
                 code=CloseReason.PROTOCOL_ERROR,
                 reason="Missing Connection: Upgrade header",
             )
-        if headers[b"upgrade"].lower() != b"websocket":
+        if headers.get(b"upgrade", b"").lower() != b"websocket":
             return Fail(
                 code=CloseReason.PROTOCOL_ERROR,
                 reason="Missing Upgrade: WebSocket header",
             )
 
-        accept_token = self._generate_accept_token(self._nonce)
-        if headers[b"sec-websocket-accept"] != accept_token:
+        accept_token = generate_accept_token(self._nonce)
+        if headers.get(b"sec-websocket-accept", b"") != accept_token:
             return Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad accept token")
 
         subprotocol = headers.get(b"sec-websocket-protocol", None)
@@ -353,23 +342,25 @@ class WSConnection(object):
             if subprotocol not in self._initiating_request.subprotocols:
                 return Fail(
                     code=CloseReason.PROTOCOL_ERROR,
-                    reason="unrecognized subprotocol {!r}".format(subprotocol),
+                    reason="unrecognized subprotocol {}".format(subprotocol),
                 )
 
-        extensions = headers.get(b"sec-websocket-extensions", None)
-        if extensions:
-            accepts = split_comma_header(extensions)
+        raw_extensions = headers.get(b"sec-websocket-extensions", None)
+        extensions = []
+        if raw_extensions:
+            accepts = split_comma_header(raw_extensions)
 
             for accept in accepts:
                 name = accept.split(";", 1)[0].strip()
                 for extension in self._initiating_request.extensions:
                     if extension.name == name:
                         extension.finalize(self, accept)
+                        extensions.append(extension)
                         break
                 else:
                     return Fail(
                         code=CloseReason.PROTOCOL_ERROR,
-                        reason="unrecognized extension {!r}".format(name),
+                        reason="unrecognized extension {}".format(name),
                     )
 
         self._proto = FrameProtocol(self.client, self._initiating_request.extensions)
@@ -395,6 +386,7 @@ class WSConnection(object):
                 connection_tokens = split_comma_header(value)
             elif name == b"host":
                 host = value.decode("ascii")
+                continue  # Skip appending to headers
             elif name == b"sec-websocket-extensions":
                 extensions = split_comma_header(value)
                 continue  # Skip appending to headers
