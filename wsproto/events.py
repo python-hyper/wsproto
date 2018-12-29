@@ -92,7 +92,56 @@ class AcceptConnection(Event):
     _defaults = {"extensions": [], "subprotocol": None}
 
 
+class RejectConnection(Event):
+    """The rejection of a Websocket upgrade request, the HTTP response.
+
+    This event is fired when a CLIENT receives a rejection response
+    from a server. It can be used to reject a request when sent from
+    as SERVER. If has_body is False the headers must include a
+    content-length or transfer encoding.
+
+    Fields:
+
+    .. attribute:: headers (List[Tuple[bytes, bytes]])
+
+       The headers to send with the response.
+
+    .. attribute:: has_body
+
+       This defaults to False, but set to True if there is a body. See
+       also :class:`~RejectData`.
+
+    .. attribute:: status_code
+
+       The response status code.
+
+    """
+
+    _fields = ["headers", "has_body", "status_code"]
+    _defaults = {"headers": [], "has_body": False, "status_code": 400}
+
+
+class RejectData(Event):
+    """The rejection HTTP response body.
+
+    Fields:
+
+    .. attribute:: body_finished
+
+       True if this is the final chunk of the body data.
+
+    .. attribute:: data (bytes)
+
+       The raw body data.
+
+    """
+
+    _fields = ["body_finished", "data"]
+    _defaults = {"body_finished": True}
+
+
 class CloseConnection(Event):
+
     """The end of a Websocket connection, represents a closure frame.
 
     This event is fired after the connection is considered closed.
