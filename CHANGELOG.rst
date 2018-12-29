@@ -19,6 +19,13 @@
     BytesReceived -> BytesMessage
     PingReceived -> Ping
     PongReceived -> Pong
+* Introduce RejectConnection and RejectData events to be used by a
+  server connection to reject rather than accept a connection or by a
+  client connection to emit the rejection response. The RejectData
+  event represents the rejection response body, if present.
+* Add an extra_headers field to the AcceptConnection event in order to
+  customise the acceptance response in server mode or to emit this
+  information in client mode.
 
 0.12.0 2018-09-23
 -----------------

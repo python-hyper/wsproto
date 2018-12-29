@@ -19,6 +19,8 @@ from .events import (
     Fail,
     Ping,
     Pong,
+    RejectConnection,
+    RejectData,
     Request,
     TextMessage,
 )
@@ -40,6 +42,7 @@ class ConnectionState(Enum):
     OPEN = 1
     CLOSING = 2
     CLOSED = 3
+    REJECTING = 4
 
 
 class ConnectionType(Enum):
@@ -99,8 +102,12 @@ class WSConnection(object):
         # type: (wsproto.events.Event) -> None:
         if isinstance(event, Request):
             self._initiate_connection(event)
-        if isinstance(event, AcceptConnection):
+        elif isinstance(event, AcceptConnection):
             self._accept(event)
+        elif isinstance(event, RejectConnection):
+            self._reject(event)
+        elif isinstance(event, RejectData):
+            self._send_reject_data(event)
         elif isinstance(event, Data):
             self._outgoing += self._proto.send_data(event.data, event.message_finished)
         elif isinstance(event, Ping):
@@ -176,6 +183,31 @@ class WSConnection(object):
         self._proto = FrameProtocol(self.client, event.extensions)
         self._state = ConnectionState.OPEN
 
+    def _reject(self, event):
+        # type: (RejectConnection) -> None:
+        if self._state != ConnectionState.CONNECTING:
+            raise ValueError("Connection cannot be rejected in state %s" % self._state)
+
+        headers = event.headers
+        if not event.has_body:
+            headers.append(("content-length", "0"))
+        response = h11.Response(status_code=event.status_code, headers=headers)
+        self._outgoing += self._upgrade_connection.send(response)
+        self._state = ConnectionState.REJECTING
+        if not event.has_body:
+            self._outgoing += self._upgrade_connection.send(h11.EndOfMessage())
+            self._state = ConnectionState.CLOSED
+
+    def _send_reject_data(self, event):
+        # type: (RejectData) -> None:
+        if self._state != ConnectionState.REJECTING:
+            raise ValueError("Cannot send rejection data in state %s" % self._state)
+
+        self._outgoing += self._upgrade_connection.send(h11.Data(data=event.data))
+        if event.body_finished:
+            self._outgoing += self._upgrade_connection.send(h11.EndOfMessage())
+            self._state = ConnectionState.CLOSED
+
     @property
     def closed(self):
         return self._state is ConnectionState.CLOSED
@@ -223,7 +255,7 @@ class WSConnection(object):
             self._state = ConnectionState.CLOSED
             return
 
-        if self._state is ConnectionState.CONNECTING:
+        if self._state in {ConnectionState.CONNECTING, ConnectionState.REJECTING}:
             event, data = self._process_upgrade(data)
             if event is not None:
                 self._events.append(event)
@@ -301,8 +333,23 @@ class WSConnection(object):
             elif self.client and isinstance(
                 event, (h11.InformationalResponse, h11.Response)
             ):
-                data = self._upgrade_connection.trailing_data[0]
-                return self._establish_client_connection(event), data
+                if event.status_code == 101:
+                    data = self._upgrade_connection.trailing_data[0]
+                    return self._establish_client_connection(event), data
+
+                self._state = ConnectionState.REJECTING
+                return (
+                    RejectConnection(
+                        headers=event.headers,
+                        status_code=event.status_code,
+                        has_body=False,
+                    ),
+                    None,
+                )
+            elif self.client and isinstance(event, h11.Data):
+                return RejectData(data=event.data, body_finished=False), None
+            elif self.client and isinstance(event, h11.EndOfMessage):
+                return RejectData(data=b"", body_finished=True), None
             elif not self.client and isinstance(event, h11.Request):
                 return self._process_connection_request(event), None
             else:
@@ -315,10 +362,6 @@ class WSConnection(object):
         return None, None
 
     def _establish_client_connection(self, event):
-        if event.status_code != 101:
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR, reason="Bad status code from server"
-            )
         headers = normed_header_dict(event.headers)
         connection_tokens = split_comma_header(headers.get(b"connection", b""))
         if not any(token.lower() == "upgrade" for token in connection_tokens):

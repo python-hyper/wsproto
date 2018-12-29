@@ -5,7 +5,7 @@ import h11
 import pytest
 
 from wsproto.connection import SERVER, WSConnection
-from wsproto.events import AcceptConnection, Fail, Request
+from wsproto.events import AcceptConnection, Fail, RejectConnection, RejectData, Request
 from wsproto.frame_protocol import CloseReason
 from wsproto.utilities import generate_accept_token, generate_nonce, normed_header_dict
 from .helpers import FakeExtension
@@ -216,4 +216,60 @@ def test_protocol_error():
     server.receive_bytes(b"broken nonsense\r\n\r\n")
     assert list(server.events()) == [
         Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad HTTP message")
+    ]
+
+
+def _make_handshake_rejection(status_code, body=None):
+    client = h11.Connection(h11.CLIENT)
+    server = WSConnection(SERVER)
+    nonce = generate_nonce()
+    server.receive_bytes(
+        client.send(
+            h11.Request(
+                method="GET",
+                target="/",
+                headers=[
+                    ("Host", "localhost"),
+                    ("Connection", "Keep-Alive, Upgrade"),
+                    ("Upgrade", "WebSocket"),
+                    ("Sec-WebSocket-Version", "13"),
+                    ("Sec-WebSocket-Key", nonce),
+                ],
+            )
+        )
+    )
+    if body is not None:
+        server.send(
+            RejectConnection(
+                headers=[(b"content-length", b"%d" % len(body))],
+                status_code=status_code,
+                has_body=True,
+            )
+        )
+        server.send(RejectData(data=body))
+    else:
+        server.send(RejectConnection(status_code=status_code))
+    client.receive_data(server.bytes_to_send())
+    events = []
+    while True:
+        event = client.next_event()
+        events.append(event)
+        if isinstance(event, h11.EndOfMessage):
+            return events
+
+
+def test_handshake_rejection():
+    events = _make_handshake_rejection(400)
+    assert events == [
+        h11.Response(headers=[("content-length", "0")], status_code=400),
+        h11.EndOfMessage(),
+    ]
+
+
+def test_handshake_rejection_with_body():
+    events = _make_handshake_rejection(400, body=b"Hello")
+    assert events == [
+        h11.Response(headers=[("content-length", "5")], status_code=400),
+        h11.Data(data=b"Hello"),
+        h11.EndOfMessage(),
     ]
