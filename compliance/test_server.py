@@ -2,7 +2,7 @@ import select
 import socket
 
 from wsproto.connection import WSConnection, SERVER
-from wsproto.events import AcceptConnection, CloseConnection, Data, Request
+from wsproto.events import AcceptConnection, CloseConnection, Message, Request
 from wsproto.extensions import PerMessageDeflate
 
 count = 0
@@ -24,8 +24,8 @@ def new_conn(sock):
         for event in ws.events():
             if isinstance(event, Request):
                 ws.send(AcceptConnection(extensions=[PerMessageDeflate()]))
-            elif isinstance(event, Data):
-                ws.send(Data(data=event.data, message_finished=event.message_finished))
+            elif isinstance(event, Message):
+                ws.send(Message(data=event.data, message_finished=event.message_finished))
             elif isinstance(event, CloseConnection):
                 closed = True
 

@@ -187,7 +187,7 @@ class Fail(CloseConnection):
     pass
 
 
-class Data(Event):
+class Message(Event):
     """The websocket data message.
 
     Fields:
@@ -216,13 +216,13 @@ class Data(Event):
     _defaults = {"frame_finished": True, "message_finished": True}
 
 
-class TextMessage(Data):
+class TextMessage(Message):
     """This event is fired when a data frame with TEXT payload is received."""
 
     pass
 
 
-class BytesMessage(Data):
+class BytesMessage(Message):
     """This event is fired when a data frame with BINARY payload is
     received.
 
