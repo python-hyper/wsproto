@@ -30,6 +30,12 @@ Events
 .. autoclass:: wsproto.events.AcceptConnection
    :members:
 
+.. autoclass:: wsproto.events.RejectConnection
+   :members:
+
+.. autoclass:: wsproto.events.RejectData
+   :members:
+
 .. autoclass:: wsproto.events.CloseConnection
    :members:
 

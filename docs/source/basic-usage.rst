@@ -58,25 +58,27 @@ into higher level representations of WebSocket events. In ``<APPLICATION
 GLUE>``, you need to write code to process these events. The
 :class:`WSConnection <wsproto.connection.WSConnection>` class contains a
 generator method :meth:`events <wsproto.connection.WSConnection.events>` that
-yields WebSocket events. To send a message, you call the :meth:`send_data
-<wsproto.connection.WSConnection.send_data>` method.
+yields WebSocket events. To send a message, you call the :meth:`send
+<wsproto.connection.WSConnection.send>` method.
 
 Connecting to a WebSocket server
 --------------------------------
 
-Begin by instantiating a connection object. The ``host`` and ``resource``
-arguments are required to instantiate a client. If the WebSocket server is
-located at ``http://myhost.com/foo``, then you would instantiate the connection
-as follows::
+Begin by instantiating a connection object in the client mode and then
+create a :class:`Request <wsproto.events.Request>` instance to
+send. The Request must specify ``host`` and ``target`` arguments. If
+the WebSocket server is located at ``http://example.com/foo``, then you
+would instantiate the connection as follows::
 
-    ws = WSConnection(ConnectionType.CLIENT, host="myhost.com", resource='foo')
+    ws = WSConnection(ConnectionType.CLIENT)
+    ws.send(Request(host="example.com", target='foo'))
 
 Now you need to provide the network glue. For the sake of example, we will use
 standard Python sockets here, but `wsproto` can be integrated with any network
 layer::
 
     stream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    stream.connect(("myhost", 8000))
+    stream.connect(("example.com", 80))
 
 To read from the network::
 
@@ -98,21 +100,23 @@ threading, greenlets, asyncio, etc.
 
 You also need to provide the application glue. To send a WebSocket message::
 
-    ws.send_data("Hello world!")
+    ws.send(Data(data="Hello world!"))
 
 And to receive WebSocket events::
 
     for event in ws.events():
-        if isinstance(event, ConnectionEstablished):
+        if isinstance(event, AcceptConnection):
             print('Connection established')
-        elif isinstance(event, ConnectionClosed):
+        elif isinstance(event, RejectConnection):
+            print('Connection rejected')
+        elif isinstance(event, CloseConnection):
             print('Connection closed: code={} reason={}'.format(
                 event.code, event.reason))
-        elif isinstance(event, TextReceived):
+        elif isinstance(event, TextMessage):
             print('Received TEXT data: {}'.format(event.data))
             if event.message_finished:
                 print('Message finished.')
-        elif isinstance(event, BinaryReceived):
+        elif isinstance(event, BytesMessage):
             print('Received BINARY data: {}'.format(event.data))
             if event.message_finished:
                 print('BINARY Message finished.')
@@ -134,26 +138,31 @@ constant::
 
     ws = WSConnection(ConnectionType.SERVER)
 
-A server also needs to explicitly call the ``accept`` method after it receives a
-``ConnectionRequested`` event::
+A server also needs to explicitly send an :class:`AcceptConnection
+<wsproto.events.AcceptConnection>` after it receives a
+``Request`` event::
 
     for event in ws.events():
-        if isinstance(event, ConnectionRequested):
+        if isinstance(event, Request):
             print('Accepting connection request')
-            ws.accept(event)
-        elif isinstance(event, ConnectionClosed):
+            ws.send(AcceptConnection())
+        elif isinstance(event, CloseConnection):
             print('Connection closed: code={} reason={}'.format(
                 event.code, event.reason))
-        elif isinstance(event, TextReceived):
+        elif isinstance(event, TextMessage):
             print('Received TEXT data: {}'.format(event.data))
             if event.message_finished:
                 print('TEXT Message finished.')
-        elif isinstance(event, BinaryReceived):
+        elif isinstance(event, BinaryMessage):
             print('Received BINARY data: {}'.format(event.data))
             if event.message_finished:
                 print('BINARY Message finished.')
         else:
             print('Unknown event: {!r}'.format(event))
+
+Alternatively a server can explicitly reject the connection by sending
+:class:`RejectConnection <wsproto.events.RejectConnection>` after
+receiving a ``Request`` event.
 
 For a more complete example, see `synchronous_server.py
 <https://github.com/python-hyper/wsproto/blob/master/example/synchronous_server.py>`_.
@@ -161,31 +170,33 @@ For a more complete example, see `synchronous_server.py
 Closing
 -------
 
-WebSockets are closed with a handshake that requires each endpoint to send one
-frame and receive one frame. The ``close()`` method places a close frame in the
-send buffer. When a close frame is received, it yields a ``ConnectionClosed``
-event, *and it also places a reply frame in the send buffer.* When that reply
-has been received by the initiator, it will also receive a ``ConnectionClosed``
-event.
+WebSockets are closed with a handshake that requires each endpoint to
+send one frame and receive one frame. Sending a
+:class:`CloseConnection <wsproto.events.CloseConnection>` instance
+places a close frame in the send buffer. When a close frame is
+received, it yields a ``CloseConnection`` event, *and it also places a
+reply frame in the send buffer.* When that reply has been received by
+the initiator, it will also receive a ``CloseConnection`` event.
 
-Regardless of which endpoint initiates the closing handshake, the server is
-responsible for tearing down the underlying connection. When the server receives
-a ``ConnectionClosed`` event, it should send pending `wsproto` data (if any)
-and then it can start tearing down the underlying connection.
+Regardless of which endpoint initiates the closing handshake, the
+server is responsible for tearing down the underlying connection. When
+the server receives a ``CloseConnection`` event, it should send
+pending `wsproto` data (if any) and then it can start tearing down the
+underlying connection.
 
 Ping Pong
 ---------
 
-The :class:`WSConnection <wsproto.connection.WSConnection>` class supports
-sending WebSocket ping and pong frames via the methods :meth:`ping
-<wsproto.connection.WSConnection.ping>` and :meth:`pong
-<wsproto.connection.WSConnection.pong>`.
+The :class:`WSConnection <wsproto.connection.WSConnection>` class
+supports sending WebSocket ping and pong frames via sending
+:class:`Ping <wsproto.events.Ping>` and :class:`Pong
+<wsproto.events.Pong>`.
 
 .. note::
 
-    When a ping is received, `wsproto` automatically places a pong frame in
-    its outgoing buffer. You should only call ``pong()`` if you want to send an
-    unsolicited pong frame.
+    When a ping is received, `wsproto` automatically places a pong
+    frame in its outgoing buffer. You should only send ``Pong`` if you
+    want to send an unsolicited pong frame.
 
 Back-pressure
 -------------
