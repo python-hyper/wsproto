@@ -100,7 +100,7 @@ threading, greenlets, asyncio, etc.
 
 You also need to provide the application glue. To send a WebSocket message::
 
-    ws.send(Data(data="Hello world!"))
+    ws.send(Message(data="Hello world!"))
 
 And to receive WebSocket events::
 

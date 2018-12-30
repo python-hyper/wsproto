@@ -4,7 +4,7 @@
 * Introduce a send method on the conenction which accepts the new
   events. This requires the following usage changes,
     connection.accept(subprotocol=subprotocol) -> connection.send(AcceptConnection(subprotocol=subprotocol))
-    connection.send_data(data) -> connection.send(Data(payload=payload))
+    connection.send_data(data) -> connection.send(Message(payload=payload))
     connection.close(code) -> connection.send(CloseConnection(code=code))
     connection.ping() -> connection.send(Ping())
     connection.pong() -> connection.send(Pong())
@@ -14,7 +14,7 @@
     ConnectionEstablished -> AcceptConnection
     ConnectionClosed -> CloseConnection
     ConnectionFailed -> Fail
-    DataReceived -> Data
+    DataReceived -> Message
     TextReceived -> TextMessage
     BytesReceived -> BytesMessage
     PingReceived -> Ping

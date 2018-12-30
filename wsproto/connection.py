@@ -15,8 +15,8 @@ from .events import (
     AcceptConnection,
     BytesMessage,
     CloseConnection,
-    Data,
     Fail,
+    Message,
     Ping,
     Pong,
     RejectConnection,
@@ -108,7 +108,7 @@ class WSConnection(object):
             self._reject(event)
         elif isinstance(event, RejectData):
             self._send_reject_data(event)
-        elif isinstance(event, Data):
+        elif isinstance(event, Message):
             self._outgoing += self._proto.send_data(event.data, event.message_finished)
         elif isinstance(event, Ping):
             self._outgoing += self._proto.ping(event.payload)

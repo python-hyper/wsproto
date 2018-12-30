@@ -9,7 +9,7 @@ from wsproto.events import (
     AcceptConnection,
     BytesMessage,
     CloseConnection,
-    Data,
+    Message,
     Ping,
     Pong,
     Request,
@@ -51,7 +51,7 @@ class TestConnection(object):
 
         data = b"x" * 23
 
-        me.send(Data(data=data, message_finished=final))
+        me.send(Message(data=data, message_finished=final))
         them.receive_bytes(me.bytes_to_send())
 
         event = next(them.events())

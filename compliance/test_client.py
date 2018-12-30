@@ -3,7 +3,7 @@ import socket
 
 from wsproto.compat import PY2
 from wsproto.connection import WSConnection, CLIENT
-from wsproto.events import AcceptConnection, CloseConnection, Request, TextMessage, Data
+from wsproto.events import AcceptConnection, CloseConnection, Request, TextMessage, Message
 from wsproto.extensions import PerMessageDeflate
 from wsproto.frame_protocol import CloseReason
 
@@ -68,8 +68,8 @@ def run_case(server, case, agent):
             data = None
         connection.receive_bytes(data or None)
         for event in connection.events():
-            if isinstance(event, Data):
-                connection.send(Data(data=event.data, message_finished=event.message_finished))
+            if isinstance(event, Message):
+                connection.send(Message(data=event.data, message_finished=event.message_finished))
             elif isinstance(event, CloseConnection):
                 closed = True
             # else:

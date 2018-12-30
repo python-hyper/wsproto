@@ -42,7 +42,7 @@ Events
 .. autoclass:: wsproto.events.Fail
    :members:
 
-.. autoclass:: wsproto.events.Data
+.. autoclass:: wsproto.events.Message
    :members:
 
 .. autoclass:: wsproto.events.TextMessage

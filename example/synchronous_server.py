@@ -9,7 +9,7 @@ import socket
 import sys
 
 from wsproto.connection import ConnectionType, WSConnection
-from wsproto.events import AcceptConnection, CloseConnection, Data, Ping, Request, TextMessage
+from wsproto.events import AcceptConnection, CloseConnection, Message, Ping, Request, TextMessage
 
 
 MAX_CONNECTS = 5
@@ -90,7 +90,7 @@ def handle_connection(stream):
         elif isinstance(event, TextMessage):
             # Reverse text and send it back to wsproto
             print('Received request and sending response')
-            ws.send(Data(data=event.data[::-1]))
+            ws.send(Message(data=event.data[::-1]))
         elif isinstance(event, Ping):
             # wsproto handles ping events for you by placing a pong frame in
             # the outgoing buffer. You should not call pong() unless you want to

@@ -8,7 +8,7 @@ import socket
 import sys
 
 from wsproto.connection import ConnectionType, WSConnection
-from wsproto.events import AcceptConnection, CloseConnection, Data, Ping, Pong, Request, TextMessage
+from wsproto.events import AcceptConnection, CloseConnection, Message, Ping, Pong, Request, TextMessage
 
 
 RECEIVE_BYTES = 4096
@@ -72,7 +72,7 @@ def wsproto_demo(host, port):
     # 2) Send a message and display response
     message = "wsproto is great"
     print('Sending message: {}'.format(message))
-    ws.send(Data(data=message))
+    ws.send(Message(data=message))
     net_send_recv(ws, conn)
     event = next(events)
     if isinstance(event, TextMessage):
