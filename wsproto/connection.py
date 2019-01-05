@@ -185,8 +185,8 @@ class WSConnection(object):
 
     def _reject(self, event):
         # type: (RejectConnection) -> None:
-        if self._state != ConnectionState.CONNECTING:
-            raise ValueError("Connection cannot be rejected in state %s" % self._state)
+        if self.state != ConnectionState.CONNECTING:
+            raise ValueError("Connection cannot be rejected in state %s" % self.state)
 
         headers = event.headers
         if not event.has_body:
@@ -200,8 +200,8 @@ class WSConnection(object):
 
     def _send_reject_data(self, event):
         # type: (RejectData) -> None:
-        if self._state != ConnectionState.REJECTING:
-            raise ValueError("Cannot send rejection data in state %s" % self._state)
+        if self.state != ConnectionState.REJECTING:
+            raise ValueError("Cannot send rejection data in state %s" % self.state)
 
         self._outgoing += self._upgrade_connection.send(h11.Data(data=event.data))
         if event.body_finished:
@@ -209,8 +209,9 @@ class WSConnection(object):
             self._state = ConnectionState.CLOSED
 
     @property
-    def closed(self):
-        return self._state is ConnectionState.CLOSED
+    def state(self):
+        # type: () -> ConnectionState
+        return self._state
 
     def bytes_to_send(self, amount=None):
         """
@@ -246,7 +247,7 @@ class WSConnection(object):
         :type data: ``bytes``
         """
 
-        if data is None and self._state is ConnectionState.OPEN:
+        if data is None and self.state is ConnectionState.OPEN:
             # "If _The WebSocket Connection is Closed_ and no Close control
             # frame was received by the endpoint (such as could occur if the
             # underlying transport connection is lost), _The WebSocket
@@ -255,14 +256,14 @@ class WSConnection(object):
             self._state = ConnectionState.CLOSED
             return
 
-        if self._state in {ConnectionState.CONNECTING, ConnectionState.REJECTING}:
+        if self.state in {ConnectionState.CONNECTING, ConnectionState.REJECTING}:
             event, data = self._process_upgrade(data)
             if event is not None:
                 self._events.append(event)
 
-        if self._state in (ConnectionState.OPEN, ConnectionState.CLOSING):
+        if self.state in (ConnectionState.OPEN, ConnectionState.CLOSING):
             self._proto.receive_bytes(data)
-        elif self._state is ConnectionState.CLOSED:
+        elif self.state is ConnectionState.CLOSED:
             raise ValueError("Connection already closed.")
 
     def events(self):
@@ -292,7 +293,7 @@ class WSConnection(object):
 
                 elif frame.opcode is Opcode.CLOSE:
                     code, reason = frame.payload
-                    if self._state is ConnectionState.OPEN:
+                    if self.state is ConnectionState.OPEN:
                         self.send(CloseConnection(code=code, reason=reason))
                     self._state = ConnectionState.CLOSED
                     yield CloseConnection(code=code, reason=reason)
