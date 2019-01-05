@@ -39,9 +39,6 @@ Events
 .. autoclass:: wsproto.events.CloseConnection
    :members:
 
-.. autoclass:: wsproto.events.Fail
-   :members:
-
 .. autoclass:: wsproto.events.Message
    :members:
 
@@ -73,3 +70,12 @@ Extensions
    :members:
 
 .. autodata:: wsproto.extensions.SUPPORTED_EXTENSIONS
+
+Exceptions
+----------
+
+.. autoclass:: wsproto.utilities.LocalProtocolError
+   :members:
+
+.. autoclass:: wsproto.utilities.RemoteProtocolError
+   :members:

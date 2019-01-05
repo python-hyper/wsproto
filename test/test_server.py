@@ -5,14 +5,19 @@ import h11
 import pytest
 
 from wsproto.connection import SERVER, WSConnection
-from wsproto.events import AcceptConnection, Fail, RejectConnection, RejectData, Request
+from wsproto.events import AcceptConnection, RejectConnection, RejectData, Request
 from wsproto.frame_protocol import CloseReason
-from wsproto.utilities import generate_accept_token, generate_nonce, normed_header_dict
+from wsproto.utilities import (
+    generate_accept_token,
+    generate_nonce,
+    normed_header_dict,
+    RemoteProtocolError,
+)
 from .helpers import FakeExtension
 
 
 def _make_connection_request(request_headers, method="GET"):
-    # type: (List[Tuple[str, str]]) -> Union[Request, Fail]
+    # type: (List[Tuple[str, str]]) -> Request
     client = h11.Connection(h11.CLIENT)
     server = WSConnection(SERVER)
     server.receive_bytes(
@@ -48,80 +53,75 @@ def test_connection_request():
 
 
 def test_connection_request_bad_method():
-    event = _make_connection_request(
-        [
-            ("Host", "localhost"),
-            ("Connection", "Keep-Alive, Upgrade"),
-            ("Upgrade", "WebSocket"),
-            ("Sec-WebSocket-Version", "13"),
-            ("Sec-WebSocket-Key", generate_nonce()),
-        ],
-        method="POST",
-    )
-    assert event == Fail(
-        code=CloseReason.PROTOCOL_ERROR, reason="Request method must be GET"
-    )
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        event = _make_connection_request(
+            [
+                ("Host", "localhost"),
+                ("Connection", "Keep-Alive, Upgrade"),
+                ("Upgrade", "WebSocket"),
+                ("Sec-WebSocket-Version", "13"),
+                ("Sec-WebSocket-Key", generate_nonce()),
+            ],
+            method="POST",
+        )
+    assert str(excinfo.value) == "Request method must be GET"
 
 
 def test_connection_request_bad_connection_header():
-    event = _make_connection_request(
-        [
-            ("Host", "localhost"),
-            ("Connection", "Keep-Alive, No-Upgrade"),
-            ("Upgrade", "WebSocket"),
-            ("Sec-WebSocket-Version", "13"),
-            ("Sec-WebSocket-Key", generate_nonce()),
-        ]
-    )
-    assert event == Fail(
-        code=CloseReason.PROTOCOL_ERROR, reason="Missing Connection: Upgrade header"
-    )
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        event = _make_connection_request(
+            [
+                ("Host", "localhost"),
+                ("Connection", "Keep-Alive, No-Upgrade"),
+                ("Upgrade", "WebSocket"),
+                ("Sec-WebSocket-Version", "13"),
+                ("Sec-WebSocket-Key", generate_nonce()),
+            ]
+        )
+    assert str(excinfo.value) == "Missing header, 'Connection: Upgrade'"
 
 
 def test_connection_request_bad_upgrade_header():
-    event = _make_connection_request(
-        [
-            ("Host", "localhost"),
-            ("Connection", "Keep-Alive, Upgrade"),
-            ("Upgrade", "h2c"),
-            ("Sec-WebSocket-Version", "13"),
-            ("Sec-WebSocket-Key", generate_nonce()),
-        ]
-    )
-    assert event == Fail(
-        code=CloseReason.PROTOCOL_ERROR, reason="Missing Upgrade: WebSocket header"
-    )
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        event = _make_connection_request(
+            [
+                ("Host", "localhost"),
+                ("Connection", "Keep-Alive, Upgrade"),
+                ("Upgrade", "h2c"),
+                ("Sec-WebSocket-Version", "13"),
+                ("Sec-WebSocket-Key", generate_nonce()),
+            ]
+        )
+    assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
 
 
 @pytest.mark.parametrize("version", ["12", "not-a-digit"])
 @pytest.mark.skip  # Will fix in a subsequent commit
 def test_connection_request_bad_version_header(version):
-    event = _make_connection_request(
-        [
-            ("Host", "localhost"),
-            ("Connection", "Keep-Alive, Upgrade"),
-            ("Upgrade", "WebSocket"),
-            ("Sec-WebSocket-Version", version),
-            ("Sec-WebSocket-Key", generate_nonce()),
-        ]
-    )
-    assert event == Fail(
-        code=CloseReason.PROTOCOL_ERROR, reason="Missing Upgrade: WebSocket header"
-    )
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        event = _make_connection_request(
+            [
+                ("Host", "localhost"),
+                ("Connection", "Keep-Alive, Upgrade"),
+                ("Upgrade", "WebSocket"),
+                ("Sec-WebSocket-Version", version),
+                ("Sec-WebSocket-Key", generate_nonce()),
+            ]
+        )
+    assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
 
 
 def test_connection_request_key_header():
-    event = _make_connection_request(
-        [
-            ("Host", "localhost"),
-            ("Connection", "Keep-Alive, Upgrade"),
-            ("Upgrade", "WebSocket"),
-            ("Sec-WebSocket-Version", "13"),
-        ]
-    )
-    assert event == Fail(
-        code=CloseReason.PROTOCOL_ERROR, reason="Missing Sec-WebSocket-Key header"
-    )
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        event = _make_connection_request(
+            [
+                ("Host", "localhost"),
+                ("Connection", "Keep-Alive, Upgrade"),
+                ("Upgrade", "WebSocket"),
+                ("Sec-WebSocket-Version", "13"),
+            ]
+        )
+    assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Key'"
 
 
 def _make_handshake(
@@ -236,10 +236,9 @@ def test_handshake_with_extra_unaccepted_extension():
 
 def test_protocol_error():
     server = WSConnection(SERVER)
-    server.receive_bytes(b"broken nonsense\r\n\r\n")
-    assert list(server.events()) == [
-        Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad HTTP message")
-    ]
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        server.receive_bytes(b"broken nonsense\r\n\r\n")
+    assert str(excinfo.value) == "Bad HTTP message"
 
 
 def _make_handshake_rejection(status_code, body=None):
