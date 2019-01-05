@@ -18,10 +18,18 @@ class ProtocolError(Exception):
 
 
 class LocalProtocolError(ProtocolError):
+    """Indicates an error due to local/programming errors.
+
+    This is raised when the connection is asked to do something that
+    is either incompatible with the state or the websocket standard.
+
+    """
+
     pass
 
 
 class RemoteProtocolError(ProtocolError):
+
     """Indicates an error due to the remote's actions.
 
     This is raised when processing the bytes from the remote if the

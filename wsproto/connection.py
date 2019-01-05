@@ -27,6 +27,7 @@ from .frame_protocol import CloseReason, FrameProtocol, Opcode, ParseFailed
 from .utilities import (
     generate_accept_token,
     generate_nonce,
+    LocalProtocolError,
     normed_header_dict,
     RemoteProtocolError,
     split_comma_header,
@@ -168,7 +169,9 @@ class WSConnection(object):
 
         if event.subprotocol is not None:
             if event.subprotocol not in self._initiating_request.subprotocols:
-                raise ValueError("unexpected subprotocol {}".format(event.subprotocol))
+                raise LocalProtocolError(
+                    "unexpected subprotocol {}".format(event.subprotocol)
+                )
             headers.append((b"Sec-WebSocket-Protocol", event.subprotocol))
 
         if event.extensions:
@@ -186,7 +189,9 @@ class WSConnection(object):
     def _reject(self, event):
         # type: (RejectConnection) -> None:
         if self.state != ConnectionState.CONNECTING:
-            raise ValueError("Connection cannot be rejected in state %s" % self.state)
+            raise LocalProtocolError(
+                "Connection cannot be rejected in state %s" % self.state
+            )
 
         headers = event.headers
         if not event.has_body:
@@ -201,7 +206,9 @@ class WSConnection(object):
     def _send_reject_data(self, event):
         # type: (RejectData) -> None:
         if self.state != ConnectionState.REJECTING:
-            raise ValueError("Cannot send rejection data in state %s" % self.state)
+            raise LocalProtocolError(
+                "Cannot send rejection data in state %s" % self.state
+            )
 
         self._outgoing += self._upgrade_connection.send(h11.Data(data=event.data))
         if event.body_finished:
@@ -264,7 +271,7 @@ class WSConnection(object):
         if self.state in (ConnectionState.OPEN, ConnectionState.CLOSING):
             self._proto.receive_bytes(data)
         elif self.state is ConnectionState.CLOSED:
-            raise ValueError("Connection already closed.")
+            raise LocalProtocolError("Connection already closed.")
 
     def events(self):
         """
