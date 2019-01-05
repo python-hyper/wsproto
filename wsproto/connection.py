@@ -116,6 +116,10 @@ class WSConnection(object):
         elif isinstance(event, Pong):
             self._outgoing += self._proto.pong(event.payload)
         elif isinstance(event, CloseConnection):
+            if self.state != ConnectionState.OPEN:
+                raise LocalProtocolError(
+                    "Connection cannot be closed in state %s" % self.state
+                )
             self._outgoing += self._proto.close(event.code, event.reason)
             self._state = ConnectionState.CLOSING
 
