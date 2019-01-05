@@ -15,7 +15,6 @@ from .events import (
     AcceptConnection,
     BytesMessage,
     CloseConnection,
-    Fail,
     Message,
     Ping,
     Pong,
@@ -29,6 +28,7 @@ from .utilities import (
     generate_accept_token,
     generate_nonce,
     normed_header_dict,
+    RemoteProtocolError,
     split_comma_header,
 )
 
@@ -325,10 +325,7 @@ class WSConnection(object):
             try:
                 event = self._upgrade_connection.next_event()
             except h11.RemoteProtocolError:
-                return (
-                    Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad HTTP message"),
-                    b"",
-                )
+                raise RemoteProtocolError("Bad HTTP message")
             if event is h11.NEED_DATA:
                 break
             elif self.client and isinstance(
@@ -354,10 +351,7 @@ class WSConnection(object):
             elif not self.client and isinstance(event, h11.Request):
                 return self._process_connection_request(event), None
             else:
-                return (
-                    Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad HTTP message"),
-                    b"",
-                )
+                raise RemoteProtocolError("Bad HTTP message")
 
         self._incoming = b""
         return None, None
@@ -391,24 +385,17 @@ class WSConnection(object):
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR,
-                reason="Missing Connection: Upgrade header",
-            )
+            raise RemoteProtocolError("Missing header, 'Connection: Upgrade'")
         if upgrade.lower() != b"websocket":
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR,
-                reason="Missing Upgrade: WebSocket header",
-            )
+            raise RemoteProtocolError("Missing header, 'Upgrade: WebSocket'")
         accept_token = generate_accept_token(self._nonce)
         if accept != accept_token:
-            return Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad accept token")
+            raise RemoteProtocolError("Bad accept token")
         if subprotocol is not None:
             subprotocol = subprotocol.decode("ascii")
             if subprotocol not in self._initiating_request.subprotocols:
-                return Fail(
-                    code=CloseReason.PROTOCOL_ERROR,
-                    reason="unrecognized subprotocol {}".format(subprotocol),
+                raise RemoteProtocolError(
+                    "unrecognized subprotocol {}".format(subprotocol)
                 )
         extensions = []
         if accepts:
@@ -420,10 +407,7 @@ class WSConnection(object):
                         extensions.append(extension)
                         break
                 else:
-                    return Fail(
-                        code=CloseReason.PROTOCOL_ERROR,
-                        reason="unrecognized extension {}".format(name),
-                    )
+                    raise RemoteProtocolError("unrecognized extension {}".format(name))
 
         self._proto = FrameProtocol(self.client, self._initiating_request.extensions)
         self._state = ConnectionState.OPEN
@@ -433,9 +417,7 @@ class WSConnection(object):
 
     def _process_connection_request(self, event):
         if event.method != b"GET":
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR, reason="Request method must be GET"
-            )
+            raise RemoteProtocolError("Request method must be GET")
         connection_tokens = None
         extensions = []
         host = None
@@ -467,27 +449,15 @@ class WSConnection(object):
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR,
-                reason="Missing Connection: Upgrade header",
-            )
+            raise RemoteProtocolError("Missing header, 'Connection: Upgrade'")
         # XX FIXME: need to check Sec-Websocket-Version, and respond with a
         # 400 if it's not what we expect
         if key is None:
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR,
-                reason="Missing Sec-WebSocket-Key header",
-            )
+            raise RemoteProtocolError("Missing header, 'Sec-WebSocket-Key'")
         if upgrade.lower() != b"websocket":
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR,
-                reason="Missing Upgrade: WebSocket header",
-            )
+            raise RemoteProtocolError("Missing header, 'Upgrade: WebSocket'")
         if version is None:
-            return Fail(
-                code=CloseReason.PROTOCOL_ERROR,
-                reason="Missing Sec-WebSocket-Version header",
-            )
+            raise RemoteProtocolError("Missing header, 'Sec-WebSocket-Version'")
 
         self._initiating_request = Request(
             extensions=extensions,

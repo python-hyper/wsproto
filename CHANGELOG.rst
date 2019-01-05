@@ -13,7 +13,6 @@
     ConnectionRequested -> Request
     ConnectionEstablished -> AcceptConnection
     ConnectionClosed -> CloseConnection
-    ConnectionFailed -> Fail
     DataReceived -> Message
     TextReceived -> TextMessage
     BytesReceived -> BytesMessage
@@ -26,6 +25,8 @@
 * Add an extra_headers field to the AcceptConnection event in order to
   customise the acceptance response in server mode or to emit this
   information in client mode.
+* Switch from Fail events being returned to RemoteProtocolError`s being
+  raised.
 
 0.12.0 2018-09-23
 -----------------

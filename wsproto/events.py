@@ -181,12 +181,6 @@ class CloseConnection(Event):
     _defaults = {"reason": None}
 
 
-class Fail(CloseConnection):
-    """Indicates the connection handshake has failed."""
-
-    pass
-
-
 class Message(Event):
     """The websocket data message.
 

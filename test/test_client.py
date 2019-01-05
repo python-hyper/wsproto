@@ -5,9 +5,13 @@ import h11
 import pytest
 
 from wsproto.connection import CLIENT, WSConnection
-from wsproto.events import AcceptConnection, Fail, RejectConnection, RejectData, Request
+from wsproto.events import AcceptConnection, RejectConnection, RejectData, Request
 from wsproto.frame_protocol import CloseReason
-from wsproto.utilities import generate_accept_token, normed_header_dict
+from wsproto.utilities import (
+    generate_accept_token,
+    normed_header_dict,
+    RemoteProtocolError,
+)
 from .helpers import FakeExtension
 
 
@@ -142,31 +146,26 @@ def test_handshake_extra_accept_headers():
 
 @pytest.mark.parametrize("extra_headers", [[], [(b"connection", b"Keep-Alive")]])
 def test_handshake_response_broken_connection_header(extra_headers):
-    events = _make_handshake(101, [(b"upgrade", b"WebSocket")] + extra_headers)
-    assert events == [
-        Fail(
-            code=CloseReason.PROTOCOL_ERROR, reason="Missing Connection: Upgrade header"
-        )
-    ]
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        events = _make_handshake(101, [(b"upgrade", b"WebSocket")] + extra_headers)
+    assert str(excinfo.value) == "Missing header, 'Connection: Upgrade'"
 
 
 @pytest.mark.parametrize("extra_headers", [[], [(b"upgrade", b"h2")]])
 def test_handshake_response_broken_upgrade_header(extra_headers):
-    events = _make_handshake(101, [(b"connection", b"Upgrade")] + extra_headers)
-    assert events == [
-        Fail(
-            code=CloseReason.PROTOCOL_ERROR, reason="Missing Upgrade: WebSocket header"
-        )
-    ]
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        events = _make_handshake(101, [(b"connection", b"Upgrade")] + extra_headers)
+    assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
 
 
 def test_handshake_response_missing_websocket_key_header():
-    events = _make_handshake(
-        101,
-        [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")],
-        auto_accept_key=False,
-    )
-    assert events == [Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad accept token")]
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        events = _make_handshake(
+            101,
+            [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")],
+            auto_accept_key=False,
+        )
+    assert str(excinfo.value) == "Bad accept token"
 
 
 def test_handshake_with_subprotocol():
@@ -183,17 +182,16 @@ def test_handshake_with_subprotocol():
 
 
 def test_handshake_bad_subprotocol():
-    events = _make_handshake(
-        101,
-        [
-            (b"connection", b"Upgrade"),
-            (b"upgrade", b"WebSocket"),
-            (b"sec-websocket-protocol", b"new"),
-        ],
-    )
-    assert events == [
-        Fail(code=CloseReason.PROTOCOL_ERROR, reason="unrecognized subprotocol new")
-    ]
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        events = _make_handshake(
+            101,
+            [
+                (b"connection", b"Upgrade"),
+                (b"upgrade", b"WebSocket"),
+                (b"sec-websocket-protocol", b"new"),
+            ],
+        )
+    assert str(excinfo.value) == "unrecognized subprotocol new"
 
 
 def test_handshake_with_extension():
@@ -211,26 +209,24 @@ def test_handshake_with_extension():
 
 
 def test_handshake_bad_extension():
-    events = _make_handshake(
-        101,
-        [
-            (b"connection", b"Upgrade"),
-            (b"upgrade", b"WebSocket"),
-            (b"sec-websocket-extensions", b"bad, foo"),
-        ],
-    )
-    assert events == [
-        Fail(code=CloseReason.PROTOCOL_ERROR, reason="unrecognized extension bad")
-    ]
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        events = _make_handshake(
+            101,
+            [
+                (b"connection", b"Upgrade"),
+                (b"upgrade", b"WebSocket"),
+                (b"sec-websocket-extensions", b"bad, foo"),
+            ],
+        )
+    assert str(excinfo.value) == "unrecognized extension bad"
 
 
 def test_protocol_error():
     client = WSConnection(CLIENT)
     client.send(Request(host="localhost", target="/"))
-    client.receive_bytes(b"broken nonsense\r\n\r\n")
-    assert list(client.events()) == [
-        Fail(code=CloseReason.PROTOCOL_ERROR, reason="Bad HTTP message")
-    ]
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        client.receive_bytes(b"broken nonsense\r\n\r\n")
+    assert str(excinfo.value) == "Bad HTTP message"
 
 
 def _make_handshake_rejection(status_code, body=None):

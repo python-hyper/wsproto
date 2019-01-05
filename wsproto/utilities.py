@@ -13,6 +13,26 @@ import os
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
+class ProtocolError(Exception):
+    pass
+
+
+class LocalProtocolError(ProtocolError):
+    pass
+
+
+class RemoteProtocolError(ProtocolError):
+    """Indicates an error due to the remote's actions.
+
+    This is raised when processing the bytes from the remote if the
+    remote has sent data that is incompatible with the websocket
+    standard.
+
+    """
+
+    pass
+
+
 # Some convenience utilities for working with HTTP headers
 def normed_header_dict(h11_headers):
     # This mangles Set-Cookie headers. But it happens that we don't care about
