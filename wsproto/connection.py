@@ -258,7 +258,7 @@ class WSConnection(object):
         :type data: ``bytes``
         """
 
-        if data is None and self.state is ConnectionState.OPEN:
+        if data is None:
             # "If _The WebSocket Connection is Closed_ and no Close control
             # frame was received by the endpoint (such as could occur if the
             # underlying transport connection is lost), _The WebSocket
