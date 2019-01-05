@@ -167,6 +167,17 @@ receiving a ``Request`` event.
 For a more complete example, see `synchronous_server.py
 <https://github.com/python-hyper/wsproto/blob/master/example/synchronous_server.py>`_.
 
+Protocol Errors
+---------------
+
+Protocol errors relating to either incorrect data or incorrect state
+changes are raised when the connection receives data or when events
+are sent. A :class:`LocalProtocolError
+<wsproto.utilities.LocalProtocolError>` is raised if the local actions
+are in error whereas a :class:`RemoteProtocolError
+<wsproto.utilities.RemoteProtocolError>` is raised if the remote
+actions are in error.
+
 Closing
 -------
 
