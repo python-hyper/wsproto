@@ -27,6 +27,9 @@
   information in client mode.
 * Switch from Fail events being returned to RemoteProtocolError`s being
   raised.
+* Switch from ValueError`s to LocalProtocolError`s being raised when
+  an action is taken that is incompatible with the connection state or
+  websocket standard.
 
 0.12.0 2018-09-23
 -----------------

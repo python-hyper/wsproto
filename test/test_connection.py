@@ -16,6 +16,7 @@ from wsproto.events import (
     TextMessage,
 )
 from wsproto.frame_protocol import CloseReason, FrameProtocol
+from wsproto.utilities import LocalProtocolError
 
 
 class TestConnection(object):
@@ -116,7 +117,7 @@ class TestConnection(object):
             next(initiator.events())
 
         completor.send(Ping())
-        with pytest.raises(ValueError):
+        with pytest.raises(LocalProtocolError):
             initiator.receive_bytes(completor.bytes_to_send())
 
     def test_abnormal_closure(self):
