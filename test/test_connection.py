@@ -100,7 +100,7 @@ class TestConnection(object):
         assert isinstance(next(completor.events()), CloseConnection)
 
         # completor enters CLOSED state
-        assert completor.closed
+        assert completor.state is ConnectionState.CLOSED
         with pytest.raises(StopIteration):
             next(completor.events())
 
@@ -111,7 +111,7 @@ class TestConnection(object):
         assert isinstance(next(initiator.events()), CloseConnection)
 
         # initiator enters CLOSED state
-        assert initiator.closed
+        assert initiator.state is ConnectionState.CLOSED
         with pytest.raises(StopIteration):
             next(initiator.events())
 
@@ -127,7 +127,7 @@ class TestConnection(object):
             event = next(conn.events())
             assert isinstance(event, CloseConnection)
             assert event.code is CloseReason.ABNORMAL_CLOSURE
-            assert conn.closed
+            assert conn.state is ConnectionState.CLOSED
 
     def test_bytes_send_all(self):
         connection = WSConnection(SERVER)
