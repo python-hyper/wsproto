@@ -130,6 +130,17 @@ class TestConnection(object):
             assert event.code is CloseReason.ABNORMAL_CLOSURE
             assert conn.state is ConnectionState.CLOSED
 
+    def test_close_before_handshake(self):
+        client = WSConnection(CLIENT)
+        with pytest.raises(LocalProtocolError):
+            client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+
+    def test_close_when_closing(self):
+        client, _ = self.create_connection()
+        client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+        with pytest.raises(LocalProtocolError):
+            client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+
     def test_bytes_send_all(self):
         connection = WSConnection(SERVER)
         connection._outgoing = b"fnord fnord"
