@@ -108,6 +108,9 @@ def test_connection_request_bad_version_header(version):
             ]
         )
     assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Version'"
+    assert excinfo.value.event_hint == RejectConnection(
+        headers=[(b"Sec-WebSocket-Version", b"13")], status_code=426
+    )
 
 
 def test_connection_request_key_header():
