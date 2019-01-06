@@ -337,7 +337,9 @@ class WSConnection(object):
             try:
                 event = self._upgrade_connection.next_event()
             except h11.RemoteProtocolError:
-                raise RemoteProtocolError("Bad HTTP message")
+                raise RemoteProtocolError(
+                    "Bad HTTP message", event_hint=RejectConnection()
+                )
             if event is h11.NEED_DATA:
                 break
             elif self.client and isinstance(
@@ -363,7 +365,9 @@ class WSConnection(object):
             elif not self.client and isinstance(event, h11.Request):
                 return self._process_connection_request(event), None
             else:
-                raise RemoteProtocolError("Bad HTTP message")
+                raise RemoteProtocolError(
+                    "Bad HTTP message", event_hint=RejectConnection()
+                )
 
         self._incoming = b""
         return None, None
@@ -397,17 +401,22 @@ class WSConnection(object):
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
-            raise RemoteProtocolError("Missing header, 'Connection: Upgrade'")
+            raise RemoteProtocolError(
+                "Missing header, 'Connection: Upgrade'", event_hint=RejectConnection()
+            )
         if upgrade.lower() != b"websocket":
-            raise RemoteProtocolError("Missing header, 'Upgrade: WebSocket'")
+            raise RemoteProtocolError(
+                "Missing header, 'Upgrade: WebSocket'", event_hint=RejectConnection()
+            )
         accept_token = generate_accept_token(self._nonce)
         if accept != accept_token:
-            raise RemoteProtocolError("Bad accept token")
+            raise RemoteProtocolError("Bad accept token", event_hint=RejectConnection())
         if subprotocol is not None:
             subprotocol = subprotocol.decode("ascii")
             if subprotocol not in self._initiating_request.subprotocols:
                 raise RemoteProtocolError(
-                    "unrecognized subprotocol {}".format(subprotocol)
+                    "unrecognized subprotocol {}".format(subprotocol),
+                    event_hint=RejectConnection(),
                 )
         extensions = []
         if accepts:
@@ -419,7 +428,10 @@ class WSConnection(object):
                         extensions.append(extension)
                         break
                 else:
-                    raise RemoteProtocolError("unrecognized extension {}".format(name))
+                    raise RemoteProtocolError(
+                        "unrecognized extension {}".format(name),
+                        event_hint=RejectConnection(),
+                    )
 
         self._proto = FrameProtocol(self.client, self._initiating_request.extensions)
         self._state = ConnectionState.OPEN
@@ -429,7 +441,9 @@ class WSConnection(object):
 
     def _process_connection_request(self, event):
         if event.method != b"GET":
-            raise RemoteProtocolError("Request method must be GET")
+            raise RemoteProtocolError(
+                "Request method must be GET", event_hint=RejectConnection()
+            )
         connection_tokens = None
         extensions = []
         host = None
@@ -461,15 +475,29 @@ class WSConnection(object):
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
-            raise RemoteProtocolError("Missing header, 'Connection: Upgrade'")
+            raise RemoteProtocolError(
+                "Missing header, 'Connection: Upgrade'", event_hint=RejectConnection()
+            )
         if version != WEBSOCKET_VERSION:
-            raise RemoteProtocolError("Missing header, 'Sec-WebSocket-Version'")
+            raise RemoteProtocolError(
+                "Missing header, 'Sec-WebSocket-Version'",
+                event_hint=RejectConnection(
+                    headers=[(b"Sec-WebSocket-Version", WEBSOCKET_VERSION)],
+                    status_code=426,
+                ),
+            )
         if key is None:
-            raise RemoteProtocolError("Missing header, 'Sec-WebSocket-Key'")
+            raise RemoteProtocolError(
+                "Missing header, 'Sec-WebSocket-Key'", event_hint=RejectConnection()
+            )
         if upgrade.lower() != b"websocket":
-            raise RemoteProtocolError("Missing header, 'Upgrade: WebSocket'")
+            raise RemoteProtocolError(
+                "Missing header, 'Upgrade: WebSocket'", event_hint=RejectConnection()
+            )
         if version is None:
-            raise RemoteProtocolError("Missing header, 'Sec-WebSocket-Version'")
+            raise RemoteProtocolError(
+                "Missing header, 'Sec-WebSocket-Version'", event_hint=RejectConnection()
+            )
 
         self._initiating_request = Request(
             extensions=extensions,

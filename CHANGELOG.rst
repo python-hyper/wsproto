@@ -31,6 +31,8 @@
   an action is taken that is incompatible with the connection state or
   websocket standard.
 * Enforce version checking in SERVER mode, only 13 is supported.
+* Add an event_hint to RemoteProtocolErrors to hint at how to respond
+  to issues.
 
 0.12.0 2018-09-23
 -----------------

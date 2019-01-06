@@ -29,16 +29,23 @@ class LocalProtocolError(ProtocolError):
 
 
 class RemoteProtocolError(ProtocolError):
-
     """Indicates an error due to the remote's actions.
 
     This is raised when processing the bytes from the remote if the
     remote has sent data that is incompatible with the websocket
     standard.
 
+    .. attribute:: event_hint
+
+       This is a suggested wsproto Event to send to the client based
+       on the error. It could be None if no hint is available.
+
     """
 
-    pass
+    def __init__(self, message, event_hint=None):
+        # type: (str, Optional[Event]) -> None
+        self.event_hint = event_hint
+        super(RemoteProtocolError, self).__init__(message)
 
 
 # Some convenience utilities for working with HTTP headers
