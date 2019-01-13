@@ -37,6 +37,14 @@
 * Enforce version checking in SERVER mode, only 13 is supported.
 * Add an event_hint to RemoteProtocolErrors to hint at how to respond
   to issues.
+* Switch from a ``bytes_to_send`` method to the ``send`` method
+  returning the bytes to send directly. Responses to Ping and Close
+  messages must now be sent (via ``send``), with the ``Ping`` and
+  ``CloseConnection`` events gaining a ``response`` method. This
+  allows ::
+
+    if isinstance(event, Ping):
+        bytes_to_send = connection.send(event.response())
 
 0.12.0 2018-09-23
 -----------------
