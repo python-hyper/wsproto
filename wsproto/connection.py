@@ -44,9 +44,10 @@ class ConnectionState(Enum):
 
     CONNECTING = 0
     OPEN = 1
-    CLOSING = 2
-    CLOSED = 3
-    REJECTING = 4
+    REMOTE_CLOSING = 2
+    LOCAL_CLOSING = 3
+    CLOSED = 4
+    REJECTING = 5
 
 
 class ConnectionType(Enum):
@@ -82,7 +83,6 @@ class WSConnection(object):
         self._close_reason = None
 
         self._nonce = None
-        self._outgoing = b""
         self._events = deque()
         self._proto = None
 
@@ -101,31 +101,36 @@ class WSConnection(object):
         self.receive_bytes(h11_client.send(upgrade_request))
 
     def send(self, event):
-        # type: (wsproto.events.Event) -> None:
+        # type: (wsproto.events.Event) -> bytes:
+        data = b""
         if isinstance(event, Request):
-            self._initiate_connection(event)
+            data += self._initiate_connection(event)
         elif isinstance(event, AcceptConnection):
-            self._accept(event)
+            data += self._accept(event)
         elif isinstance(event, RejectConnection):
-            self._reject(event)
+            data += self._reject(event)
         elif isinstance(event, RejectData):
-            self._send_reject_data(event)
+            data += self._send_reject_data(event)
         elif isinstance(event, Message):
-            self._outgoing += self._proto.send_data(event.data, event.message_finished)
+            data += self._proto.send_data(event.data, event.message_finished)
         elif isinstance(event, Ping):
-            self._outgoing += self._proto.ping(event.payload)
+            data += self._proto.ping(event.payload)
         elif isinstance(event, Pong):
-            self._outgoing += self._proto.pong(event.payload)
+            data += self._proto.pong(event.payload)
         elif isinstance(event, CloseConnection):
-            if self.state != ConnectionState.OPEN:
+            if self.state not in {ConnectionState.OPEN, ConnectionState.REMOTE_CLOSING}:
                 raise LocalProtocolError(
                     "Connection cannot be closed in state %s" % self.state
                 )
-            self._outgoing += self._proto.close(event.code, event.reason)
-            self._state = ConnectionState.CLOSING
+            data += self._proto.close(event.code, event.reason)
+            if self.state == ConnectionState.REMOTE_CLOSING:
+                self._state = ConnectionState.CLOSED
+            else:
+                self._state = ConnectionState.LOCAL_CLOSING
+        return data
 
     def _initiate_connection(self, request):
-        # type: (Request) -> None
+        # type: (Request) -> bytes
         self._initiating_request = request
         self._nonce = generate_nonce()
 
@@ -157,7 +162,7 @@ class WSConnection(object):
             target=request.target.encode("ascii"),
             headers=headers + request.extra_headers,
         )
-        self._outgoing += self._upgrade_connection.send(upgrade)
+        return self._upgrade_connection.send(upgrade)
 
     def _accept(self, event):
         # type: (AcceptConnection) -> None
@@ -187,12 +192,12 @@ class WSConnection(object):
         response = h11.InformationalResponse(
             status_code=101, headers=headers + event.extra_headers
         )
-        self._outgoing += self._upgrade_connection.send(response)
         self._proto = FrameProtocol(self.client, event.extensions)
         self._state = ConnectionState.OPEN
+        return self._upgrade_connection.send(response)
 
     def _reject(self, event):
-        # type: (RejectConnection) -> None:
+        # type: (RejectConnection) -> bytes:
         if self.state != ConnectionState.CONNECTING:
             raise LocalProtocolError(
                 "Connection cannot be rejected in state %s" % self.state
@@ -202,51 +207,30 @@ class WSConnection(object):
         if not event.has_body:
             headers.append(("content-length", "0"))
         response = h11.Response(status_code=event.status_code, headers=headers)
-        self._outgoing += self._upgrade_connection.send(response)
+        data = self._upgrade_connection.send(response)
         self._state = ConnectionState.REJECTING
         if not event.has_body:
-            self._outgoing += self._upgrade_connection.send(h11.EndOfMessage())
+            data += self._upgrade_connection.send(h11.EndOfMessage())
             self._state = ConnectionState.CLOSED
+        return data
 
     def _send_reject_data(self, event):
-        # type: (RejectData) -> None:
+        # type: (RejectData) -> bytes:
         if self.state != ConnectionState.REJECTING:
             raise LocalProtocolError(
                 "Cannot send rejection data in state %s" % self.state
             )
 
-        self._outgoing += self._upgrade_connection.send(h11.Data(data=event.data))
+        data = self._upgrade_connection.send(h11.Data(data=event.data))
         if event.body_finished:
-            self._outgoing += self._upgrade_connection.send(h11.EndOfMessage())
+            data += self._upgrade_connection.send(h11.EndOfMessage())
             self._state = ConnectionState.CLOSED
+        return data
 
     @property
     def state(self):
         # type: () -> ConnectionState
         return self._state
-
-    def bytes_to_send(self, amount=None):
-        """
-        Returns some data for sending out of the internal data buffer.
-
-        This method is analogous to ``read`` on a file-like object, but it
-        doesn't block. Instead, it returns as much data as the user asks for,
-        or less if that much data is not available. It does not perform any
-        I/O, and so uses a different name.
-
-        :param amount: (optional) The maximum amount of data to return. If not
-            set, or set to ``None``, will return as much data as possible.
-        :type amount: ``int``
-        :returns: A bytestring containing the data to send on the wire.
-        :rtype: ``bytes``
-        """
-        if amount is None:
-            data = self._outgoing
-            self._outgoing = b""
-        else:
-            data = self._outgoing[:amount]
-            self._outgoing = self._outgoing[amount:]
-        return data
 
     def receive_bytes(self, data):
         """
@@ -273,7 +257,7 @@ class WSConnection(object):
             if event is not None:
                 self._events.append(event)
 
-        if self.state in (ConnectionState.OPEN, ConnectionState.CLOSING):
+        if self.state in (ConnectionState.OPEN, ConnectionState.LOCAL_CLOSING):
             self._proto.receive_bytes(data)
         elif self.state is ConnectionState.CLOSED:
             raise LocalProtocolError("Connection already closed.")
@@ -296,7 +280,6 @@ class WSConnection(object):
             for frame in self._proto.received_frames():
                 if frame.opcode is Opcode.PING:
                     assert frame.frame_finished and frame.message_finished
-                    self._outgoing += self._proto.pong(frame.payload)
                     yield Ping(payload=frame.payload)
 
                 elif frame.opcode is Opcode.PONG:
@@ -305,9 +288,10 @@ class WSConnection(object):
 
                 elif frame.opcode is Opcode.CLOSE:
                     code, reason = frame.payload
-                    if self.state is ConnectionState.OPEN:
-                        self.send(CloseConnection(code=code, reason=reason))
-                    self._state = ConnectionState.CLOSED
+                    if self.state is ConnectionState.LOCAL_CLOSING:
+                        self._state = ConnectionState.CLOSED
+                    else:
+                        self._state = ConnectionState.REMOTE_CLOSING
                     yield CloseConnection(code=code, reason=reason)
 
                 elif frame.opcode is Opcode.TEXT:
@@ -324,11 +308,6 @@ class WSConnection(object):
                         message_finished=frame.message_finished,
                     )
         except ParseFailed as exc:
-            # XX FIXME: apparently autobahn intentionally deviates from the
-            # spec in that on protocol errors it just closes the connection
-            # rather than trying to send a CLOSE frame. Investigate whether we
-            # should do the same.
-            self.send(CloseConnection(code=exc.code, reason=str(exc)))
             yield CloseConnection(code=exc.code, reason=str(exc))
 
     def _process_upgrade(self, data):

@@ -23,14 +23,11 @@ class TestConnection(object):
     def create_connection(self):
         server = WSConnection(SERVER)
         client = WSConnection(CLIENT)
-        client.send(Request(host="localhost", target="foo"))
-
-        server.receive_bytes(client.bytes_to_send())
+        server.receive_bytes(client.send(Request(host="localhost", target="foo")))
         event = next(server.events())
         assert isinstance(event, Request)
 
-        server.send(AcceptConnection())
-        client.receive_bytes(server.bytes_to_send())
+        client.receive_bytes(server.send(AcceptConnection()))
         assert isinstance(next(client.events()), AcceptConnection)
 
         return client, server
@@ -52,8 +49,7 @@ class TestConnection(object):
 
         data = b"x" * 23
 
-        me.send(Message(data=data, message_finished=final))
-        them.receive_bytes(me.bytes_to_send())
+        them.receive_bytes(me.send(Message(data=data, message_finished=final)))
 
         event = next(them.events())
         assert isinstance(event, BytesMessage)
@@ -78,8 +74,7 @@ class TestConnection(object):
             me = server
             them = client
 
-        me.send(CloseConnection(code=code, reason=reason))
-        them.receive_bytes(me.bytes_to_send())
+        them.receive_bytes(me.send(CloseConnection(code=code, reason=reason)))
 
         event = next(them.events())
         assert isinstance(event, CloseConnection)
@@ -94,31 +89,34 @@ class TestConnection(object):
             initiator, completor = self.create_connection()
 
         # initiator sends CLOSE to completor
-        initiator.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
-        completor.receive_bytes(initiator.bytes_to_send())
+        completor.receive_bytes(
+            initiator.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+        )
+        assert initiator.state is ConnectionState.LOCAL_CLOSING
 
         # completor emits Close
-        assert isinstance(next(completor.events()), CloseConnection)
+        close = next(completor.events())
+        assert isinstance(close, CloseConnection)
 
-        # completor enters CLOSED state
-        assert completor.state is ConnectionState.CLOSED
+        # completor enters REMOTE_CLOSING state
+        assert completor.state is ConnectionState.REMOTE_CLOSING
         with pytest.raises(StopIteration):
             next(completor.events())
 
         # completor sends CLOSE back to initiator
-        initiator.receive_bytes(completor.bytes_to_send())
+        initiator.receive_bytes(completor.send(close.response()))
 
         # initiator emits Close
         assert isinstance(next(initiator.events()), CloseConnection)
 
         # initiator enters CLOSED state
         assert initiator.state is ConnectionState.CLOSED
+        assert completor.state is ConnectionState.CLOSED
         with pytest.raises(StopIteration):
             next(initiator.events())
 
-        completor.send(Ping())
         with pytest.raises(LocalProtocolError):
-            initiator.receive_bytes(completor.bytes_to_send())
+            initiator.receive_bytes(b"Any data")
 
     def test_abnormal_closure(self):
         client, server = self.create_connection()
@@ -141,18 +139,6 @@ class TestConnection(object):
         with pytest.raises(LocalProtocolError):
             client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
 
-    def test_bytes_send_all(self):
-        connection = WSConnection(SERVER)
-        connection._outgoing = b"fnord fnord"
-        assert connection.bytes_to_send() == b"fnord fnord"
-        assert connection.bytes_to_send() == b""
-
-    def test_bytes_send_some(self):
-        connection = WSConnection(SERVER)
-        connection._outgoing = b"fnord fnord"
-        assert connection.bytes_to_send(5) == b"fnord"
-        assert connection.bytes_to_send() == b" fnord"
-
     @pytest.mark.parametrize("as_client", [True, False])
     def test_ping_pong(self, as_client):
         client, server = self.create_connection()
@@ -166,8 +152,7 @@ class TestConnection(object):
         payload = b"x" * 23
 
         # Send a PING message
-        me.send(Ping(payload=payload))
-        wire_data = me.bytes_to_send()
+        wire_data = me.send(Ping(payload=payload))
 
         # Verify that the peer emits the Ping event with the correct
         # payload.
@@ -179,7 +164,7 @@ class TestConnection(object):
             repr(next(them.events()))
 
         # Let the peer send the automatic PONG message
-        wire_data = them.bytes_to_send()
+        wire_data = them.send(event.response())
         assert wire_data[0] == 0x8A
         masked = bool(wire_data[1] & 0x80)
         assert wire_data[1] & ~0x80 == len(payload)
@@ -206,8 +191,7 @@ class TestConnection(object):
     )
     def test_unsolicited_pong(self, payload, expected_payload):
         client, server = self.create_connection()
-        client.send(Pong(payload=payload))
-        wire_data = client.bytes_to_send()
+        wire_data = client.send(Pong(payload=payload))
         server.receive_bytes(wire_data)
         events = list(server.events())
         assert len(events) == 1
@@ -249,7 +233,6 @@ class TestConnection(object):
         connection.send(Request(host="localhost", target="foo"))
         connection._proto = FrameProtocol(True, [])
         connection._state = ConnectionState.OPEN
-        connection.bytes_to_send()
 
         connection.receive_bytes(frame)
         event = next(connection.events())
@@ -260,8 +243,6 @@ class TestConnection(object):
         assert event.data == payload
         assert event.frame_finished is full_frame
         assert event.message_finished is full_message
-
-        assert not connection.bytes_to_send()
 
     def test_frame_protocol_somehow_loses_its_mind(self):
         class FailFrame(object):
@@ -278,12 +259,10 @@ class TestConnection(object):
         connection.send(Request(host="localhost", target="foo"))
         connection._proto = DoomProtocol()
         connection._state = ConnectionState.OPEN
-        connection.bytes_to_send()
 
         connection.receive_bytes(b"")
         with pytest.raises(StopIteration):
             next(connection.events())
-        assert not connection.bytes_to_send()
 
     def test_frame_protocol_gets_fed_garbage(self):
         client, server = self.create_connection()
@@ -296,5 +275,5 @@ class TestConnection(object):
         assert isinstance(event, CloseConnection)
         assert event.code == CloseReason.PROTOCOL_ERROR
 
-        output = client.bytes_to_send()
+        output = client.send(event.response())
         assert output[:1] == b"\x88"

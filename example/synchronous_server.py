@@ -81,26 +81,27 @@ def handle_connection(stream):
         if isinstance(event, Request):
             # Negotiate new WebSocket connection
             print('Accepting WebSocket upgrade')
-            ws.send(AcceptConnection())
+            out_data = ws.send(AcceptConnection())
         elif isinstance(event, CloseConnection):
             # Print log message and break out
             print('Connection closed: code={}/{} reason={}'.format(
                 event.code.value, event.code.name, event.reason))
+            out_data = ws.send(event.response())
             running = False
         elif isinstance(event, TextMessage):
             # Reverse text and send it back to wsproto
             print('Received request and sending response')
-            ws.send(Message(data=event.data[::-1]))
+            out_data = ws.send(Message(data=event.data[::-1]))
         elif isinstance(event, Ping):
             # wsproto handles ping events for you by placing a pong frame in
             # the outgoing buffer. You should not call pong() unless you want to
             # send an unsolicited pong frame.
             print('Received ping and sending pong')
+            out_data = ws.send(event.response())
         else:
             print('Unknown event: {!r}'.format(event))
 
         # 4) Send data from wsproto to network
-        out_data = ws.bytes_to_send()
         print('Sending {} bytes'.format(len(out_data)))
         stream.send(out_data)
 

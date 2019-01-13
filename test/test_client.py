@@ -19,8 +19,7 @@ def _make_connection_request(request):
     # type: (Request) -> h11.Request
     client = WSConnection(CLIENT)
     server = h11.Connection(h11.SERVER)
-    client.send(request)
-    server.receive_data(client.bytes_to_send())
+    server.receive_data(client.send(request))
     return server.next_event()
 
 
@@ -103,15 +102,16 @@ def _make_handshake(
 ):
     client = WSConnection(CLIENT)
     server = h11.Connection(h11.SERVER)
-    client.send(
-        Request(
-            host="localhost",
-            target="/",
-            subprotocols=subprotocols or [],
-            extensions=extensions or [],
+    server.receive_data(
+        client.send(
+            Request(
+                host="localhost",
+                target="/",
+                subprotocols=subprotocols or [],
+                extensions=extensions or [],
+            )
         )
     )
-    server.receive_data(client.bytes_to_send())
     request = server.next_event()
     if auto_accept_key:
         full_request_headers = normed_header_dict(request.headers)
@@ -232,8 +232,7 @@ def test_protocol_error():
 def _make_handshake_rejection(status_code, body=None):
     client = WSConnection(CLIENT)
     server = h11.Connection(h11.SERVER)
-    client.send(Request(host="localhost", target="/"))
-    server.receive_data(client.bytes_to_send())
+    server.receive_data(client.send(Request(host="localhost", target="/")))
     headers = []
     if body is not None:
         headers.append(("Content-Length", str(len(body))))
