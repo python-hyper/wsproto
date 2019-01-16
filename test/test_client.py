@@ -4,7 +4,8 @@
 import h11
 import pytest
 
-from wsproto.connection import CLIENT, WSConnection
+from wsproto import WSConnection
+from wsproto.connection import CLIENT
 from wsproto.events import AcceptConnection, RejectConnection, RejectData, Request
 from wsproto.frame_protocol import CloseReason
 from wsproto.utilities import (
@@ -124,7 +125,7 @@ def _make_handshake(
     response = h11.InformationalResponse(
         status_code=response_status, headers=response_headers
     )
-    client.receive_bytes(server.send(response))
+    client.receive_data(server.send(response))
 
     return list(client.events())
 
@@ -225,7 +226,7 @@ def test_protocol_error():
     client = WSConnection(CLIENT)
     client.send(Request(host="localhost", target="/"))
     with pytest.raises(RemoteProtocolError) as excinfo:
-        client.receive_bytes(b"broken nonsense\r\n\r\n")
+        client.receive_data(b"broken nonsense\r\n\r\n")
     assert str(excinfo.value) == "Bad HTTP message"
 
 
@@ -236,12 +237,12 @@ def _make_handshake_rejection(status_code, body=None):
     headers = []
     if body is not None:
         headers.append(("Content-Length", str(len(body))))
-    client.receive_bytes(
+    client.receive_data(
         server.send(h11.Response(status_code=status_code, headers=headers))
     )
     if body is not None:
-        client.receive_bytes(server.send(h11.Data(data=body)))
-    client.receive_bytes(server.send(h11.EndOfMessage()))
+        client.receive_data(server.send(h11.Data(data=body)))
+    client.receive_data(server.send(h11.EndOfMessage()))
 
     return list(client.events())
 
@@ -249,7 +250,9 @@ def _make_handshake_rejection(status_code, body=None):
 def test_handshake_rejection():
     events = _make_handshake_rejection(400)
     assert events == [
-        RejectConnection(headers=[(b"connection", b"close")], status_code=400),
+        RejectConnection(
+            headers=[(b"connection", b"close")], has_body=True, status_code=400
+        ),
         RejectData(body_finished=True, data=b""),
     ]
 
@@ -257,7 +260,9 @@ def test_handshake_rejection():
 def test_handshake_rejection_with_body():
     events = _make_handshake_rejection(400, b"Hello")
     assert events == [
-        RejectConnection(headers=[(b"content-length", b"5")], status_code=400),
+        RejectConnection(
+            headers=[(b"content-length", b"5")], has_body=True, status_code=400
+        ),
         RejectData(body_finished=False, data=b"Hello"),
         RejectData(body_finished=True, data=b""),
     ]

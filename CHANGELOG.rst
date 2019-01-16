@@ -45,6 +45,12 @@
 
     if isinstance(event, Ping):
         bytes_to_send = connection.send(event.response())
+* Separate the handshake from the active connection handling. This
+  allows the handshake and connection to be seperately used. By
+  default though WSConnection does both.
+* ``receive_bytes`` is renamed to ``receive_data`` and
+  ``WSConnection`` should be imported from ``wsproto`` rather than
+  ``wsproto.connection``.
 
 0.12.0 2018-09-23
 -----------------

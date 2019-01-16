@@ -41,7 +41,7 @@ handshake. To create a WebSocket client connection:
 
 .. code-block:: python
 
-  from wsproto.connection import WSConnection, ConnectionType
+  from wsproto import WSConnection, ConnectionType
   from wsproto.events import Request
 
   ws = WSConnection(ConnectionType.CLIENT)
@@ -66,7 +66,7 @@ Both connection types need to receive incoming data:
 
 .. code-block:: python
 
-  ws.receive_bytes(some_byte_string_of_data)
+  ws.receive_data(some_byte_string_of_data)
 
 And wsproto will issue events if the data contains any WebSocket messages or state changes:
 

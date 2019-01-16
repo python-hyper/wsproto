@@ -14,7 +14,7 @@ Connections
 -----------
 
 The main class you'll be working with is the
-:class:`WSConnection <wsproto.connection.WSConnection>` object. This object
+:class:`WSConnection <wsproto.WSConnection>` object. This object
 represents a connection to a WebSocket client or server and contains all the
 state needed to communicate with the entity at the other end. Whether you're
 connecting to a server or receiving a connection from a client, this is the
@@ -39,28 +39,28 @@ code is like a sandwich around `wsproto`.
 `wsproto` does not do perform any network I/O, so ``<NETWORK GLUE>``
 represents the code you need to write to glue `wsproto` to the actual
 network layer, i.e.  code that can send and receive data over the
-network. The :class:`WSConnection <wsproto.connection.WSConnection>`
+network. The :class:`WSConnection <wsproto.WSConnection>`
 class provides two methods for this purpose. When data has been
 received on a network socket, you feed this data into `wsproto` by
-calling :meth:`receive_bytes
-<wsproto.connection.WSConnection.receive_bytes>`. When `wsproto` sends
-events the :meth:`send <wsproto.connection.WSConnection.send>` will
+calling :meth:`receive_data
+<wsproto.WSConnection.receive_data>`. When `wsproto` sends
+events the :meth:`send <wsproto.WSConnection.send>` will
 return the bytes that need to be sent over the network. Your code is
 responsible for actually sending that data over the network.
 
 .. note::
 
     If the connection drops, a standard Python ``socket.recv()`` will return
-    zero. You should call ``receive_bytes(None)`` to update the internal
+    zero. You should call ``receive_data(None)`` to update the internal
     `wsproto` state to indicate that the connection has been closed.
 
 Internally, `wsproto` process the raw network data you feed into it and turns it
 into higher level representations of WebSocket events. In ``<APPLICATION
 GLUE>``, you need to write code to process these events. The
-:class:`WSConnection <wsproto.connection.WSConnection>` class contains a
-generator method :meth:`events <wsproto.connection.WSConnection.events>` that
+:class:`WSConnection <wsproto.WSConnection>` class contains a
+generator method :meth:`events <wsproto.WSConnection.events>` that
 yields WebSocket events. To send a message, you call the :meth:`send
-<wsproto.connection.WSConnection.send>` method.
+<wsproto.WSConnection.send>` method.
 
 Connecting to a WebSocket server
 --------------------------------
@@ -84,7 +84,7 @@ layer::
 To read from the network::
 
     data = stream.recv(4096)
-    ws.receive_bytes(data)
+    ws.receive_data(data)
 
 You also need to send data returned by the send method::
 
@@ -195,7 +195,7 @@ underlying connection.
 Ping Pong
 ---------
 
-The :class:`WSConnection <wsproto.connection.WSConnection>` class
+The :class:`WSConnection <wsproto.WSConnection>` class
 supports sending WebSocket ping and pong frames via sending
 :class:`Ping <wsproto.events.Ping>` and :class:`Pong
 <wsproto.events.Pong>`.
@@ -218,7 +218,7 @@ does some processing, and then sends a response. What happens if the client
 sends messages faster than the the server can process them? If the incoming
 messages are buffered in memory, then the server will slowly use more and more
 memory, until the OS eventually kills it. This scenario is directly applicable
-to `wsproto`, because every time you call ``receive_bytes()``, it appends that
+to `wsproto`, because every time you call ``receive_data()``, it appends that
 data to an internal buffer.
 
 The slow endpoint needs a way to signal the fast endpoint to stop sending

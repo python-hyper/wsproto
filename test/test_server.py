@@ -4,7 +4,8 @@
 import h11
 import pytest
 
-from wsproto.connection import SERVER, WSConnection
+from wsproto import WSConnection
+from wsproto.connection import SERVER
 from wsproto.events import AcceptConnection, RejectConnection, RejectData, Request
 from wsproto.frame_protocol import CloseReason
 from wsproto.utilities import (
@@ -20,7 +21,7 @@ def _make_connection_request(request_headers, method="GET"):
     # type: (List[Tuple[str, str]]) -> Request
     client = h11.Connection(h11.CLIENT)
     server = WSConnection(SERVER)
-    server.receive_bytes(
+    server.receive_data(
         client.send(h11.Request(method=method, target="/", headers=request_headers))
     )
     return next(server.events())
@@ -132,7 +133,7 @@ def _make_handshake(
     client = h11.Connection(h11.CLIENT)
     server = WSConnection(SERVER)
     nonce = generate_nonce()
-    server.receive_bytes(
+    server.receive_data(
         client.send(
             h11.Request(
                 method="GET",
@@ -240,7 +241,7 @@ def test_handshake_with_extra_unaccepted_extension():
 def test_protocol_error():
     server = WSConnection(SERVER)
     with pytest.raises(RemoteProtocolError) as excinfo:
-        server.receive_bytes(b"broken nonsense\r\n\r\n")
+        server.receive_data(b"broken nonsense\r\n\r\n")
     assert str(excinfo.value) == "Bad HTTP message"
 
 
@@ -248,7 +249,7 @@ def _make_handshake_rejection(status_code, body=None):
     client = h11.Connection(h11.CLIENT)
     server = WSConnection(SERVER)
     nonce = generate_nonce()
-    server.receive_bytes(
+    server.receive_data(
         client.send(
             h11.Request(
                 method="GET",

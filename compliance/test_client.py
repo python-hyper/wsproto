@@ -1,8 +1,9 @@
 import json
 import socket
 
+from wsproto import WSConnection
 from wsproto.compat import PY2
-from wsproto.connection import WSConnection, CLIENT
+from wsproto.connection import CLIENT
 from wsproto.events import AcceptConnection, CloseConnection, Ping, Request, TextMessage, Message
 from wsproto.extensions import PerMessageDeflate
 from wsproto.frame_protocol import CloseReason
@@ -31,7 +32,7 @@ def get_case_count(server):
     case_count = None
     while case_count is None:
         data = sock.recv(65535)
-        connection.receive_bytes(data)
+        connection.receive_data(data)
         data = ""
         out_data = b""
         for event in connection.events():
@@ -67,7 +68,7 @@ def run_case(server, case, agent):
             data = sock.recv(65535)
         except CONNECTION_EXCEPTIONS:
             data = None
-        connection.receive_bytes(data or None)
+        connection.receive_data(data or None)
         out_data = b""
         for event in connection.events():
             if isinstance(event, Message):
@@ -100,7 +101,7 @@ def update_reports(server, agent):
 
     while not closed:
         data = sock.recv(65535)
-        connection.receive_bytes(data)
+        connection.receive_data(data)
         for event in connection.events():
             if isinstance(event, AcceptConnection):
                 sock.sendall(connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE)))

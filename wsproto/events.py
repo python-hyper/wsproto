@@ -32,7 +32,11 @@ class Event(object):
                         field, self.__class__.__name__
                     )
                 )
-        self.__dict__.update(self._defaults)
+        defaults = {
+            key: value() if callable(value) else value
+            for key, value in self._defaults.items()
+        }
+        self.__dict__.update(defaults)
         self.__dict__.update(kwargs)
 
     def __repr__(self):
@@ -84,7 +88,7 @@ class Request(Event):
     """
 
     _fields = ["extensions", "extra_headers", "host", "subprotocols", "target"]
-    _defaults = {"extensions": [], "extra_headers": [], "subprotocols": []}
+    _defaults = {"extensions": list, "extra_headers": list, "subprotocols": list}
 
 
 class AcceptConnection(Event):
@@ -104,7 +108,7 @@ class AcceptConnection(Event):
     """
 
     _fields = ["extensions", "extra_headers", "subprotocol"]
-    _defaults = {"extensions": [], "extra_headers": [], "subprotocol": None}
+    _defaults = {"extensions": list, "extra_headers": list, "subprotocol": None}
 
 
 class RejectConnection(Event):
@@ -133,7 +137,7 @@ class RejectConnection(Event):
     """
 
     _fields = ["headers", "has_body", "status_code"]
-    _defaults = {"headers": [], "has_body": False, "status_code": 400}
+    _defaults = {"headers": list, "has_body": False, "status_code": 400}
 
 
 class RejectData(Event):
