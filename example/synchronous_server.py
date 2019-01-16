@@ -8,7 +8,7 @@ wsproto.
 import socket
 import sys
 
-from wsproto.connection import ConnectionType, WSConnection
+from wsproto import ConnectionType, WSConnection
 from wsproto.events import AcceptConnection, CloseConnection, Message, Ping, Request, TextMessage
 
 
@@ -68,7 +68,7 @@ def handle_connection(stream):
         # 1) Read data from network
         in_data = stream.recv(RECEIVE_BYTES)
         print('Received {} bytes'.format(len(in_data)))
-        ws.receive_bytes(in_data)
+        ws.receive_data(in_data)
 
         # 2) Get next wsproto event
         try:

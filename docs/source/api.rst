@@ -15,7 +15,7 @@ subject to change at any time.
 Connection
 ----------
 
-.. autoclass:: wsproto.connection.WSConnection
+.. autoclass:: wsproto.WSConnection
    :members:
 
 Events

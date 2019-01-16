@@ -7,7 +7,8 @@ demonstrate how to use wsproto.
 import socket
 import sys
 
-from wsproto.connection import ConnectionType, WSConnection
+from wsproto import WSConnection
+from wsproto.connection import ConnectionType
 from wsproto.events import AcceptConnection, CloseConnection, Message, Ping, Pong, Request, TextMessage
 
 
@@ -115,10 +116,10 @@ def net_recv(ws, conn):
         # A receive of zero bytes indicates the TCP socket has been closed. We
         # need to pass None to wsproto to update its internal state.
         print('Received 0 bytes (connection closed)')
-        ws.receive_bytes(None)
+        ws.receive_data(None)
     else:
         print('Received {} bytes'.format(len(in_data)))
-        ws.receive_bytes(in_data)
+        ws.receive_data(in_data)
 
 
 if __name__ == '__main__':
