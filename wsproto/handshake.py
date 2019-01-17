@@ -251,7 +251,9 @@ class H11Handshake(object):
             headers.append((b"Sec-WebSocket-Protocol", event.subprotocol))
 
         if event.extensions:
-            accepts = self._extension_accept(event.extensions)
+            accepts = handshake_extensions(
+                self._initiating_request.extensions, event.extensions
+            )
             if accepts:
                 headers.append((b"Sec-WebSocket-Extensions", accepts))
 
@@ -385,7 +387,7 @@ class H11Handshake(object):
                 name = accept.split(";", 1)[0].strip()
                 for extension in self._initiating_request.extensions:
                     if extension.name == name:
-                        extension.finalize(self, accept)
+                        extension.finalize(accept)
                         extensions.append(extension)
                         break
                 else:
@@ -404,36 +406,41 @@ class H11Handshake(object):
             extensions=extensions, extra_headers=headers, subprotocol=subprotocol
         )
 
-    def _extension_accept(self, supported):
-        accepts = {}
-
-        for offer in self._initiating_request.extensions:
-            name = offer.split(";", 1)[0].strip()
-            for extension in supported:
-                if extension.name == name:
-                    accept = extension.accept(self, offer)
-                    if accept is True:
-                        accepts[extension.name] = True
-                    elif accept is not False and accept is not None:
-                        accepts[extension.name] = accept.encode("ascii")
-
-        if accepts:
-            extensions = []
-            for name, params in accepts.items():
-                if params is True:
-                    extensions.append(name.encode("ascii"))
-                else:
-                    # py34 annoyance: doesn't support bytestring formatting
-                    params = params.decode("ascii")
-                    if params == "":
-                        extensions.append(("%s" % (name)).encode("ascii"))
-                    else:
-                        extensions.append(("%s; %s" % (name, params)).encode("ascii"))
-            return b", ".join(extensions)
-
-        return None
-
     def __repr__(self):
         return "{}(client={}, state={})".format(
             self.__class__.__name__, self.client, self.state
         )
+
+
+def handshake_extensions(requested, supported):
+    # type: (List[str], List[Extension]) -> Optional[bytes]
+    """Agree on the extensions to use returning an appropriate header value.
+
+    This returns None if there are no agreed extensions
+    """
+    accepts = {}
+    for offer in requested:
+        name = offer.split(";", 1)[0].strip()
+        for extension in supported:
+            if extension.name == name:
+                accept = extension.accept(offer)
+                if accept is True:
+                    accepts[extension.name] = True
+                elif accept is not False and accept is not None:
+                    accepts[extension.name] = accept.encode("ascii")
+
+    if accepts:
+        extensions = []
+        for name, params in accepts.items():
+            if params is True:
+                extensions.append(name.encode("ascii"))
+            else:
+                # py34 annoyance: doesn't support bytestring formatting
+                params = params.decode("ascii")
+                if params == "":
+                    extensions.append(("%s" % (name)).encode("ascii"))
+                else:
+                    extensions.append(("%s; %s" % (name, params)).encode("ascii"))
+        return b", ".join(extensions)
+
+    return None

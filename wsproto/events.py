@@ -65,7 +65,7 @@ class Request(Event):
 
     Fields:
 
-    .. attribute:: extensions (List[Extension])
+    .. attribute:: extensions (Union[List[Extension], List[str]])
 
     .. attribute:: extra_headers
 
