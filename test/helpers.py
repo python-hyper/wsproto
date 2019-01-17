@@ -10,12 +10,12 @@ class FakeExtension(Extension):
         self.offered = None
         self.accept_response = accept_response
 
-    def offer(self, proto):
+    def offer(self):
         return self.offer_response
 
-    def finalize(self, proto, offer):
+    def finalize(self, offer):
         self.accepted_offer = offer
 
-    def accept(self, proto, offer):
+    def accept(self, offer):
         self.offered = offer
         return self.accept_response
