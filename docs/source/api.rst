@@ -18,6 +18,14 @@ Connection
 .. autoclass:: wsproto.WSConnection
    :members:
 
+Handshake
+---------
+
+.. autoclass:: wsproto.handshake.H11Handshake
+   :members:
+
+.. autofunction:: wsproto.handshake.handshake_extensions
+
 Events
 ------
 
