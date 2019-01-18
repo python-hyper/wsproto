@@ -78,20 +78,20 @@ Now you need to provide the network glue. For the sake of example, we will use
 standard Python sockets here, but `wsproto` can be integrated with any network
 layer::
 
-    stream = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    stream.connect(("example.com", 80))
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect(("example.com", 80))
 
 To read from the network::
 
-    data = stream.recv(4096)
+    data = sock.recv(4096)
     ws.receive_data(data)
 
 You also need to send data returned by the send method::
 
     data = ws.send(Message(data=b"Hello"))
-    stream.send(data)
+    sock.send(data)
 
-A standard Python socket will block on the call to ``stream.recv()``, so you
+A standard Python socket will block on the call to ``sock.recv()``, so you
 will probably need to use a non-blocking socket or some form of concurrency like
 threading, greenlets, asyncio, etc.
 
@@ -108,7 +108,12 @@ And to receive WebSocket events::
             print('Connection rejected')
         elif isinstance(event, CloseConnection):
             print('Connection closed: code={} reason={}'.format(
-                event.code, event.reason))
+                event.code, event.reason
+            ))
+            sock.send(ws.send(event.response()))
+        elif isinstance(event, Ping):
+            print('Received Ping frame with payload {}'.format(event.payload))
+            sock.send(ws.send(event.response()))
         elif isinstance(event, TextMessage):
             print('Received TEXT data: {}'.format(event.data))
             if event.message_finished:
@@ -142,10 +147,15 @@ A server also needs to explicitly send an :class:`AcceptConnection
     for event in ws.events():
         if isinstance(event, Request):
             print('Accepting connection request')
-            ws.send(AcceptConnection())
+            sock.send(ws.send(AcceptConnection()))
         elif isinstance(event, CloseConnection):
             print('Connection closed: code={} reason={}'.format(
-                event.code, event.reason))
+                event.code, event.reason
+            ))
+            sock.send(ws.send(event.response()))
+        elif isinstance(event, Ping):
+            print('Received Ping frame with payload {}'.format(event.payload))
+            sock.send(ws.send(event.response()))
         elif isinstance(event, TextMessage):
             print('Received TEXT data: {}'.format(event.data))
             if event.message_finished:
@@ -181,10 +191,21 @@ Closing
 WebSockets are closed with a handshake that requires each endpoint to
 send one frame and receive one frame. Sending a
 :class:`CloseConnection <wsproto.events.CloseConnection>` instance
-places a close frame in the send buffer. When a close frame is
-received, it yields a ``CloseConnection`` event, *and it also places a
-reply frame in the send buffer.* When that reply has been received by
-the initiator, it will also receive a ``CloseConnection`` event.
+sets the state to ``LOCAL_CLOSING``. When a close frame is received,
+it yields a ``CloseConnection`` event, sets the state to
+``REMOTE_CLOSING`` **and requires a reply to be sent**, this reply
+should be a ``CloseConnection`` event. To aid with this the
+``CloseConnection`` class has a :func:`response()
+<wsproto.events.CloseConnection.response>` method to create the
+appropriate reply. For example,
+
+.. code-block:: python
+
+    if isinstance(event, CloseConnection):
+        sock.send(ws.send(event.response()))
+
+When the reply has been received by the initiator, it will also yield
+a ``CloseConnection`` event.
 
 Regardless of which endpoint initiates the closing handshake, the
 server is responsible for tearing down the underlying connection. When
@@ -192,58 +213,28 @@ the server receives a ``CloseConnection`` event, it should send
 pending `wsproto` data (if any) and then it can start tearing down the
 underlying connection.
 
+.. note::
+
+    Both client and server connections must remember to reply to
+    ``CloseConnection`` events initiated by the remote party.
+
 Ping Pong
 ---------
 
-The :class:`WSConnection <wsproto.WSConnection>` class
-supports sending WebSocket ping and pong frames via sending
-:class:`Ping <wsproto.events.Ping>` and :class:`Pong
-<wsproto.events.Pong>`.
+The :class:`WSConnection <wsproto.WSConnection>` class supports
+sending WebSocket ping and pong frames via sending :class:`Ping
+<wsproto.events.Ping>` and :class:`Pong <wsproto.events.Pong>`. When a
+``Ping`` frame is received it **requires a reply**, this reply should be
+a ``Pong`` event. To aid with this the ``Ping`` class has a
+:func:`response() <wsproto.events.Ping.response>` method to create the
+appropriate reply. For example,
+
+.. code-block:: python
+
+    if isinstance(event, Ping):
+        sock.send(ws.send(event.response()))
 
 .. note::
 
-    When a ping is received, `wsproto` automatically places a pong
-    frame in its outgoing buffer. You should only send ``Pong`` if you
-    want to send an unsolicited pong frame.
-
-Back-pressure
--------------
-
-Back-pressure is an important concept to understand when implementing a
-client/server protocol. This section briefly explains the issue and then
-explains how to handle back-pressure when using `wsproto`.
-
-Imagine that you have a WebSocket server that reads messages from the client,
-does some processing, and then sends a response. What happens if the client
-sends messages faster than the the server can process them? If the incoming
-messages are buffered in memory, then the server will slowly use more and more
-memory, until the OS eventually kills it. This scenario is directly applicable
-to `wsproto`, because every time you call ``receive_data()``, it appends that
-data to an internal buffer.
-
-The slow endpoint needs a way to signal the fast endpoint to stop sending
-messages until the slow endpoint can catch up. This signaling is called
-"back-pressure". As a Sans-IO library, `wsproto` is not responsible for
-network concerns like back-pressure, so that responsibility belongs to your
-network glue code.
-
-Fortunately, TCP has the ability to signal backpressure, and the operating
-system will do that for you automatically—if you follow a few rules! The OS
-buffers all incoming and outgoing network data. Standard Python socket methods
-like ``send()`` and ``recv()`` copy data to and from those OS buffers. For
-example, if the peer is sending data too quickly, then the OS receive buffere
-will start to get full, and the OS will signal the peer to stop transmitting.
-When ``recv()`` is called, the OS will copy data from its internal buffer into
-your process, free up space in its own buffer, and then signal to the peer to
-start transmitting again.
-
-Therefore, you need to follow these two rules to implement back-pressure over
-TCP:
-
-#. Do not receive from the socket faster than your code can process the
-   messages. Your processing code may need to signal the receiving code when its
-   ready to receive more data.
-#. Do not store out-going messages in an unbounded collection. Ideally,
-   out-going messages should be sent to the OS as soon as possible. If you need
-   to buffer messages in memory, the buffer should be bounded so that it can not
-   grow indefinitely.
+    Both client and server connections must remember to reply to
+    ``Ping`` events initiated by the remote party.
