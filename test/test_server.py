@@ -148,14 +148,15 @@ def _make_handshake(
             )
         )
     )
-    server.send(
-        AcceptConnection(
-            extra_headers=accept_headers or [],
-            subprotocol=subprotocol,
-            extensions=extensions or [],
+    client.receive_data(
+        server.send(
+            AcceptConnection(
+                extra_headers=accept_headers or [],
+                subprotocol=subprotocol,
+                extensions=extensions or [],
+            )
         )
     )
-    client.receive_data(server.bytes_to_send())
     event = client.next_event()
     return event, nonce
 
@@ -263,17 +264,18 @@ def _make_handshake_rejection(status_code, body=None):
         )
     )
     if body is not None:
-        server.send(
-            RejectConnection(
-                headers=[(b"content-length", b"%d" % len(body))],
-                status_code=status_code,
-                has_body=True,
+        client.receive_data(
+            server.send(
+                RejectConnection(
+                    headers=[(b"content-length", b"%d" % len(body))],
+                    status_code=status_code,
+                    has_body=True,
+                )
             )
         )
-        server.send(RejectData(data=body))
+        client.receive_data(server.send(RejectData(data=body)))
     else:
-        server.send(RejectConnection(status_code=status_code))
-    client.receive_data(server.bytes_to_send())
+        client.receive_data(server.send(RejectConnection(status_code=status_code)))
     events = []
     while True:
         event = client.next_event()

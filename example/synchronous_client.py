@@ -50,7 +50,8 @@ def wsproto_demo(host, port):
     # 1) Negotiate WebSocket opening handshake
     print('Opening WebSocket')
     ws = WSConnection(ConnectionType.CLIENT)
-    ws.send(Request(host=host, target='server'))
+    net_send(ws.send(Request(host=host, target='server')), conn)
+    net_recv(ws, conn)
 
     # events is a generator that yields websocket event objects. Usually you
     # would say `for event in ws.events()`, but the synchronous nature of this
@@ -62,7 +63,6 @@ def wsproto_demo(host, port):
 
     # Because this is a client WebSocket, wsproto has automatically queued up
     # a handshake, and we need to send it and wait for a response.
-    net_send_recv(ws, conn)
     event = next(events)
     if isinstance(event, AcceptConnection):
         print('WebSocket negotiation complete')
@@ -72,8 +72,8 @@ def wsproto_demo(host, port):
     # 2) Send a message and display response
     message = "wsproto is great"
     print('Sending message: {}'.format(message))
-    ws.send(Message(data=message))
-    net_send_recv(ws, conn)
+    net_send(ws.send(Message(data=message)), conn)
+    net_recv(ws, conn)
     event = next(events)
     if isinstance(event, TextMessage):
         print('Received message: {}'.format(event.data))
@@ -83,8 +83,8 @@ def wsproto_demo(host, port):
     # 3) Send ping and display pong
     payload = b"table tennis"
     print('Sending ping: {}'.format(payload))
-    ws.send(Ping(payload=payload))
-    net_send_recv(ws, conn)
+    net_send(ws.send(Ping(payload=payload)), conn)
+    net_recv(ws, conn)
     event = next(events)
     if isinstance(event, Pong):
         print('Received pong: {}'.format(event.payload))
@@ -93,18 +93,17 @@ def wsproto_demo(host, port):
 
     # 4) Negotiate WebSocket closing handshake
     print('Closing WebSocket')
-    ws.send(CloseConnection(code=1000, reason='sample reason'))
+    net_send(ws.send(CloseConnection(code=1000, reason='sample reason')), conn)
     # After sending the closing frame, we won't get any more events. The server
     # should send a reply and then close the connection, so we need to receive
     # twice:
-    net_send_recv(ws, conn)
+    net_recv(ws, conn)
     conn.shutdown(socket.SHUT_WR)
     net_recv(ws, conn)
 
 
-def net_send(ws, conn):
+def net_send(out_data, conn):
     ''' Write pending data from websocket to network. '''
-    out_data = ws.bytes_to_send()
     print('Sending {} bytes'.format(len(out_data)))
     conn.send(out_data)
 
@@ -120,12 +119,6 @@ def net_recv(ws, conn):
     else:
         print('Received {} bytes'.format(len(in_data)))
         ws.receive_bytes(in_data)
-
-
-def net_send_recv(ws, conn):
-    ''' Send pending data and then wait for response. '''
-    net_send(ws, conn)
-    net_recv(ws, conn)
 
 
 if __name__ == '__main__':

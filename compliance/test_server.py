@@ -1,8 +1,8 @@
 import select
 import socket
 
-from wsproto.connection import WSConnection, SERVER
-from wsproto.events import AcceptConnection, CloseConnection, Message, Request
+from wsproto.connection import ConnectionState, WSConnection, SERVER
+from wsproto.events import AcceptConnection, CloseConnection, Message, Ping, Request
 from wsproto.extensions import PerMessageDeflate
 
 count = 0
@@ -21,20 +21,24 @@ def new_conn(sock):
 
         ws.receive_bytes(data or None)
 
+        outgoing_data = b""
         for event in ws.events():
             if isinstance(event, Request):
-                ws.send(AcceptConnection(extensions=[PerMessageDeflate()]))
+                outgoing_data += ws.send(AcceptConnection(extensions=[PerMessageDeflate()]))
             elif isinstance(event, Message):
-                ws.send(Message(data=event.data, message_finished=event.message_finished))
+                outgoing_data += ws.send(Message(data=event.data, message_finished=event.message_finished))
+            elif isinstance(event, Ping):
+                outgoing_data += ws.send(event.response())
             elif isinstance(event, CloseConnection):
                 closed = True
+                if ws.state is not ConnectionState.CLOSED:
+                    outgoing_data += ws.send(event.response())
 
         if not data:
             closed = True
 
         try:
-            data = ws.bytes_to_send()
-            sock.sendall(data)
+            sock.sendall(outgoing_data)
         except socket.error:
             closed = True
 

@@ -3,7 +3,7 @@ import socket
 
 from wsproto.compat import PY2
 from wsproto.connection import WSConnection, CLIENT
-from wsproto.events import AcceptConnection, CloseConnection, Request, TextMessage, Message
+from wsproto.events import AcceptConnection, CloseConnection, Ping, Request, TextMessage, Message
 from wsproto.extensions import PerMessageDeflate
 from wsproto.frame_protocol import CloseReason
 
@@ -23,25 +23,25 @@ else:
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')
     connection = WSConnection(CLIENT)
-    connection.send(Request(host=uri.netloc, target=uri.path))
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
-    sock.sendall(connection.bytes_to_send())
+    sock.sendall(connection.send(Request(host=uri.netloc, target=uri.path)))
 
     case_count = None
     while case_count is None:
         data = sock.recv(65535)
         connection.receive_bytes(data)
         data = ""
+        out_data = b""
         for event in connection.events():
             if isinstance(event, TextMessage):
                 data += event.data
                 if event.message_finished:
                     case_count = json.loads(data)
-                    connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+                    out_data += connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
             try:
-                sock.sendall(connection.bytes_to_send())
+                sock.sendall(out_data)
             except CONNECTION_EXCEPTIONS:
                 break
 
@@ -51,14 +51,15 @@ def get_case_count(server):
 def run_case(server, case, agent):
     uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
     connection = WSConnection(CLIENT)
-    connection.send(Request(
-        host=uri.netloc, target='%s?%s' % (uri.path, uri.query),
-        extensions=[PerMessageDeflate()],
-    ))
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
-    sock.sendall(connection.bytes_to_send())
+    sock.sendall(
+        connection.send(Request(
+            host=uri.netloc, target='%s?%s' % (uri.path, uri.query),
+            extensions=[PerMessageDeflate()],
+        ))
+    )
     closed = False
 
     while not closed:
@@ -67,18 +68,21 @@ def run_case(server, case, agent):
         except CONNECTION_EXCEPTIONS:
             data = None
         connection.receive_bytes(data or None)
+        out_data = b""
         for event in connection.events():
             if isinstance(event, Message):
-                connection.send(Message(data=event.data, message_finished=event.message_finished))
+                out_data += connection.send(Message(data=event.data, message_finished=event.message_finished))
+            elif isinstance(event, Ping):
+                out_data += connection.send(event.response())
             elif isinstance(event, CloseConnection):
                 closed = True
+                out_data += connection.send(event.response())
             # else:
             #     print("??", event)
-        if data is None:
+        if out_data is None:
             break
         try:
-            data = connection.bytes_to_send()
-            sock.sendall(data)
+            sock.sendall(out_data)
         except CONNECTION_EXCEPTIONS:
             closed = True
             break
@@ -86,11 +90,12 @@ def run_case(server, case, agent):
 def update_reports(server, agent):
     uri = urlparse(server + '/updateReports?agent=%s' % agent)
     connection = WSConnection(CLIENT)
-    connection.send(Request(host=uri.netloc, target='%s?%s' % (uri.path, uri.query)))
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
-    sock.sendall(connection.bytes_to_send())
+    sock.sendall(
+        connection.send(Request(host=uri.netloc, target='%s?%s' % (uri.path, uri.query)))
+    )
     closed = False
 
     while not closed:
@@ -98,8 +103,7 @@ def update_reports(server, agent):
         connection.receive_bytes(data)
         for event in connection.events():
             if isinstance(event, AcceptConnection):
-                connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
-                sock.sendall(connection.bytes_to_send())
+                sock.sendall(connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE)))
                 try:
                     sock.close()
                 except CONNECTION_EXCEPTIONS:

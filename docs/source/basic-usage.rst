@@ -36,16 +36,17 @@ code is like a sandwich around `wsproto`.
 | Network Layer      |
 +--------------------+
 
-`wsproto` does not do perform any network I/O, so ``<NETWORK GLUE>`` represents
-the code you need to write to glue `wsproto` to the actual network layer, i.e.
-code that can send and receive data over the network. The
-:class:`WSConnection <wsproto.connection.WSConnection>` class provides two
-methods for this purpose. When data has been received on a network socket, you
-feed this data into `wsproto` by calling :meth:`receive_bytes
-<wsproto.connection.WSConnection.receive_bytes>`. When `wsproto` has data that
-needs to be sent over the network, you retrieve that data by calling
-:meth:`bytes_to_send <wsproto.connection.WSConnection.bytes_to_send>`, and your
-code is responsible for actually sending that data over the network.
+`wsproto` does not do perform any network I/O, so ``<NETWORK GLUE>``
+represents the code you need to write to glue `wsproto` to the actual
+network layer, i.e.  code that can send and receive data over the
+network. The :class:`WSConnection <wsproto.connection.WSConnection>`
+class provides two methods for this purpose. When data has been
+received on a network socket, you feed this data into `wsproto` by
+calling :meth:`receive_bytes
+<wsproto.connection.WSConnection.receive_bytes>`. When `wsproto` sends
+events the :meth:`send <wsproto.connection.WSConnection.send>` will
+return the bytes that need to be sent over the network. Your code is
+responsible for actually sending that data over the network.
 
 .. note::
 
@@ -85,14 +86,10 @@ To read from the network::
     data = stream.recv(4096)
     ws.receive_bytes(data)
 
-You also need to check if `wsproto` has data to send to the network::
+You also need to send data returned by the send method::
 
-    data = ws.bytes_to_send()
+    data = ws.send(Message(data=b"Hello"))
     stream.send(data)
-
-Note that ``bytes_to_send()`` will return zero bytes if the protocol has no
-pending data. You can either poll this method or call it only when you expect
-to have pending data.
 
 A standard Python socket will block on the call to ``stream.recv()``, so you
 will probably need to use a non-blocking socket or some form of concurrency like

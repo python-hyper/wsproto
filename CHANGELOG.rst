@@ -2,14 +2,17 @@
 -----------------
 
 * Introduce a send method on the conenction which accepts the new
-  events. This requires the following usage changes,
+  events. This requires the following usage changes, ::
+
     connection.accept(subprotocol=subprotocol) -> connection.send(AcceptConnection(subprotocol=subprotocol))
     connection.send_data(data) -> connection.send(Message(payload=payload))
     connection.close(code) -> connection.send(CloseConnection(code=code))
     connection.ping() -> connection.send(Ping())
     connection.pong() -> connection.send(Pong())
+
 * The Event structure is altered to allow for events to be sent and
-  received, this requires the following name changes in existing code,
+  received, this requires the following name changes in existing code, ::
+
     ConnectionRequested -> Request
     ConnectionEstablished -> AcceptConnection
     ConnectionClosed -> CloseConnection
@@ -18,6 +21,7 @@
     BytesReceived -> BytesMessage
     PingReceived -> Ping
     PongReceived -> Pong
+
 * Introduce RejectConnection and RejectData events to be used by a
   server connection to reject rather than accept a connection or by a
   client connection to emit the rejection response. The RejectData
@@ -33,6 +37,14 @@
 * Enforce version checking in SERVER mode, only 13 is supported.
 * Add an event_hint to RemoteProtocolErrors to hint at how to respond
   to issues.
+* Switch from a ``bytes_to_send`` method to the ``send`` method
+  returning the bytes to send directly. Responses to Ping and Close
+  messages must now be sent (via ``send``), with the ``Ping`` and
+  ``CloseConnection`` events gaining a ``response`` method. This
+  allows ::
+
+    if isinstance(event, Ping):
+        bytes_to_send = connection.send(event.response())
 
 0.12.0 2018-09-23
 -----------------

@@ -180,6 +180,9 @@ class CloseConnection(Event):
     _fields = ["code", "reason"]
     _defaults = {"reason": None}
 
+    def response(self):
+        return CloseConnection(code=self.code, reason=self.reason)
+
 
 class Message(Event):
     """The websocket data message.
@@ -240,6 +243,9 @@ class Ping(Event):
 
     _fields = ["payload"]
     _defaults = {"payload": b""}
+
+    def response(self):
+        return Pong(payload=self.payload)
 
 
 class Pong(Event):
