@@ -1,8 +1,9 @@
 import pytest
 
 from wsproto.connection import CLIENT, ConnectionState, SERVER
-from wsproto.events import AcceptConnection, RejectConnection, Request
+from wsproto.events import AcceptConnection, Ping, RejectConnection, Request
 from wsproto.handshake import H11Handshake
+from wsproto.utilities import LocalProtocolError
 
 
 def test_successful_handshake():
@@ -31,3 +32,15 @@ def test_rejected_handshake():
 
     assert client.state is ConnectionState.CLOSED
     assert server.state is ConnectionState.CLOSED
+
+
+def test_initiate_upgrade_as_client():
+    client = H11Handshake(CLIENT)
+    with pytest.raises(LocalProtocolError):
+        client.initiate_upgrade_connection([], b"/")
+
+
+def test_send_invalid_event():
+    client = H11Handshake(CLIENT)
+    with pytest.raises(LocalProtocolError):
+        client.send(Ping())

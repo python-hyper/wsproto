@@ -150,3 +150,16 @@ def test_frame_protocol_gets_fed_garbage():
     event = next(client.events())
     assert isinstance(event, CloseConnection)
     assert event.code == CloseReason.PROTOCOL_ERROR
+
+
+def test_send_invalid_event():
+    client = Connection(CLIENT)
+    with pytest.raises(LocalProtocolError):
+        client.send(Request(target="/", host="wsproto"))
+
+
+def test_receive_data_when_closed():
+    client = Connection(CLIENT)
+    client._state = ConnectionState.CLOSED
+    with pytest.raises(LocalProtocolError):
+        client.receive_data(b"something")

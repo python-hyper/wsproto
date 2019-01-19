@@ -127,6 +127,35 @@ def test_connection_request_key_header():
     assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Key'"
 
 
+def test_upgrade_request():
+    server = WSConnection(SERVER)
+    server.initiate_upgrade_connection(
+        [
+            (b"Host", b"localhost"),
+            (b"Connection", b"Keep-Alive, Upgrade"),
+            (b"Upgrade", b"WebSocket"),
+            (b"Sec-WebSocket-Version", b"13"),
+            (b"Sec-WebSocket-Key", generate_nonce()),
+            (b"X-Foo", b"bar"),
+        ],
+        b"/",
+    )
+    event = next(server.events())
+
+    assert event.extensions == []
+    assert event.host == "localhost"
+    assert event.subprotocols == []
+    assert event.target == "/"
+    headers = normed_header_dict(event.extra_headers)
+    assert b"host" not in headers
+    assert b"sec-websocket-extensions" not in headers
+    assert b"sec-websocket-protocol" not in headers
+    assert headers[b"connection"] == b"Keep-Alive, Upgrade"
+    assert headers[b"sec-websocket-version"] == b"13"
+    assert headers[b"upgrade"] == b"WebSocket"
+    assert headers[b"x-foo"] == b"bar"
+
+
 def _make_handshake(
     request_headers, accept_headers=None, subprotocol=None, extensions=None
 ):

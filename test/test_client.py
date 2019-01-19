@@ -134,7 +134,15 @@ def test_handshake():
     events = _make_handshake(
         101, [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")]
     )
-    assert [AcceptConnection()]
+    assert events == [AcceptConnection()]
+
+
+def test_broken_handshake():
+    events = _make_handshake(
+        102, [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")]
+    )
+    assert isinstance(events[0], RejectConnection)
+    assert events[0].status_code == 102
 
 
 def test_handshake_extra_accept_headers():
@@ -142,7 +150,7 @@ def test_handshake_extra_accept_headers():
         101,
         [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket"), (b"X-Foo", b"bar")],
     )
-    assert [AcceptConnection(extra_headers=[(b"X-Foo", b"bar")])]
+    assert events == [AcceptConnection(extra_headers=[(b"x-foo", b"bar")])]
 
 
 @pytest.mark.parametrize("extra_headers", [[], [(b"connection", b"Keep-Alive")]])
