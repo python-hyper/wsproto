@@ -85,7 +85,7 @@ class TestPerMessageDeflate(object):
     @pytest.mark.parametrize("params", parameter_sets)
     def test_offer(self, params):
         ext = wpext.PerMessageDeflate(**params)
-        offer = ext.offer(None)
+        offer = ext.offer()
 
         self.compare_params_to_string(params, ext, offer)
 
@@ -102,7 +102,7 @@ class TestPerMessageDeflate(object):
             if params["server_max_window_bits"] is None:
                 del params["server_max_window_bits"]
         offer = self.make_offer_string(params)
-        ext.finalize(None, offer)
+        ext.finalize(offer)
 
         if params.get("client_max_window_bits", None):
             assert ext.client_max_window_bits == params["client_max_window_bits"]
@@ -121,7 +121,7 @@ class TestPerMessageDeflate(object):
         ext = wpext.PerMessageDeflate()
         assert not ext.enabled()
 
-        ext.finalize(None, "i am the lizard queen; worship me")
+        ext.finalize("i am the lizard queen; worship me")
 
         assert ext.enabled()
 
@@ -131,7 +131,7 @@ class TestPerMessageDeflate(object):
         assert not ext.enabled()
 
         offer = self.make_offer_string(params)
-        response = ext.accept(None, offer)
+        response = ext.accept(offer)
 
         if ext.client_no_context_takeover:
             assert "client_no_context_takeover" in response
@@ -156,7 +156,7 @@ class TestPerMessageDeflate(object):
         ext = wpext.PerMessageDeflate()
         assert not ext.enabled()
 
-        ext.accept(None, "i am the lizard queen; worship me")
+        ext.accept("i am the lizard queen; worship me")
 
         assert ext.enabled()
 

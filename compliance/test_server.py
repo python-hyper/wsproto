@@ -1,7 +1,8 @@
 import select
 import socket
 
-from wsproto.connection import ConnectionState, WSConnection, SERVER
+from wsproto import WSConnection
+from wsproto.connection import ConnectionState, SERVER
 from wsproto.events import AcceptConnection, CloseConnection, Message, Ping, Request
 from wsproto.extensions import PerMessageDeflate
 
@@ -19,7 +20,7 @@ def new_conn(sock):
         except socket.error:
             data = None
 
-        ws.receive_bytes(data or None)
+        ws.receive_data(data or None)
 
         outgoing_data = b""
         for event in ws.events():

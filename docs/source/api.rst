@@ -15,8 +15,16 @@ subject to change at any time.
 Connection
 ----------
 
-.. autoclass:: wsproto.connection.WSConnection
+.. autoclass:: wsproto.WSConnection
    :members:
+
+Handshake
+---------
+
+.. autoclass:: wsproto.handshake.H11Handshake
+   :members:
+
+.. autofunction:: wsproto.handshake.handshake_extensions
 
 Events
 ------

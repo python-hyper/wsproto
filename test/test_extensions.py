@@ -9,15 +9,15 @@ class TestExtension(object):
 
     def test_offer(self):
         ext = wpext.Extension()
-        assert ext.offer(None) is None
+        assert ext.offer() is None
 
     def test_accept(self):
         ext = wpext.Extension()
-        assert ext.accept(None, None) is None
+        assert ext.accept(None) is None
 
     def test_finalize(self):
         ext = wpext.Extension()
-        assert ext.finalize(None, None) is None
+        assert ext.finalize(None) is None
 
     def test_frame_inbound_header(self):
         ext = wpext.Extension()

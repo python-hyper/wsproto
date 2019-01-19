@@ -9,32 +9,9 @@ An implementation of a WebSocket connection.
 from collections import deque
 from enum import Enum
 
-import h11
-
-from .events import (
-    AcceptConnection,
-    BytesMessage,
-    CloseConnection,
-    Message,
-    Ping,
-    Pong,
-    RejectConnection,
-    RejectData,
-    Request,
-    TextMessage,
-)
+from .events import BytesMessage, CloseConnection, Message, Ping, Pong, TextMessage
 from .frame_protocol import CloseReason, FrameProtocol, Opcode, ParseFailed
-from .utilities import (
-    generate_accept_token,
-    generate_nonce,
-    LocalProtocolError,
-    normed_header_dict,
-    RemoteProtocolError,
-    split_comma_header,
-)
-
-# RFC6455, Section 4.2.1/6 - Reading the Client's Opening Handshake
-WEBSOCKET_VERSION = b"13"
+from .utilities import LocalProtocolError
 
 
 class ConnectionState(Enum):
@@ -62,7 +39,7 @@ CLIENT = ConnectionType.CLIENT
 SERVER = ConnectionType.SERVER
 
 
-class WSConnection(object):
+class Connection(object):
     """
     A low-level WebSocket connection object.
 
@@ -76,42 +53,23 @@ class WSConnection(object):
     :type conn_type: ``ConnectionType``
     """
 
-    def __init__(self, conn_type):
-        self.client = conn_type is ConnectionType.CLIENT
-
-        self._state = ConnectionState.CONNECTING
-        self._close_reason = None
-
-        self._nonce = None
+    def __init__(self, connection_type, extensions=None, trailing_data=b""):
+        # type: (bool, Optional[List[Extension]], bytes) -> None
+        self.client = connection_type is ConnectionType.CLIENT
         self._events = deque()
-        self._proto = None
+        self._proto = FrameProtocol(self.client, extensions or [])
+        self._state = ConnectionState.OPEN
+        self.receive_data(trailing_data)
 
-        if self.client:
-            self._upgrade_connection = h11.Connection(h11.CLIENT)
-        else:
-            self._upgrade_connection = h11.Connection(h11.SERVER)
-
-        # The request that initiated the websocket connection
-        self._initiating_request = None  # type: Optional[Request]
-
-    def initiate_upgrade_connection(self, headers, path):
-        # type: (List[Tuple[bytes, bytes]], str) -> None
-        upgrade_request = h11.Request(method=b"GET", target=path, headers=headers)
-        h11_client = h11.Connection(h11.CLIENT)
-        self.receive_bytes(h11_client.send(upgrade_request))
+    @property
+    def state(self):
+        # type: () -> ConnectionState
+        return self._state
 
     def send(self, event):
         # type: (wsproto.events.Event) -> bytes:
         data = b""
-        if isinstance(event, Request):
-            data += self._initiate_connection(event)
-        elif isinstance(event, AcceptConnection):
-            data += self._accept(event)
-        elif isinstance(event, RejectConnection):
-            data += self._reject(event)
-        elif isinstance(event, RejectData):
-            data += self._send_reject_data(event)
-        elif isinstance(event, Message):
+        if isinstance(event, Message):
             data += self._proto.send_data(event.data, event.message_finished)
         elif isinstance(event, Ping):
             data += self._proto.ping(event.payload)
@@ -127,117 +85,17 @@ class WSConnection(object):
                 self._state = ConnectionState.CLOSED
             else:
                 self._state = ConnectionState.LOCAL_CLOSING
+        else:
+            raise LocalProtocolError("Event {} cannot be sent.".format(event))
         return data
 
-    def _initiate_connection(self, request):
-        # type: (Request) -> bytes
-        self._initiating_request = request
-        self._nonce = generate_nonce()
-
-        headers = [
-            (b"Host", request.host.encode("ascii")),
-            (b"Upgrade", b"WebSocket"),
-            (b"Connection", b"Upgrade"),
-            (b"Sec-WebSocket-Key", self._nonce),
-            (b"Sec-WebSocket-Version", WEBSOCKET_VERSION),
-        ]
-
-        if request.subprotocols:
-            headers.append((b"Sec-WebSocket-Protocol", ", ".join(request.subprotocols)))
-
-        if request.extensions:
-            offers = {e.name: e.offer(self) for e in request.extensions}
-            extensions = []
-            for name, params in offers.items():
-                if params is True:
-                    extensions.append(name.encode("ascii"))
-                elif params:
-                    # py34 annoyance: doesn't support bytestring formatting
-                    extensions.append(("%s; %s" % (name, params)).encode("ascii"))
-            if extensions:
-                headers.append((b"Sec-WebSocket-Extensions", b", ".join(extensions)))
-
-        upgrade = h11.Request(
-            method=b"GET",
-            target=request.target.encode("ascii"),
-            headers=headers + request.extra_headers,
-        )
-        return self._upgrade_connection.send(upgrade)
-
-    def _accept(self, event):
-        # type: (AcceptConnection) -> None
-        request_headers = normed_header_dict(self._initiating_request.extra_headers)
-
-        nonce = request_headers[b"sec-websocket-key"]
-        accept_token = generate_accept_token(nonce)
-
-        headers = [
-            (b"Upgrade", b"WebSocket"),
-            (b"Connection", b"Upgrade"),
-            (b"Sec-WebSocket-Accept", accept_token),
-        ]
-
-        if event.subprotocol is not None:
-            if event.subprotocol not in self._initiating_request.subprotocols:
-                raise LocalProtocolError(
-                    "unexpected subprotocol {}".format(event.subprotocol)
-                )
-            headers.append((b"Sec-WebSocket-Protocol", event.subprotocol))
-
-        if event.extensions:
-            accepts = self._extension_accept(event.extensions)
-            if accepts:
-                headers.append((b"Sec-WebSocket-Extensions", accepts))
-
-        response = h11.InformationalResponse(
-            status_code=101, headers=headers + event.extra_headers
-        )
-        self._proto = FrameProtocol(self.client, event.extensions)
-        self._state = ConnectionState.OPEN
-        return self._upgrade_connection.send(response)
-
-    def _reject(self, event):
-        # type: (RejectConnection) -> bytes:
-        if self.state != ConnectionState.CONNECTING:
-            raise LocalProtocolError(
-                "Connection cannot be rejected in state %s" % self.state
-            )
-
-        headers = event.headers
-        if not event.has_body:
-            headers.append(("content-length", "0"))
-        response = h11.Response(status_code=event.status_code, headers=headers)
-        data = self._upgrade_connection.send(response)
-        self._state = ConnectionState.REJECTING
-        if not event.has_body:
-            data += self._upgrade_connection.send(h11.EndOfMessage())
-            self._state = ConnectionState.CLOSED
-        return data
-
-    def _send_reject_data(self, event):
-        # type: (RejectData) -> bytes:
-        if self.state != ConnectionState.REJECTING:
-            raise LocalProtocolError(
-                "Cannot send rejection data in state %s" % self.state
-            )
-
-        data = self._upgrade_connection.send(h11.Data(data=event.data))
-        if event.body_finished:
-            data += self._upgrade_connection.send(h11.EndOfMessage())
-            self._state = ConnectionState.CLOSED
-        return data
-
-    @property
-    def state(self):
-        # type: () -> ConnectionState
-        return self._state
-
-    def receive_bytes(self, data):
+    def receive_data(self, data):
+        # type: (bytes) -> None
         """
         Pass some received data to the connection for handling.
 
         A list of events that the remote peer triggered by sending this data can
-        be retrieved with :meth:`~wsproto.connection.WSConnection.events`.
+        be retrieved with :meth:`~wsproto.connection.Connection.events`.
 
         :param data: The data received from the remote peer on the network.
         :type data: ``bytes``
@@ -252,29 +110,21 @@ class WSConnection(object):
             self._state = ConnectionState.CLOSED
             return
 
-        if self.state in {ConnectionState.CONNECTING, ConnectionState.REJECTING}:
-            event, data = self._process_upgrade(data)
-            if event is not None:
-                self._events.append(event)
-
         if self.state in (ConnectionState.OPEN, ConnectionState.LOCAL_CLOSING):
             self._proto.receive_bytes(data)
         elif self.state is ConnectionState.CLOSED:
             raise LocalProtocolError("Connection already closed.")
 
     def events(self):
+        # type: () -> Generator[Event, None, None]
         """
         Return a generator that provides any events that have been generated
         by protocol activity.
 
         :returns: generator of :class:`Event <wsproto.events.Event>` subclasses
         """
-
         while self._events:
             yield self._events.popleft()
-
-        if self._proto is None:
-            return
 
         try:
             for frame in self._proto.received_frames():
@@ -309,209 +159,3 @@ class WSConnection(object):
                     )
         except ParseFailed as exc:
             yield CloseConnection(code=exc.code, reason=str(exc))
-
-    def _process_upgrade(self, data):
-        self._upgrade_connection.receive_data(data)
-        while True:
-            try:
-                event = self._upgrade_connection.next_event()
-            except h11.RemoteProtocolError:
-                raise RemoteProtocolError(
-                    "Bad HTTP message", event_hint=RejectConnection()
-                )
-            if event is h11.NEED_DATA:
-                break
-            elif self.client and isinstance(
-                event, (h11.InformationalResponse, h11.Response)
-            ):
-                if event.status_code == 101:
-                    data = self._upgrade_connection.trailing_data[0]
-                    return self._establish_client_connection(event), data
-
-                self._state = ConnectionState.REJECTING
-                return (
-                    RejectConnection(
-                        headers=event.headers,
-                        status_code=event.status_code,
-                        has_body=False,
-                    ),
-                    None,
-                )
-            elif self.client and isinstance(event, h11.Data):
-                return RejectData(data=event.data, body_finished=False), None
-            elif self.client and isinstance(event, h11.EndOfMessage):
-                return RejectData(data=b"", body_finished=True), None
-            elif not self.client and isinstance(event, h11.Request):
-                return self._process_connection_request(event), None
-            else:
-                raise RemoteProtocolError(
-                    "Bad HTTP message", event_hint=RejectConnection()
-                )
-
-        self._incoming = b""
-        return None, None
-
-    def _establish_client_connection(self, event):  # noqa: MC0001
-        accept = None
-        connection_tokens = None
-        accepts = []
-        subprotocol = None
-        upgrade = b""
-        headers = []
-        for name, value in event.headers:
-            name = name.lower()
-            if name == b"connection":
-                connection_tokens = split_comma_header(value)
-                continue  # Skip appending to headers
-            elif name == b"sec-websocket-extensions":
-                accepts = split_comma_header(value)
-                continue  # Skip appending to headers
-            elif name == b"sec-websocket-accept":
-                accept = value
-                continue  # Skip appending to headers
-            elif name == b"sec-websocket-protocol":
-                subprotocol = value
-                continue  # Skip appending to headers
-            elif name == b"upgrade":
-                upgrade = value
-                continue  # Skip appending to headers
-            headers.append((name, value))
-
-        if connection_tokens is None or not any(
-            token.lower() == "upgrade" for token in connection_tokens
-        ):
-            raise RemoteProtocolError(
-                "Missing header, 'Connection: Upgrade'", event_hint=RejectConnection()
-            )
-        if upgrade.lower() != b"websocket":
-            raise RemoteProtocolError(
-                "Missing header, 'Upgrade: WebSocket'", event_hint=RejectConnection()
-            )
-        accept_token = generate_accept_token(self._nonce)
-        if accept != accept_token:
-            raise RemoteProtocolError("Bad accept token", event_hint=RejectConnection())
-        if subprotocol is not None:
-            subprotocol = subprotocol.decode("ascii")
-            if subprotocol not in self._initiating_request.subprotocols:
-                raise RemoteProtocolError(
-                    "unrecognized subprotocol {}".format(subprotocol),
-                    event_hint=RejectConnection(),
-                )
-        extensions = []
-        if accepts:
-            for accept in accepts:
-                name = accept.split(";", 1)[0].strip()
-                for extension in self._initiating_request.extensions:
-                    if extension.name == name:
-                        extension.finalize(self, accept)
-                        extensions.append(extension)
-                        break
-                else:
-                    raise RemoteProtocolError(
-                        "unrecognized extension {}".format(name),
-                        event_hint=RejectConnection(),
-                    )
-
-        self._proto = FrameProtocol(self.client, self._initiating_request.extensions)
-        self._state = ConnectionState.OPEN
-        return AcceptConnection(
-            extensions=extensions, extra_headers=headers, subprotocol=subprotocol
-        )
-
-    def _process_connection_request(self, event):
-        if event.method != b"GET":
-            raise RemoteProtocolError(
-                "Request method must be GET", event_hint=RejectConnection()
-            )
-        connection_tokens = None
-        extensions = []
-        host = None
-        key = None
-        subprotocols = []
-        upgrade = b""
-        version = None
-        headers = []
-        for name, value in event.headers:
-            name = name.lower()
-            if name == b"connection":
-                connection_tokens = split_comma_header(value)
-            elif name == b"host":
-                host = value.decode("ascii")
-                continue  # Skip appending to headers
-            elif name == b"sec-websocket-extensions":
-                extensions = split_comma_header(value)
-                continue  # Skip appending to headers
-            elif name == b"sec-websocket-key":
-                key = value
-            elif name == b"sec-websocket-protocol":
-                subprotocols = split_comma_header(value)
-                continue  # Skip appending to headers
-            elif name == b"sec-websocket-version":
-                version = value
-            elif name == b"upgrade":
-                upgrade = value
-            headers.append((name, value))
-        if connection_tokens is None or not any(
-            token.lower() == "upgrade" for token in connection_tokens
-        ):
-            raise RemoteProtocolError(
-                "Missing header, 'Connection: Upgrade'", event_hint=RejectConnection()
-            )
-        if version != WEBSOCKET_VERSION:
-            raise RemoteProtocolError(
-                "Missing header, 'Sec-WebSocket-Version'",
-                event_hint=RejectConnection(
-                    headers=[(b"Sec-WebSocket-Version", WEBSOCKET_VERSION)],
-                    status_code=426,
-                ),
-            )
-        if key is None:
-            raise RemoteProtocolError(
-                "Missing header, 'Sec-WebSocket-Key'", event_hint=RejectConnection()
-            )
-        if upgrade.lower() != b"websocket":
-            raise RemoteProtocolError(
-                "Missing header, 'Upgrade: WebSocket'", event_hint=RejectConnection()
-            )
-        if version is None:
-            raise RemoteProtocolError(
-                "Missing header, 'Sec-WebSocket-Version'", event_hint=RejectConnection()
-            )
-
-        self._initiating_request = Request(
-            extensions=extensions,
-            extra_headers=headers,
-            host=host,
-            subprotocols=subprotocols,
-            target=event.target.decode("ascii"),
-        )
-        return self._initiating_request
-
-    def _extension_accept(self, supported):
-        accepts = {}
-
-        for offer in self._initiating_request.extensions:
-            name = offer.split(";", 1)[0].strip()
-            for extension in supported:
-                if extension.name == name:
-                    accept = extension.accept(self, offer)
-                    if accept is True:
-                        accepts[extension.name] = True
-                    elif accept is not False and accept is not None:
-                        accepts[extension.name] = accept.encode("ascii")
-
-        if accepts:
-            extensions = []
-            for name, params in accepts.items():
-                if params is True:
-                    extensions.append(name.encode("ascii"))
-                else:
-                    # py34 annoyance: doesn't support bytestring formatting
-                    params = params.decode("ascii")
-                    if params == "":
-                        extensions.append(("%s" % (name)).encode("ascii"))
-                    else:
-                        extensions.append(("%s; %s" % (name, params)).encode("ascii"))
-            return b", ".join(extensions)
-
-        return None

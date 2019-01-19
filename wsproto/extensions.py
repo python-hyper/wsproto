@@ -17,13 +17,13 @@ class Extension(object):
     def enabled(self):
         return False
 
-    def offer(self, connection):
+    def offer(self):
         pass
 
-    def accept(self, connection, offer):
+    def accept(self, offer):
         pass
 
-    def finalize(self, connection, offer):
+    def finalize(self, offer):
         pass
 
     def frame_inbound_header(self, proto, opcode, rsv, payload_length):
@@ -78,7 +78,7 @@ class PerMessageDeflate(Extension):
     def enabled(self):
         return self._enabled
 
-    def offer(self, connection):
+    def offer(self):
         parameters = [
             "client_max_window_bits=%d" % self.client_max_window_bits,
             "server_max_window_bits=%d" % self.server_max_window_bits,
@@ -91,7 +91,7 @@ class PerMessageDeflate(Extension):
 
         return "; ".join(parameters)
 
-    def finalize(self, connection, offer):
+    def finalize(self, offer):
         bits = [b.strip() for b in offer.split(";")]
         for bit in bits[1:]:
             if bit.startswith("client_no_context_takeover"):
@@ -128,7 +128,7 @@ class PerMessageDeflate(Extension):
 
         return client_max_window_bits, server_max_window_bits
 
-    def accept(self, connection, offer):
+    def accept(self, offer):
         client_max_window_bits, server_max_window_bits = self._parse_params(offer)
 
         self._enabled = True
