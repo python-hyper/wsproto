@@ -399,8 +399,8 @@ class H11Handshake(object):
         self._connection = Connection(
             ConnectionType.CLIENT if self.client else ConnectionType.SERVER,
             self._initiating_request.extensions,
-            self._h11_connection.trailing_data[0],
         )
+        self._connection.receive_data(self._h11_connection.trailing_data[0])
         self._state = ConnectionState.OPEN
         return AcceptConnection(
             extensions=extensions, extra_headers=headers, subprotocol=subprotocol

@@ -5,6 +5,7 @@ from wsproto import WSConnection
 from wsproto.connection import ConnectionState, SERVER
 from wsproto.events import AcceptConnection, CloseConnection, Message, Ping, Request
 from wsproto.extensions import PerMessageDeflate
+from wsproto.utilities import RemoteProtocolError
 
 count = 0
 
@@ -20,20 +21,24 @@ def new_conn(sock):
         except socket.error:
             data = None
 
-        ws.receive_data(data or None)
-
         outgoing_data = b""
-        for event in ws.events():
-            if isinstance(event, Request):
-                outgoing_data += ws.send(AcceptConnection(extensions=[PerMessageDeflate()]))
-            elif isinstance(event, Message):
-                outgoing_data += ws.send(Message(data=event.data, message_finished=event.message_finished))
-            elif isinstance(event, Ping):
-                outgoing_data += ws.send(event.response())
-            elif isinstance(event, CloseConnection):
-                closed = True
-                if ws.state is not ConnectionState.CLOSED:
+        try:
+            ws.receive_data(data or None)
+        except RemoteProtocolError as error:
+            outgoing_data = ws.send(error.event_hint)
+            closed = True
+        else:
+            for event in ws.events():
+                if isinstance(event, Request):
+                    outgoing_data += ws.send(AcceptConnection(extensions=[PerMessageDeflate()]))
+                elif isinstance(event, Message):
+                    outgoing_data += ws.send(Message(data=event.data, message_finished=event.message_finished))
+                elif isinstance(event, Ping):
                     outgoing_data += ws.send(event.response())
+                elif isinstance(event, CloseConnection):
+                    closed = True
+                    if ws.state is not ConnectionState.CLOSED:
+                        outgoing_data += ws.send(event.response())
 
         if not data:
             closed = True

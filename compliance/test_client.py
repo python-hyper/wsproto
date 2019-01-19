@@ -7,6 +7,7 @@ from wsproto.connection import CLIENT
 from wsproto.events import AcceptConnection, CloseConnection, Ping, Request, TextMessage, Message
 from wsproto.extensions import PerMessageDeflate
 from wsproto.frame_protocol import CloseReason
+from wsproto.utilities import RemoteProtocolError
 
 if PY2:
     from urlparse import urlparse
@@ -32,19 +33,23 @@ def get_case_count(server):
     case_count = None
     while case_count is None:
         data = sock.recv(65535)
-        connection.receive_data(data)
-        data = ""
         out_data = b""
-        for event in connection.events():
-            if isinstance(event, TextMessage):
-                data += event.data
-                if event.message_finished:
-                    case_count = json.loads(data)
-                    out_data += connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
-            try:
-                sock.sendall(out_data)
-            except CONNECTION_EXCEPTIONS:
-                break
+        try:
+            connection.receive_data(data)
+        except RemoteProtocolError as error:
+            out_data = connection.send(error.event_hint)
+        else:
+            data = ""
+            for event in connection.events():
+                if isinstance(event, TextMessage):
+                    data += event.data
+                    if event.message_finished:
+                        case_count = json.loads(data)
+                        out_data += connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+        try:
+            sock.sendall(out_data)
+        except CONNECTION_EXCEPTIONS:
+            break
 
     sock.close()
     return case_count
@@ -64,22 +69,27 @@ def run_case(server, case, agent):
     closed = False
 
     while not closed:
+        out_data = b""
         try:
             data = sock.recv(65535)
         except CONNECTION_EXCEPTIONS:
             data = None
-        connection.receive_data(data or None)
-        out_data = b""
-        for event in connection.events():
-            if isinstance(event, Message):
-                out_data += connection.send(Message(data=event.data, message_finished=event.message_finished))
-            elif isinstance(event, Ping):
-                out_data += connection.send(event.response())
-            elif isinstance(event, CloseConnection):
-                closed = True
-                out_data += connection.send(event.response())
-            # else:
-            #     print("??", event)
+        try:
+            connection.receive_data(data or None)
+        except RemoteProtocolError as error:
+            out_data = connection.send(error.event_hint)
+            closed = True
+        else:
+            for event in connection.events():
+                if isinstance(event, Message):
+                    out_data += connection.send(Message(data=event.data, message_finished=event.message_finished))
+                elif isinstance(event, Ping):
+                    out_data += connection.send(event.response())
+                elif isinstance(event, CloseConnection):
+                    closed = True
+                    out_data += connection.send(event.response())
+                # else:
+                #     print("??", event)
         if out_data is None:
             break
         try:
@@ -101,16 +111,20 @@ def update_reports(server, agent):
 
     while not closed:
         data = sock.recv(65535)
-        connection.receive_data(data)
-        for event in connection.events():
-            if isinstance(event, AcceptConnection):
-                sock.sendall(connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE)))
-                try:
-                    sock.close()
-                except CONNECTION_EXCEPTIONS:
-                    pass
-                finally:
-                    closed = True
+        try:
+            connection.receive_data(data)
+        except RemoteProtocolError as error:
+            closed = True
+        else:
+            for event in connection.events():
+                if isinstance(event, AcceptConnection):
+                    sock.sendall(connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE)))
+                    try:
+                        sock.close()
+                    except CONNECTION_EXCEPTIONS:
+                        pass
+                    finally:
+                        closed = True
 
 CASE = None
 # 1.1.1 = 1

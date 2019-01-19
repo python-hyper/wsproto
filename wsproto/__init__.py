@@ -16,7 +16,6 @@ class WSConnection(object):
         # type: (ConnectionType) -> None:
         self.client = connection_type is ConnectionType.CLIENT
         self.handshake = H11Handshake(connection_type)
-        self.connection = None
 
     @property
     def state(self):
@@ -24,6 +23,10 @@ class WSConnection(object):
             return self.handshake.state
         else:
             return self.connection.state
+
+    @property
+    def connection(self):
+        return self.handshake.connection
 
     def initiate_upgrade_connection(self, headers, path):
         # type: (List[Tuple[bytes, bytes]], str) -> None
@@ -33,7 +36,6 @@ class WSConnection(object):
         data = b""
         if self.connection is None:
             data += self.handshake.send(event)
-            self.connection = self.handshake.connection
         else:
             data += self.connection.send(event)
         return data
@@ -41,7 +43,6 @@ class WSConnection(object):
     def receive_data(self, data):
         if self.connection is None:
             self.handshake.receive_data(data)
-            self.connection = self.handshake.connection
         else:
             self.connection.receive_data(data)
 

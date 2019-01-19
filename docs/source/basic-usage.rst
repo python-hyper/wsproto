@@ -185,6 +185,18 @@ are in error whereas a :class:`RemoteProtocolError
 <wsproto.utilities.RemoteProtocolError>` is raised if the remote
 actions are in error.
 
+``RemoteProtocolError`` occur when receiving data and have an
+``event_hint`` attribute suggesting how to respond. This pattern is
+therefore useful,
+
+.. code-block:: python
+
+    data = conn.recv(4096)
+    try:
+        ws.receive_data(data)
+    except RemoteProtocolError as error:
+        conn.send(ws.send(error.event_hint))
+
 Closing
 -------
 

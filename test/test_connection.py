@@ -16,7 +16,7 @@ from wsproto.events import (
     TextMessage,
 )
 from wsproto.frame_protocol import CloseReason, FrameProtocol
-from wsproto.utilities import LocalProtocolError
+from wsproto.utilities import LocalProtocolError, RemoteProtocolError
 
 
 @pytest.mark.parametrize("client_sends", [True, False])
@@ -146,8 +146,10 @@ def test_frame_protocol_gets_fed_garbage():
     payload = b"x" * 23
     frame = b"\x09" + bytearray([len(payload)]) + payload
 
-    client.receive_data(frame)
-    event = next(client.events())
+    with pytest.raises(RemoteProtocolError) as exc_info:
+        client.receive_data(frame)
+
+    event = exc_info.value.event_hint
     assert isinstance(event, CloseConnection)
     assert event.code == CloseReason.PROTOCOL_ERROR
 

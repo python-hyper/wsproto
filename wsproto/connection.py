@@ -11,7 +11,7 @@ from enum import Enum
 
 from .events import BytesMessage, CloseConnection, Message, Ping, Pong, TextMessage
 from .frame_protocol import CloseReason, FrameProtocol, Opcode, ParseFailed
-from .utilities import LocalProtocolError
+from .utilities import LocalProtocolError, RemoteProtocolError
 
 
 class ConnectionState(Enum):
@@ -53,13 +53,12 @@ class Connection(object):
     :type conn_type: ``ConnectionType``
     """
 
-    def __init__(self, connection_type, extensions=None, trailing_data=b""):
+    def __init__(self, connection_type, extensions=None):
         # type: (bool, Optional[List[Extension]], bytes) -> None
         self.client = connection_type is ConnectionType.CLIENT
         self._events = deque()
         self._proto = FrameProtocol(self.client, extensions or [])
         self._state = ConnectionState.OPEN
-        self.receive_data(trailing_data)
 
     @property
     def state(self):
@@ -112,6 +111,41 @@ class Connection(object):
 
         if self.state in (ConnectionState.OPEN, ConnectionState.LOCAL_CLOSING):
             self._proto.receive_bytes(data)
+            try:
+                for frame in self._proto.received_frames():
+                    if frame.opcode is Opcode.PING:
+                        assert frame.frame_finished and frame.message_finished
+                        self._events.append(Ping(payload=frame.payload))
+                    elif frame.opcode is Opcode.PONG:
+                        assert frame.frame_finished and frame.message_finished
+                        self._events.append(Pong(payload=frame.payload))
+                    elif frame.opcode is Opcode.CLOSE:
+                        code, reason = frame.payload
+                        if self.state is ConnectionState.LOCAL_CLOSING:
+                            self._state = ConnectionState.CLOSED
+                        else:
+                            self._state = ConnectionState.REMOTE_CLOSING
+                        self._events.append(CloseConnection(code=code, reason=reason))
+                    elif frame.opcode is Opcode.TEXT:
+                        self._events.append(
+                            TextMessage(
+                                data=frame.payload,
+                                frame_finished=frame.frame_finished,
+                                message_finished=frame.message_finished,
+                            )
+                        )
+                    elif frame.opcode is Opcode.BINARY:
+                        self._events.append(
+                            BytesMessage(
+                                data=frame.payload,
+                                frame_finished=frame.frame_finished,
+                                message_finished=frame.message_finished,
+                            )
+                        )
+            except ParseFailed as exc:
+                raise RemoteProtocolError(
+                    str(exc), event_hint=CloseConnection(code=exc.code, reason=str(exc))
+                )
         elif self.state is ConnectionState.CLOSED:
             raise LocalProtocolError("Connection already closed.")
 
@@ -125,37 +159,3 @@ class Connection(object):
         """
         while self._events:
             yield self._events.popleft()
-
-        try:
-            for frame in self._proto.received_frames():
-                if frame.opcode is Opcode.PING:
-                    assert frame.frame_finished and frame.message_finished
-                    yield Ping(payload=frame.payload)
-
-                elif frame.opcode is Opcode.PONG:
-                    assert frame.frame_finished and frame.message_finished
-                    yield Pong(payload=frame.payload)
-
-                elif frame.opcode is Opcode.CLOSE:
-                    code, reason = frame.payload
-                    if self.state is ConnectionState.LOCAL_CLOSING:
-                        self._state = ConnectionState.CLOSED
-                    else:
-                        self._state = ConnectionState.REMOTE_CLOSING
-                    yield CloseConnection(code=code, reason=reason)
-
-                elif frame.opcode is Opcode.TEXT:
-                    yield TextMessage(
-                        data=frame.payload,
-                        frame_finished=frame.frame_finished,
-                        message_finished=frame.message_finished,
-                    )
-
-                elif frame.opcode is Opcode.BINARY:
-                    yield BytesMessage(
-                        data=frame.payload,
-                        frame_finished=frame.frame_finished,
-                        message_finished=frame.message_finished,
-                    )
-        except ParseFailed as exc:
-            yield CloseConnection(code=exc.code, reason=str(exc))
