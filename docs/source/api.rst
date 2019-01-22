@@ -24,7 +24,9 @@ Handshake
 .. autoclass:: wsproto.handshake.H11Handshake
    :members:
 
-.. autofunction:: wsproto.handshake.handshake_extensions
+.. autofunction:: wsproto.handshake.client_extensions_handshake
+
+.. autofunction:: wsproto.handshake.server_extensions_handshake
 
 Events
 ------

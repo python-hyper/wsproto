@@ -69,3 +69,56 @@ directly.
 
     for event in connection.events():
         # As with WSConnection, only without any handshake events
+
+HTTP/2
+------
+
+WebSockets over HTTP/2 have a distinct difference to HTTP/1 in that
+only a single HTTP/2 stream is dedicated to the WebSocket rather than
+the entire connection (as in HTTP/1). This requires the HTTP/2
+connection to be managed before the WebSocket connection with
+`Hyper-h2 <https://python-hyper.org/h2>`_ being recommended for
+HTTP/2.
+
+Although `wsproto` doesn't manage the HTTP/2 connection it can still
+be used for the WebSocket stream. The HTTP/2 connection will need to
+handshake the WebSocket stream, with the key being agreement on the
+extensions used. Once the extensions have been agreed the
+:class:`Connection <wsproto.connection.Connection>` class can be used
+to manage the WebSocket connection, noting that data to be sent or
+received will need to be parsed by the HTTP/2 connection first. In
+practice for a server this looks like,
+
+.. code-block:: python
+
+     from wsproto.connection import Connection, ConnectionType
+     from wsproto.extensions import PerMessageDeflate
+     from wsproto.handshake import server_extensions_handshake
+
+     # WebSocket request has been received
+     request_extensions: List[str]
+     supported_extensions = [PerMessageDeflate()]
+     accepts = server_extensions_handshake(request_extensions, supported_extensions)
+     if accepts:
+         response_headers.append({"sec-websocket-extensions": accepts})
+     # Send the response headers
+     connection = Connection(ConnectionType.SERVER, supported_extensions)
+
+and for a client
+
+.. code-block:: python
+
+    from wsproto.connection import Connection, ConnectionType
+    from wsproto.extensions import PerMessageDeflate
+    from wsproto.handshake import client_extensions_handshake
+
+    # WebSocket response has been received
+    accepted_extensions: List[str]
+    proposed_extensions = [PerMessageDeflate()]
+    extensions = client_extensions_handshake(accepted_extensions, proposed_extensions)
+    connection = Connection(ConnectionType.CLIENT, supported_extensions)
+
+any data received on the stream should be passed to the ``connection``
+via the ``receive_bytes`` method and bytes returned from the
+``connection.send`` method should be wrapped in a HTTP/2 data frame
+and sent.

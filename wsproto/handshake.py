@@ -253,7 +253,7 @@ class H11Handshake(object):
             )
 
         if event.extensions:
-            accepts = handshake_extensions(
+            accepts = server_extensions_handshake(
                 self._initiating_request.extensions, event.extensions
             )
             if accepts:
@@ -388,24 +388,13 @@ class H11Handshake(object):
                     "unrecognized subprotocol {}".format(subprotocol),
                     event_hint=RejectConnection(),
                 )
-        extensions = []
-        if accepts:
-            for accept in accepts:
-                name = accept.split(";", 1)[0].strip()
-                for extension in self._initiating_request.extensions:
-                    if extension.name == name:
-                        extension.finalize(accept)
-                        extensions.append(extension)
-                        break
-                else:
-                    raise RemoteProtocolError(
-                        "unrecognized extension {}".format(name),
-                        event_hint=RejectConnection(),
-                    )
+        extensions = client_extensions_handshake(
+            accepts, self._initiating_request.extensions
+        )
 
         self._connection = Connection(
             ConnectionType.CLIENT if self.client else ConnectionType.SERVER,
-            self._initiating_request.extensions,
+            extensions,
             self._h11_connection.trailing_data[0],
         )
         self._state = ConnectionState.OPEN
@@ -419,7 +408,7 @@ class H11Handshake(object):
         )
 
 
-def handshake_extensions(requested, supported):
+def server_extensions_handshake(requested, supported):
     # type: (List[str], List[Extension]) -> Optional[bytes]
     """Agree on the extensions to use returning an appropriate header value.
 
@@ -451,3 +440,22 @@ def handshake_extensions(requested, supported):
         return b", ".join(extensions)
 
     return None
+
+
+def client_extensions_handshake(accepted, supported):
+    # type: (List[str], List[Extension]) -> List[Extension]
+    # This raises RemoteProtocolError is the accepted extension is not
+    # supported.
+    extensions = []
+    for accept in accepted:
+        name = accept.split(";", 1)[0].strip()
+        for extension in supported:
+            if extension.name == name:
+                extension.finalize(accept)
+                extensions.append(extension)
+                break
+        else:
+            raise RemoteProtocolError(
+                "unrecognized extension {}".format(name), event_hint=RejectConnection()
+            )
+    return extensions
