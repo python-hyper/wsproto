@@ -1,4 +1,4 @@
-0.13.0 Unreleased
+0.13.0 2019-01-24
 -----------------
 
 * Introduce a send method on the conenction which accepts the new
