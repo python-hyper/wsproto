@@ -14,4 +14,4 @@ from `our GitHub repository`_ and run:
 
     $ python setup.py install
 
-.. _our GitHub repository: https://github.com/jeamland/wsproto
+.. _our GitHub repository: https://github.com/python-hyper/wsproto
