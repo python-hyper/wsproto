@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-wsproto/hanshake
+wsproto/handshake
 ~~~~~~~~~~~~~~~~~~
 
 An implementation of WebSocket handshakes.
@@ -25,7 +25,7 @@ WEBSOCKET_VERSION = b"13"
 
 
 class H11Handshake(object):
-    """A Hanshake implementation for HTTP/1.1 connections."""
+    """A Handshake implementation for HTTP/1.1 connections."""
 
     def __init__(self, connection_type):
         # type: (ConnectionType) -> None
