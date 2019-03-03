@@ -248,7 +248,9 @@ class H11Handshake(object):
                 raise LocalProtocolError(
                     "unexpected subprotocol {}".format(event.subprotocol)
                 )
-            headers.append((b"Sec-WebSocket-Protocol", event.subprotocol))
+            headers.append(
+                (b"Sec-WebSocket-Protocol", event.subprotocol.encode("ascii"))
+            )
 
         if event.extensions:
             accepts = handshake_extensions(
@@ -314,7 +316,12 @@ class H11Handshake(object):
         ]
 
         if request.subprotocols:
-            headers.append((b"Sec-WebSocket-Protocol", ", ".join(request.subprotocols)))
+            headers.append(
+                (
+                    b"Sec-WebSocket-Protocol",
+                    (", ".join(request.subprotocols)).encode("ascii"),
+                )
+            )
 
         if request.extensions:
             offers = {e.name: e.offer() for e in request.extensions}

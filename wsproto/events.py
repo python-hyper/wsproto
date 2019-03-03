@@ -76,7 +76,7 @@ class Request(Event):
 
        The hostname, or host header value.
 
-    .. attribute:: subprotocols
+    .. attribute:: subprotocols List[str]
 
        A list of subprotocols ordered by preference.
 
@@ -104,6 +104,10 @@ class AcceptConnection(Event):
 
        Any additional (non websocket related) headers present in the
        acceptance response.
+
+    .. attribute: subprotocol (Optional[str])
+
+       The accepted subprotocol to use. Optional.
 
     """
 
