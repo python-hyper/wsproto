@@ -13,7 +13,7 @@ __version__ = "0.13.0+dev"
 
 class WSConnection(object):
     def __init__(self, connection_type):
-        # type: (ConnectionType) -> None:
+        # type: (ConnectionType) -> None
         self.client = connection_type is ConnectionType.CLIENT
         self.handshake = H11Handshake(connection_type)
         self.connection = None
