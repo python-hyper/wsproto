@@ -7,9 +7,10 @@ Events that result from processing data on a WebSocket connection.
 """
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Generic, List, Optional, Tuple, TypeVar, Union
+from typing import Generic, List, Optional, TypeVar, Union
 
 from .extensions import Extension
+from .typing import Headers
 
 
 class Event(ABC):
@@ -54,8 +55,10 @@ class Request(Event):
 
     host: str
     target: str
-    extensions: Union[List[Extension], List[str]] = field(default_factory=list)
-    extra_headers: List[Tuple[bytes, bytes]] = field(default_factory=list)
+    extensions: Union[List[Extension], List[str]] = field(  # type: ignore
+        default_factory=list
+    )
+    extra_headers: Headers = field(default_factory=list)
     subprotocols: List[str] = field(default_factory=list)
 
 
@@ -82,7 +85,7 @@ class AcceptConnection(Event):
 
     subprotocol: Optional[str] = None
     extensions: List[Extension] = field(default_factory=list)
-    extra_headers: List[Tuple[bytes, bytes]] = field(default_factory=list)
+    extra_headers: Headers = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -96,7 +99,7 @@ class RejectConnection(Event):
 
     Fields:
 
-    .. attribute:: headers (List[Tuple[bytes, bytes]])
+    .. attribute:: headers (Headers)
 
        The headers to send with the response.
 
@@ -112,7 +115,7 @@ class RejectConnection(Event):
     """
 
     status_code: int = 400
-    headers: List[Tuple[bytes, bytes]] = field(default_factory=list)
+    headers: Headers = field(default_factory=list)
     has_body: bool = False
 
 
@@ -162,7 +165,7 @@ class CloseConnection(Event):
     code: int
     reason: Optional[str] = None
 
-    def response(self):
+    def response(self) -> "CloseConnection":
         return CloseConnection(code=self.code, reason=self.reason)
 
 
@@ -245,7 +248,7 @@ class Ping(Event):
 
     payload: bytes = b""
 
-    def response(self):
+    def response(self) -> "Pong":
         return Pong(payload=self.payload)
 
 

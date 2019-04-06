@@ -6,11 +6,14 @@ wsproto/handshake
 An implementation of WebSocket handshakes.
 """
 from collections import deque
+from typing import Deque, Dict, Generator, List, Optional, Union
 
 import h11
 
 from .connection import Connection, ConnectionState, ConnectionType
-from .events import AcceptConnection, RejectConnection, RejectData, Request
+from .events import AcceptConnection, Event, RejectConnection, RejectData, Request
+from .extensions import Extension
+from .typing import Headers
 from .utilities import (
     generate_accept_token,
     generate_nonce,
@@ -27,8 +30,7 @@ WEBSOCKET_VERSION = b"13"
 class H11Handshake:
     """A Handshake implementation for HTTP/1.1 connections."""
 
-    def __init__(self, connection_type):
-        # type: (ConnectionType) -> None
+    def __init__(self, connection_type: ConnectionType) -> None:
         self.client = connection_type is ConnectionType.CLIENT
         self._state = ConnectionState.CONNECTING
 
@@ -37,19 +39,17 @@ class H11Handshake:
         else:
             self._h11_connection = h11.Connection(h11.SERVER)
 
-        self._connection = None
-        self._events = deque()
-        self._initiating_request = None
-        self._nonce = None
+        self._connection: Optional[Connection] = None
+        self._events: Deque[Event] = deque()
+        self._initiating_request: Optional[Request] = None
+        self._nonce: Optional[bytes] = None
 
     @property
-    def state(self):
-        # type() -> ConnectionState
+    def state(self) -> ConnectionState:
         return self._state
 
     @property
-    def connection(self):
-        # type() -> Optional[Connection]
+    def connection(self) -> Optional[Connection]:
         """Return the established connection.
 
         This will either return the connection or raise a
@@ -58,8 +58,7 @@ class H11Handshake:
         """
         return self._connection
 
-    def initiate_upgrade_connection(self, headers, path):
-        # type: (List[Tuple[bytes, bytes]], str) -> None
+    def initiate_upgrade_connection(self, headers: Headers, path: str) -> None:
         """Initiate an upgrade connection.
 
         This should be used if the request has already be received and
@@ -74,8 +73,7 @@ class H11Handshake:
         h11_client = h11.Connection(h11.CLIENT)
         self.receive_data(h11_client.send(upgrade_request))
 
-    def send(self, event):
-        # type(Event) -> bytes
+    def send(self, event: Event) -> bytes:
         """Send an event to the remote.
 
         This will return the bytes to send based on the event or raise
@@ -98,8 +96,7 @@ class H11Handshake:
             )
         return data
 
-    def receive_data(self, data):
-        # type: (bytes) -> None
+    def receive_data(self, data: bytes) -> None:
         """Receive data from the remote.
 
         A list of events that the remote peer triggered by sending
@@ -154,26 +151,25 @@ class H11Handshake:
                 if isinstance(event, h11.Request):
                     self._events.append(self._process_connection_request(event))
 
-    def events(self):
-        # type() -> Generator[Event, None, None]
+    def events(self) -> Generator[Event, None, None]:
         while self._events:
             yield self._events.popleft()
 
     ############ Server mode methods
 
-    def _process_connection_request(self, event):
+    def _process_connection_request(self, event: h11.Request) -> Request:
         if event.method != b"GET":
             raise RemoteProtocolError(
                 "Request method must be GET", event_hint=RejectConnection()
             )
         connection_tokens = None
-        extensions = []
+        extensions: List[str] = []
         host = None
         key = None
-        subprotocols = []
+        subprotocols: List[str] = []
         upgrade = b""
         version = None
-        headers = []
+        headers: Headers = []
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
@@ -230,8 +226,7 @@ class H11Handshake:
         )
         return self._initiating_request
 
-    def _accept(self, event):
-        # type: (AcceptConnection) -> None
+    def _accept(self, event: AcceptConnection) -> bytes:
         request_headers = normed_header_dict(self._initiating_request.extra_headers)
 
         nonce = request_headers[b"sec-websocket-key"]
@@ -253,7 +248,7 @@ class H11Handshake:
             )
 
         if event.extensions:
-            accepts = server_extensions_handshake(
+            accepts = server_extensions_handshake(  # type: ignore
                 self._initiating_request.extensions, event.extensions
             )
             if accepts:
@@ -269,8 +264,7 @@ class H11Handshake:
         self._state = ConnectionState.OPEN
         return self._h11_connection.send(response)
 
-    def _reject(self, event):
-        # type: (RejectConnection) -> bytes
+    def _reject(self, event: RejectConnection) -> bytes:
         if self.state != ConnectionState.CONNECTING:
             raise LocalProtocolError(
                 "Connection cannot be rejected in state %s" % self.state
@@ -287,8 +281,7 @@ class H11Handshake:
             self._state = ConnectionState.CLOSED
         return data
 
-    def _send_reject_data(self, event):
-        # type: (RejectData) -> bytes
+    def _send_reject_data(self, event: RejectData) -> bytes:
         if self.state != ConnectionState.REJECTING:
             raise LocalProtocolError(
                 "Cannot send rejection data in state {}".format(self.state)
@@ -302,8 +295,7 @@ class H11Handshake:
 
     ############ Client mode methods
 
-    def _initiate_connection(self, request):
-        # type: (Request) -> bytes
+    def _initiate_connection(self, request: Request) -> bytes:
         self._initiating_request = request
         self._nonce = generate_nonce()
 
@@ -324,14 +316,16 @@ class H11Handshake:
             )
 
         if request.extensions:
-            offers = {e.name: e.offer() for e in request.extensions}
+            offers = {e.name: e.offer() for e in request.extensions}  # type: ignore
             extensions = []
             for name, params in offers.items():
                 name = name.encode("ascii")
                 if params is True:
                     extensions.append(name)
                 elif params:
-                    extensions.append(b"%s; %s" % (name, params.encode("ascii")))
+                    extensions.append(
+                        b"%s; %s" % (name, params.encode("ascii"))  # type: ignore
+                    )
             if extensions:
                 headers.append((b"Sec-WebSocket-Extensions", b", ".join(extensions)))
 
@@ -342,13 +336,15 @@ class H11Handshake:
         )
         return self._h11_connection.send(upgrade)
 
-    def _establish_client_connection(self, event):  # noqa: MC0001
+    def _establish_client_connection(
+        self, event: h11.InformationalResponse
+    ) -> AcceptConnection:  # noqa: MC0001
         accept = None
         connection_tokens = None
-        accepts = []
+        accepts: List[str] = []
         subprotocol = None
         upgrade = b""
-        headers = []
+        headers: Headers = []
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
@@ -388,7 +384,7 @@ class H11Handshake:
                     "unrecognized subprotocol {}".format(subprotocol),
                     event_hint=RejectConnection(),
                 )
-        extensions = client_extensions_handshake(
+        extensions = client_extensions_handshake(  # type: ignore
             accepts, self._initiating_request.extensions
         )
 
@@ -402,19 +398,20 @@ class H11Handshake:
             extensions=extensions, extra_headers=headers, subprotocol=subprotocol
         )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "{}(client={}, state={})".format(
             self.__class__.__name__, self.client, self.state
         )
 
 
-def server_extensions_handshake(requested, supported):
-    # type: (List[str], List[Extension]) -> Optional[bytes]
+def server_extensions_handshake(
+    requested: List[str], supported: List[Extension]
+) -> Optional[bytes]:
     """Agree on the extensions to use returning an appropriate header value.
 
     This returns None if there are no agreed extensions
     """
-    accepts = {}
+    accepts: Dict[str, Union[bool, bytes]] = {}
     for offer in requested:
         name = offer.split(";", 1)[0].strip()
         for extension in supported:
@@ -423,14 +420,14 @@ def server_extensions_handshake(requested, supported):
                 if accept is True:
                     accepts[extension.name] = True
                 elif accept is not False and accept is not None:
-                    accepts[extension.name] = accept.encode("ascii")
+                    accepts[extension.name] = accept.encode("ascii")  # type: ignore
 
     if accepts:
-        extensions = []
+        extensions: List[bytes] = []
         for name, params in accepts.items():
-            name = name.encode("ascii")
+            name = name.encode("ascii")  # type: ignore
             if params is True:
-                extensions.append(name)
+                extensions.append(name)  # type: ignore
             else:
                 if params == b"":
                     extensions.append(b"%s" % (name))
@@ -441,8 +438,9 @@ def server_extensions_handshake(requested, supported):
     return None
 
 
-def client_extensions_handshake(accepted, supported):
-    # type: (List[str], List[Extension]) -> List[Extension]
+def client_extensions_handshake(
+    accepted: List[str], supported: List[Extension]
+) -> List[Extension]:
     # This raises RemoteProtocolError is the accepted extension is not
     # supported.
     extensions = []
