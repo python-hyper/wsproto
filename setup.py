@@ -38,6 +38,7 @@ setup(
     packages=find_packages(),
     package_data={'': ['LICENSE', 'README.rst']},
     package_dir={'wsproto': 'wsproto'},
+    python_requires=">=3.5",
     include_package_data=True,
     license='MIT',
     classifiers=[
@@ -45,8 +46,6 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
@@ -57,8 +56,4 @@ setup(
     install_requires=[
         'h11 ~= 0.8.1',  # means: 0.8.x where x >= 1
     ],
-    extras_require={
-        ':python_version == "2.7"':
-            ['enum34>=1.0.4, <2'],
-    }
 )

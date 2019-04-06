@@ -11,7 +11,7 @@ import zlib
 from .frame_protocol import CloseReason, Opcode, RsvBits
 
 
-class Extension(object):
+class Extension:
     name = None
 
     def enabled(self):

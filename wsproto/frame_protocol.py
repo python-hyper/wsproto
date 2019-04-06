@@ -13,8 +13,6 @@ from codecs import getincrementaldecoder
 from collections import namedtuple
 from enum import IntEnum
 
-from .compat import unicode, Utf8Validator
-
 try:
     from wsaccel.xormask import XorMaskerSimple
 except ImportError:
@@ -193,7 +191,7 @@ NULL_MASK = struct.pack("!I", 0)
 
 class ParseFailed(Exception):
     def __init__(self, msg, code=CloseReason.PROTOCOL_ERROR):
-        super(ParseFailed, self).__init__(msg)
+        super().__init__(msg)
         self.code = code
 
 
@@ -222,7 +220,7 @@ def _truncate_utf8(data, nbytes):
     return data
 
 
-class Buffer(object):
+class Buffer:
     def __init__(self, initial_bytes=None):
         self.buffer = bytearray()
         self.bytes_used = 0
@@ -258,10 +256,9 @@ class Buffer(object):
         return len(self.buffer)
 
 
-class MessageDecoder(object):
+class MessageDecoder:
     def __init__(self):
         self.opcode = None
-        self.validator = None
         self.decoder = None
 
     def process_frame(self, frame):
@@ -275,7 +272,6 @@ class MessageDecoder(object):
             raise ParseFailed("expected CONTINUATION, got %r" % frame.opcode)
 
         if frame.opcode is Opcode.TEXT:
-            self.validator = Utf8Validator()
             self.decoder = getincrementaldecoder("utf-8")()
 
         finished = frame.frame_finished and frame.message_finished
@@ -294,22 +290,13 @@ class MessageDecoder(object):
         return frame
 
     def decode_payload(self, data, finished):
-        if self.validator is not None:
-            results = self.validator.validate(bytes(data))
-            if not results[0] or (finished and not results[1]):
-                raise ParseFailed(
-                    u"encountered invalid UTF-8 while processing"
-                    " text message at payload octet index %d" % results[3],
-                    CloseReason.INVALID_FRAME_PAYLOAD_DATA,
-                )
-
         try:
             return self.decoder.decode(data, finished)
         except UnicodeDecodeError as exc:
             raise ParseFailed(str(exc), CloseReason.INVALID_FRAME_PAYLOAD_DATA)
 
 
-class FrameDecoder(object):
+class FrameDecoder:
     def __init__(self, client, extensions=None):
         self.client = client
         self.extensions = extensions or []
@@ -465,7 +452,7 @@ class FrameDecoder(object):
                 raise ParseFailed("Reserved bit set unexpectedly")
 
 
-class FrameProtocol(object):
+class FrameProtocol:
     def __init__(self, client, extensions):
         self.client = client
         self.extensions = [ext for ext in extensions if ext.enabled()]
@@ -498,16 +485,6 @@ class FrameProtocol(object):
                 raise ParseFailed("remote CLOSE with local-only reason")
             if not isinstance(code, CloseReason) and code <= MAX_PROTOCOL_CLOSE_REASON:
                 raise ParseFailed("CLOSE with unknown reserved code")
-            validator = Utf8Validator()
-            if validator is not None:
-                results = validator.validate(bytes(data[2:]))
-                if not (results[0] and results[1]):
-                    raise ParseFailed(
-                        u"encountered invalid UTF-8 while"
-                        " processing close message at payload"
-                        " octet index %d" % results[3],
-                        CloseReason.INVALID_FRAME_PAYLOAD_DATA,
-                    )
             try:
                 reason = data[2:].decode("utf-8")
             except UnicodeDecodeError as exc:
@@ -574,7 +551,7 @@ class FrameProtocol(object):
     def send_data(self, payload=b"", fin=True):
         if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
-        elif isinstance(payload, unicode):
+        elif isinstance(payload, str):
             opcode = Opcode.TEXT
             payload = payload.encode("utf-8")
         else:

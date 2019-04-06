@@ -8,7 +8,7 @@ import wsproto.extensions as wpext
 import wsproto.frame_protocol as fp
 
 
-class TestPerMessageDeflate(object):
+class TestPerMessageDeflate:
     parameter_sets = [
         {
             "client_no_context_takeover": False,
@@ -339,7 +339,7 @@ class TestPerMessageDeflate(object):
         )
         assert result.rsv1
 
-        class FailDecompressor(object):
+        class FailDecompressor:
             def decompress(self, data):
                 return b""
 

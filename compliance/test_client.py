@@ -1,25 +1,17 @@
 import json
 import socket
+from urllib.parse import urlparse
 
 from wsproto import WSConnection
-from wsproto.compat import PY2
 from wsproto.connection import CLIENT
 from wsproto.events import AcceptConnection, CloseConnection, Ping, Request, TextMessage, Message
 from wsproto.extensions import PerMessageDeflate
 from wsproto.frame_protocol import CloseReason
 
-if PY2:
-    from urlparse import urlparse
-else:
-    from urllib.parse import urlparse
-
 SERVER = 'ws://127.0.0.1:8642'
 AGENT = 'wsproto'
 
-if PY2:
-    CONNECTION_EXCEPTIONS = (OSError,)
-else:
-    CONNECTION_EXCEPTIONS = (ConnectionError, OSError)
+CONNECTION_EXCEPTIONS = (ConnectionError, OSError)
 
 def get_case_count(server):
     uri = urlparse(server + '/getCaseCount')

@@ -11,7 +11,7 @@ from .handshake import H11Handshake
 __version__ = "0.14.0+dev"
 
 
-class WSConnection(object):
+class WSConnection:
     def __init__(self, connection_type):
         # type: (ConnectionType) -> None
         self.client = connection_type is ConnectionType.CLIENT

@@ -7,7 +7,7 @@ Events that result from processing data on a WebSocket connection.
 """
 
 
-class Event(object):
+class Event:
     """
     Base class for wsproto events.
     """
