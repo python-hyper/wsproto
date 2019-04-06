@@ -1,11 +1,17 @@
+from dataclasses import dataclass, field
+from typing import List, Optional
+
 import pytest
 
 from wsproto.events import Event
 
 
+@dataclass(frozen=True)
 class SimpleEvent(Event):
-    _fields = ["a", "b", "c", "d"]
-    _defaults = {"c": None, "d": []}
+    a: int
+    b: int
+    c: Optional[int] = None
+    d: List[int] = field(default_factory=list)
 
 
 def test_event_construction():
