@@ -30,12 +30,12 @@ def _make_connection_request(request_headers, method="GET"):
 def test_connection_request():
     event = _make_connection_request(
         [
-            ("Host", "localhost"),
-            ("Connection", "Keep-Alive, Upgrade"),
-            ("Upgrade", "WebSocket"),
-            ("Sec-WebSocket-Version", "13"),
-            ("Sec-WebSocket-Key", generate_nonce()),
-            ("X-Foo", "bar"),
+            (b"Host", b"localhost"),
+            (b"Connection", b"Keep-Alive, Upgrade"),
+            (b"Upgrade", b"WebSocket"),
+            (b"Sec-WebSocket-Version", b"13"),
+            (b"Sec-WebSocket-Key", generate_nonce()),
+            (b"X-Foo", b"bar"),
         ]
     )
 
@@ -57,11 +57,11 @@ def test_connection_request_bad_method():
     with pytest.raises(RemoteProtocolError) as excinfo:
         event = _make_connection_request(
             [
-                ("Host", "localhost"),
-                ("Connection", "Keep-Alive, Upgrade"),
-                ("Upgrade", "WebSocket"),
-                ("Sec-WebSocket-Version", "13"),
-                ("Sec-WebSocket-Key", generate_nonce()),
+                (b"Host", b"localhost"),
+                (b"Connection", b"Keep-Alive, Upgrade"),
+                (b"Upgrade", b"WebSocket"),
+                (b"Sec-WebSocket-Version", b"13"),
+                (b"Sec-WebSocket-Key", generate_nonce()),
             ],
             method="POST",
         )
@@ -72,11 +72,11 @@ def test_connection_request_bad_connection_header():
     with pytest.raises(RemoteProtocolError) as excinfo:
         event = _make_connection_request(
             [
-                ("Host", "localhost"),
-                ("Connection", "Keep-Alive, No-Upgrade"),
-                ("Upgrade", "WebSocket"),
-                ("Sec-WebSocket-Version", "13"),
-                ("Sec-WebSocket-Key", generate_nonce()),
+                (b"Host", b"localhost"),
+                (b"Connection", b"Keep-Alive, No-Upgrade"),
+                (b"Upgrade", b"WebSocket"),
+                (b"Sec-WebSocket-Version", b"13"),
+                (b"Sec-WebSocket-Key", generate_nonce()),
             ]
         )
     assert str(excinfo.value) == "Missing header, 'Connection: Upgrade'"
@@ -86,26 +86,26 @@ def test_connection_request_bad_upgrade_header():
     with pytest.raises(RemoteProtocolError) as excinfo:
         event = _make_connection_request(
             [
-                ("Host", "localhost"),
-                ("Connection", "Keep-Alive, Upgrade"),
-                ("Upgrade", "h2c"),
-                ("Sec-WebSocket-Version", "13"),
-                ("Sec-WebSocket-Key", generate_nonce()),
+                (b"Host", b"localhost"),
+                (b"Connection", b"Keep-Alive, Upgrade"),
+                (b"Upgrade", b"h2c"),
+                (b"Sec-WebSocket-Version", b"13"),
+                (b"Sec-WebSocket-Key", generate_nonce()),
             ]
         )
     assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
 
 
-@pytest.mark.parametrize("version", ["12", "not-a-digit"])
+@pytest.mark.parametrize("version", [b"12", b"not-a-digit"])
 def test_connection_request_bad_version_header(version):
     with pytest.raises(RemoteProtocolError) as excinfo:
         event = _make_connection_request(
             [
-                ("Host", "localhost"),
-                ("Connection", "Keep-Alive, Upgrade"),
-                ("Upgrade", "WebSocket"),
-                ("Sec-WebSocket-Version", version),
-                ("Sec-WebSocket-Key", generate_nonce()),
+                (b"Host", b"localhost"),
+                (b"Connection", b"Keep-Alive, Upgrade"),
+                (b"Upgrade", b"WebSocket"),
+                (b"Sec-WebSocket-Version", version),
+                (b"Sec-WebSocket-Key", generate_nonce()),
             ]
         )
     assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Version'"
@@ -118,10 +118,10 @@ def test_connection_request_key_header():
     with pytest.raises(RemoteProtocolError) as excinfo:
         event = _make_connection_request(
             [
-                ("Host", "localhost"),
-                ("Connection", "Keep-Alive, Upgrade"),
-                ("Upgrade", "WebSocket"),
-                ("Sec-WebSocket-Version", "13"),
+                (b"Host", b"localhost"),
+                (b"Connection", b"Keep-Alive, Upgrade"),
+                (b"Upgrade", b"WebSocket"),
+                (b"Sec-WebSocket-Version", b"13"),
             ]
         )
     assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Key'"
@@ -138,7 +138,7 @@ def test_upgrade_request():
             (b"Sec-WebSocket-Key", generate_nonce()),
             (b"X-Foo", b"bar"),
         ],
-        b"/",
+        "/",
     )
     event = next(server.events())
 
@@ -168,11 +168,11 @@ def _make_handshake(
                 method="GET",
                 target="/",
                 headers=[
-                    ("Host", "localhost"),
-                    ("Connection", "Keep-Alive, Upgrade"),
-                    ("Upgrade", "WebSocket"),
-                    ("Sec-WebSocket-Version", "13"),
-                    ("Sec-WebSocket-Key", nonce),
+                    (b"Host", b"localhost"),
+                    (b"Connection", b"Keep-Alive, Upgrade"),
+                    (b"Upgrade", b"WebSocket"),
+                    (b"Sec-WebSocket-Version", b"13"),
+                    (b"Sec-WebSocket-Key", nonce),
                 ]
                 + request_headers,
             )
@@ -198,9 +198,9 @@ def test_handshake():
     assert response == h11.InformationalResponse(
         status_code=101,
         headers=[
-            ("connection", "Upgrade"),
-            ("sec-websocket-accept", generate_accept_token(nonce)),
-            ("upgrade", "WebSocket"),
+            (b"connection", b"Upgrade"),
+            (b"sec-websocket-accept", generate_accept_token(nonce)),
+            (b"upgrade", b"WebSocket"),
         ],
     )
 
@@ -212,10 +212,10 @@ def test_handshake_extra_headers():
     assert response == h11.InformationalResponse(
         status_code=101,
         headers=[
-            ("connection", "Upgrade"),
-            ("sec-websocket-accept", generate_accept_token(nonce)),
-            ("upgrade", "WebSocket"),
-            ("x-foo", "bar"),
+            (b"connection", b"Upgrade"),
+            (b"sec-websocket-accept", generate_accept_token(nonce)),
+            (b"upgrade", b"WebSocket"),
+            (b"x-foo", b"bar"),
         ],
     )
 
@@ -223,7 +223,7 @@ def test_handshake_extra_headers():
 @pytest.mark.parametrize("accept_subprotocol", ["one", "two"])
 def test_handshake_with_subprotocol(accept_subprotocol):
     response, _ = _make_handshake(
-        [("Sec-Websocket-Protocol", "one, two")], subprotocol=accept_subprotocol
+        [(b"Sec-Websocket-Protocol", b"one, two")], subprotocol=accept_subprotocol
     )
 
     headers = normed_header_dict(response.headers)
@@ -233,7 +233,8 @@ def test_handshake_with_subprotocol(accept_subprotocol):
 def test_handshake_with_extension():
     extension = FakeExtension(accept_response=True)
     response, _ = _make_handshake(
-        [("Sec-Websocket-Extensions", extension.name)], extensions=[extension]
+        [(b"Sec-Websocket-Extensions", extension.name.encode("ascii"))],
+        extensions=[extension],
     )
 
     headers = normed_header_dict(response.headers)
@@ -245,7 +246,12 @@ def test_handshake_with_extension_params():
     accepted_params = "parameter1=value1; parameter2=value2"
     extension = FakeExtension(accept_response=accepted_params)
     response, _ = _make_handshake(
-        [("Sec-Websocket-Extensions", "%s; %s" % (extension.name, offered_params))],
+        [
+            (
+                b"Sec-Websocket-Extensions",
+                ("%s; %s" % (extension.name, offered_params)).encode("ascii"),
+            )
+        ],
         extensions=[extension],
     )
 
@@ -259,7 +265,12 @@ def test_handshake_with_extension_params():
 def test_handshake_with_extra_unaccepted_extension():
     extension = FakeExtension(accept_response=True)
     response, _ = _make_handshake(
-        [("Sec-Websocket-Extensions", "pretend, %s" % extension.name)],
+        [
+            (
+                b"Sec-Websocket-Extensions",
+                b"pretend, %s" % extension.name.encode("ascii"),
+            )
+        ],
         extensions=[extension],
     )
 
@@ -284,11 +295,11 @@ def _make_handshake_rejection(status_code, body=None):
                 method="GET",
                 target="/",
                 headers=[
-                    ("Host", "localhost"),
-                    ("Connection", "Keep-Alive, Upgrade"),
-                    ("Upgrade", "WebSocket"),
-                    ("Sec-WebSocket-Version", "13"),
-                    ("Sec-WebSocket-Key", nonce),
+                    (b"Host", b"localhost"),
+                    (b"Connection", b"Keep-Alive, Upgrade"),
+                    (b"Upgrade", b"WebSocket"),
+                    (b"Sec-WebSocket-Version", b"13"),
+                    (b"Sec-WebSocket-Key", nonce),
                 ],
             )
         )
@@ -317,7 +328,7 @@ def _make_handshake_rejection(status_code, body=None):
 def test_handshake_rejection():
     events = _make_handshake_rejection(400)
     assert events == [
-        h11.Response(headers=[("content-length", "0")], status_code=400),
+        h11.Response(headers=[(b"content-length", b"0")], status_code=400),
         h11.EndOfMessage(),
     ]
 
@@ -325,7 +336,7 @@ def test_handshake_rejection():
 def test_handshake_rejection_with_body():
     events = _make_handshake_rejection(400, body=b"Hello")
     assert events == [
-        h11.Response(headers=[("content-length", "5")], status_code=400),
+        h11.Response(headers=[(b"content-length", b"5")], status_code=400),
         h11.Data(data=b"Hello"),
         h11.EndOfMessage(),
     ]

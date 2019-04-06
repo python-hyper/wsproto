@@ -278,7 +278,7 @@ class H11Handshake(object):
 
         headers = event.headers
         if not event.has_body:
-            headers.append(("content-length", "0"))
+            headers.append((b"content-length", b"0"))
         response = h11.Response(status_code=event.status_code, headers=headers)
         data = self._h11_connection.send(response)
         self._state = ConnectionState.REJECTING
