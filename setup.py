@@ -38,7 +38,7 @@ setup(
     packages=find_packages(),
     package_data={'': ['LICENSE', 'README.rst']},
     package_dir={'wsproto': 'wsproto'},
-    python_requires=">=3.5",
+    python_requires=">=3.6.1",
     include_package_data=True,
     license='MIT',
     classifiers=[
@@ -47,7 +47,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: Implementation :: CPython',
