@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import zlib
+from typing import cast, Dict, Optional, Union
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 import wsproto.extensions as wpext
 import wsproto.frame_protocol as fp
+
+Params = Dict[str, Union[bool, Optional[int]]]
 
 
 class TestPerMessageDeflate:
@@ -40,7 +44,7 @@ class TestPerMessageDeflate:
         {},
     ]
 
-    def make_offer_string(self, params):
+    def make_offer_string(self, params: Params) -> str:
         offer = ["permessage-deflate"]
 
         if "client_max_window_bits" in params:
@@ -64,7 +68,9 @@ class TestPerMessageDeflate:
 
         return "; ".join(offer)
 
-    def compare_params_to_string(self, params, ext, param_string):
+    def compare_params_to_string(
+        self, params: Params, ext: wpext.PerMessageDeflate, param_string: str
+    ) -> None:
         if "client_max_window_bits" in params:
             if params["client_max_window_bits"] is None:
                 bits = ext.client_max_window_bits
@@ -83,14 +89,15 @@ class TestPerMessageDeflate:
             assert "server_no_context_takeover" in param_string
 
     @pytest.mark.parametrize("params", parameter_sets)
-    def test_offer(self, params):
-        ext = wpext.PerMessageDeflate(**params)
+    def test_offer(self, params: Params) -> None:
+        ext = wpext.PerMessageDeflate(**params)  # type: ignore
         offer = ext.offer()
+        offer = cast(str, offer)
 
         self.compare_params_to_string(params, ext, offer)
 
     @pytest.mark.parametrize("params", parameter_sets)
-    def test_finalize(self, params):
+    def test_finalize(self, params: Params) -> None:
         ext = wpext.PerMessageDeflate()
         assert not ext.enabled()
 
@@ -117,7 +124,7 @@ class TestPerMessageDeflate:
 
         assert ext.enabled()
 
-    def test_finalize_ignores_rubbish(self):
+    def test_finalize_ignores_rubbish(self) -> None:
         ext = wpext.PerMessageDeflate()
         assert not ext.enabled()
 
@@ -126,12 +133,13 @@ class TestPerMessageDeflate:
         assert ext.enabled()
 
     @pytest.mark.parametrize("params", parameter_sets)
-    def test_accept(self, params):
+    def test_accept(self, params: Params) -> None:
         ext = wpext.PerMessageDeflate()
         assert not ext.enabled()
 
         offer = self.make_offer_string(params)
         response = ext.accept(offer)
+        response = cast(str, response)
 
         if ext.client_no_context_takeover:
             assert "client_no_context_takeover" in response
@@ -152,7 +160,7 @@ class TestPerMessageDeflate:
             assert ext.server_max_window_bits == bits
             assert "server_max_window_bits=%d" % bits in response
 
-    def test_accept_ignores_rubbish(self):
+    def test_accept_ignores_rubbish(self) -> None:
         ext = wpext.PerMessageDeflate()
         assert not ext.enabled()
 
@@ -160,7 +168,7 @@ class TestPerMessageDeflate:
 
         assert ext.enabled()
 
-    def test_inbound_uncompressed_control_frame(self):
+    def test_inbound_uncompressed_control_frame(self) -> None:
         payload = b"x" * 23
 
         ext = wpext.PerMessageDeflate()
@@ -170,14 +178,14 @@ class TestPerMessageDeflate:
         result = ext.frame_inbound_header(
             proto, fp.Opcode.PING, fp.RsvBits(False, False, False), len(payload)
         )
-        assert result.rsv1
+        assert result.rsv1  # type: ignore
 
         data = ext.frame_inbound_payload_data(proto, payload)
         assert data == payload
 
         assert ext.frame_inbound_complete(proto, True) is None
 
-    def test_inbound_compressed_control_frame(self):
+    def test_inbound_compressed_control_frame(self) -> None:
         payload = b"x" * 23
 
         ext = wpext.PerMessageDeflate()
@@ -189,7 +197,7 @@ class TestPerMessageDeflate:
         )
         assert result == fp.CloseReason.PROTOCOL_ERROR
 
-    def test_inbound_compressed_continuation_frame(self):
+    def test_inbound_compressed_continuation_frame(self) -> None:
         payload = b"x" * 23
 
         ext = wpext.PerMessageDeflate()
@@ -201,7 +209,7 @@ class TestPerMessageDeflate:
         )
         assert result == fp.CloseReason.PROTOCOL_ERROR
 
-    def test_inbound_uncompressed_data_frame(self):
+    def test_inbound_uncompressed_data_frame(self) -> None:
         payload = b"x" * 23
 
         ext = wpext.PerMessageDeflate()
@@ -211,7 +219,7 @@ class TestPerMessageDeflate:
         result = ext.frame_inbound_header(
             proto, fp.Opcode.BINARY, fp.RsvBits(False, False, False), len(payload)
         )
-        assert result.rsv1
+        assert result.rsv1  # type: ignore
 
         data = ext.frame_inbound_payload_data(proto, payload)
         assert data == payload
@@ -219,7 +227,7 @@ class TestPerMessageDeflate:
         assert ext.frame_inbound_complete(proto, True) is None
 
     @pytest.mark.parametrize("client", [True, False])
-    def test_client_inbound_compressed_single_data_frame(self, client):
+    def test_client_inbound_compressed_single_data_frame(self, client: bool) -> None:
         payload = b"x" * 23
         compressed_payload = b"\xaa\xa8\xc0\n\x00\x00"
 
@@ -233,14 +241,14 @@ class TestPerMessageDeflate:
             fp.RsvBits(True, False, False),
             len(compressed_payload),
         )
-        assert result.rsv1
+        assert result.rsv1  # type: ignore
 
         data = ext.frame_inbound_payload_data(proto, compressed_payload)
-        data += ext.frame_inbound_complete(proto, True)
+        data += ext.frame_inbound_complete(proto, True)  # type: ignore
         assert data == payload
 
     @pytest.mark.parametrize("client", [True, False])
-    def test_client_inbound_compressed_multiple_data_frames(self, client):
+    def test_client_inbound_compressed_multiple_data_frames(self, client: bool) -> None:
         payload = b"x" * 23
         compressed_payload = b"\xaa\xa8\xc0\n\x00\x00"
         split = 3
@@ -253,10 +261,12 @@ class TestPerMessageDeflate:
         result = ext.frame_inbound_header(
             proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), split
         )
-        assert result.rsv1
-        result = ext.frame_inbound_payload_data(proto, compressed_payload[:split])
+        assert result.rsv1  # type: ignore
+        result = ext.frame_inbound_payload_data(  # type: ignore
+            proto, compressed_payload[:split]
+        )
         assert not isinstance(result, fp.CloseReason)
-        data += result
+        data += result  # type: ignore
         assert ext.frame_inbound_complete(proto, False) is None
 
         result = ext.frame_inbound_header(
@@ -265,19 +275,21 @@ class TestPerMessageDeflate:
             fp.RsvBits(False, False, False),
             len(compressed_payload) - split,
         )
-        assert result.rsv1
-        result = ext.frame_inbound_payload_data(proto, compressed_payload[split:])
+        assert result.rsv1  # type: ignore
+        result = ext.frame_inbound_payload_data(  # type: ignore
+            proto, compressed_payload[split:]
+        )
         assert not isinstance(result, fp.CloseReason)
-        data += result
+        data += result  # type: ignore
 
-        result = ext.frame_inbound_complete(proto, True)
+        result = ext.frame_inbound_complete(proto, True)  # type: ignore
         assert not isinstance(result, fp.CloseReason)
-        data += result
+        data += result  # type: ignore
 
         assert data == payload
 
     @pytest.mark.parametrize("client", [True, False])
-    def test_client_decompress_after_uncompressible_frame(self, client):
+    def test_client_decompress_after_uncompressible_frame(self, client: bool) -> None:
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
         proto = fp.FrameProtocol(client=client, extensions=[ext])
@@ -286,7 +298,7 @@ class TestPerMessageDeflate:
         result = ext.frame_inbound_header(
             proto, fp.Opcode.PING, fp.RsvBits(False, False, False), 0
         )
-        result = ext.frame_inbound_payload_data(proto, b"")
+        result = ext.frame_inbound_payload_data(proto, b"")  # type: ignore
         assert not isinstance(result, fp.CloseReason)
         assert ext.frame_inbound_complete(proto, True) is None
 
@@ -300,14 +312,16 @@ class TestPerMessageDeflate:
             fp.RsvBits(True, False, False),
             len(compressed_payload),
         )
-        assert result.rsv1
-        result = ext.frame_inbound_payload_data(proto, compressed_payload)
+        assert result.rsv1  # type: ignore
+        result = ext.frame_inbound_payload_data(  # type: ignore
+            proto, compressed_payload
+        )
         assert result == payload
 
-        result = ext.frame_inbound_complete(proto, True)
+        result = ext.frame_inbound_complete(proto, True)  # type: ignore
         assert not isinstance(result, fp.CloseReason)
 
-    def test_inbound_bad_zlib_payload(self):
+    def test_inbound_bad_zlib_payload(self) -> None:
         compressed_payload = b"x" * 23
 
         ext = wpext.PerMessageDeflate()
@@ -320,11 +334,13 @@ class TestPerMessageDeflate:
             fp.RsvBits(True, False, False),
             len(compressed_payload),
         )
-        assert result.rsv1
-        result = ext.frame_inbound_payload_data(proto, compressed_payload)
+        assert result.rsv1  # type: ignore
+        result = ext.frame_inbound_payload_data(  # type: ignore
+            proto, compressed_payload
+        )
         assert result is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
-    def test_inbound_bad_zlib_decoder_end_state(self, monkeypatch):
+    def test_inbound_bad_zlib_decoder_end_state(self, monkeypatch: MonkeyPatch) -> None:
         compressed_payload = b"x" * 23
 
         ext = wpext.PerMessageDeflate()
@@ -337,25 +353,25 @@ class TestPerMessageDeflate:
             fp.RsvBits(True, False, False),
             len(compressed_payload),
         )
-        assert result.rsv1
+        assert result.rsv1  # type: ignore
 
         class FailDecompressor:
-            def decompress(self, data):
+            def decompress(self, data: bytes) -> bytes:
                 return b""
 
-            def flush(self):
+            def flush(self) -> None:
                 raise zlib.error()
 
         monkeypatch.setattr(ext, "_decompressor", FailDecompressor())
 
-        result = ext.frame_inbound_complete(proto, True)
+        result = ext.frame_inbound_complete(proto, True)  # type: ignore
         assert result is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     @pytest.mark.parametrize(
         "client,no_context_takeover",
         [(True, True), (True, False), (False, True), (False, False)],
     )
-    def test_decompressor_reset(self, client, no_context_takeover):
+    def test_decompressor_reset(self, client: bool, no_context_takeover: bool) -> None:
         if client:
             args = {"server_no_context_takeover": no_context_takeover}
         else:
@@ -367,11 +383,11 @@ class TestPerMessageDeflate:
         result = ext.frame_inbound_header(
             proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), 0
         )
-        assert result.rsv1
+        assert result.rsv1  # type: ignore
 
         assert ext._decompressor is not None
 
-        result = ext.frame_inbound_complete(proto, True)
+        result = ext.frame_inbound_complete(proto, True)  # type: ignore
         assert not isinstance(result, fp.CloseReason)
 
         if no_context_takeover:
@@ -382,11 +398,11 @@ class TestPerMessageDeflate:
         result = ext.frame_inbound_header(
             proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), 0
         )
-        assert result.rsv1
+        assert result.rsv1  # type: ignore
 
         assert ext._decompressor is not None
 
-    def test_outbound_uncompressible_opcode(self):
+    def test_outbound_uncompressible_opcode(self) -> None:
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
         proto = fp.FrameProtocol(client=True, extensions=[ext])
@@ -400,7 +416,7 @@ class TestPerMessageDeflate:
         assert data == payload
 
     @pytest.mark.parametrize("client", [True, False])
-    def test_outbound_compress_single_frame(self, client):
+    def test_outbound_compress_single_frame(self, client: bool) -> None:
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
         proto = fp.FrameProtocol(client=client, extensions=[ext])
@@ -415,7 +431,7 @@ class TestPerMessageDeflate:
         assert data == compressed_payload
 
     @pytest.mark.parametrize("client", [True, False])
-    def test_outbound_compress_multiple_frames(self, client):
+    def test_outbound_compress_multiple_frames(self, client: bool) -> None:
         ext = wpext.PerMessageDeflate()
         ext._enabled = True
         proto = fp.FrameProtocol(client=client, extensions=[ext])
@@ -441,7 +457,7 @@ class TestPerMessageDeflate:
         "client,no_context_takeover",
         [(True, True), (True, False), (False, True), (False, False)],
     )
-    def test_compressor_reset(self, client, no_context_takeover):
+    def test_compressor_reset(self, client: bool, no_context_takeover: bool) -> None:
         if client:
             args = {"client_no_context_takeover": no_context_takeover}
         else:
@@ -469,6 +485,6 @@ class TestPerMessageDeflate:
         assert ext._compressor is not None
 
     @pytest.mark.parametrize("params", parameter_sets)
-    def test_repr(self, params):
-        ext = wpext.PerMessageDeflate(**params)
+    def test_repr(self, params: Params) -> None:
+        ext = wpext.PerMessageDeflate(**params)  # type: ignore
         self.compare_params_to_string(params, ext, repr(ext))

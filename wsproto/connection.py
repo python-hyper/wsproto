@@ -8,8 +8,18 @@ An implementation of a WebSocket connection.
 
 from collections import deque
 from enum import Enum
+from typing import Generator, List, Optional
 
-from .events import BytesMessage, CloseConnection, Message, Ping, Pong, TextMessage
+from .events import (
+    BytesMessage,
+    CloseConnection,
+    Event,
+    Message,
+    Ping,
+    Pong,
+    TextMessage,
+)
+from .extensions import Extension
 from .frame_protocol import CloseReason, FrameProtocol, Opcode, ParseFailed
 from .utilities import LocalProtocolError
 
@@ -53,21 +63,23 @@ class Connection:
     :type conn_type: ``ConnectionType``
     """
 
-    def __init__(self, connection_type, extensions=None, trailing_data=b""):
-        # type: (bool, Optional[List[Extension]], bytes) -> None
+    def __init__(
+        self,
+        connection_type: ConnectionType,
+        extensions: Optional[List[Extension]] = None,
+        trailing_data: bytes = b"",
+    ) -> None:
         self.client = connection_type is ConnectionType.CLIENT
-        self._events = deque()
+        self._events = deque()  # type: ignore
         self._proto = FrameProtocol(self.client, extensions or [])
         self._state = ConnectionState.OPEN
         self.receive_data(trailing_data)
 
     @property
-    def state(self):
-        # type: () -> ConnectionState
+    def state(self) -> ConnectionState:
         return self._state
 
-    def send(self, event):
-        # type: (wsproto.events.Event) -> bytes
+    def send(self, event: Event) -> bytes:
         data = b""
         if isinstance(event, Message):
             data += self._proto.send_data(event.data, event.message_finished)
@@ -89,8 +101,7 @@ class Connection:
             raise LocalProtocolError("Event {} cannot be sent.".format(event))
         return data
 
-    def receive_data(self, data):
-        # type: (bytes) -> None
+    def receive_data(self, data: bytes) -> None:
         """
         Pass some received data to the connection for handling.
 
@@ -115,8 +126,7 @@ class Connection:
         elif self.state is ConnectionState.CLOSED:
             raise LocalProtocolError("Connection already closed.")
 
-    def events(self):
-        # type: () -> Generator[Event, None, None]
+    def events(self) -> Generator[Event, None, None]:
         """
         Return a generator that provides any events that have been generated
         by protocol activity.
@@ -130,11 +140,11 @@ class Connection:
             for frame in self._proto.received_frames():
                 if frame.opcode is Opcode.PING:
                     assert frame.frame_finished and frame.message_finished
-                    yield Ping(payload=frame.payload)
+                    yield Ping(payload=frame.payload)  # type: ignore
 
                 elif frame.opcode is Opcode.PONG:
                     assert frame.frame_finished and frame.message_finished
-                    yield Pong(payload=frame.payload)
+                    yield Pong(payload=frame.payload)  # type: ignore
 
                 elif frame.opcode is Opcode.CLOSE:
                     code, reason = frame.payload
@@ -142,17 +152,17 @@ class Connection:
                         self._state = ConnectionState.CLOSED
                     else:
                         self._state = ConnectionState.REMOTE_CLOSING
-                    yield CloseConnection(code=code, reason=reason)
+                    yield CloseConnection(code=code, reason=reason)  # type: ignore
 
                 elif frame.opcode is Opcode.TEXT:
-                    yield TextMessage(
+                    yield TextMessage(  # type: ignore
                         data=frame.payload,
                         frame_finished=frame.frame_finished,
                         message_finished=frame.message_finished,
                     )
 
                 elif frame.opcode is Opcode.BINARY:
-                    yield BytesMessage(
+                    yield BytesMessage(  # type: ignore
                         data=frame.payload,
                         frame_finished=frame.frame_finished,
                         message_finished=frame.message_finished,

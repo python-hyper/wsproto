@@ -9,25 +9,37 @@ WebSocket frame protocol implementation.
 import itertools
 import os
 import struct
-from codecs import getincrementaldecoder
-from collections import namedtuple
+from codecs import getincrementaldecoder, IncrementalDecoder
 from enum import IntEnum
+from typing import (
+    AnyStr,
+    Generator,
+    List,
+    NamedTuple,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+    Union,
+)
+
+if TYPE_CHECKING:
+    from .extensions import Extension  # noqa
 
 try:
-    from wsaccel.xormask import XorMaskerSimple
+    from wsaccel.xormask import XorMaskerSimple  # type: ignore
 except ImportError:
 
-    class XorMaskerSimple:
-        def __init__(self, masking_key):
+    class XorMaskerSimple:  # type: ignore
+        def __init__(self, masking_key: bytes) -> None:
             self._maskbytes = itertools.cycle(bytearray(masking_key))
 
-        def process(self, data):
+        def process(self, data: bytes) -> bytes:
             maskbytes = self._maskbytes
             return bytearray(b ^ next(maskbytes) for b in bytearray(data))
 
 
 class XorMaskerNull:
-    def process(self, data):
+    def process(self, data: bytes) -> bytes:
         return data
 
 
@@ -76,7 +88,7 @@ class Opcode(IntEnum):
     #: Pong frame
     PONG = 0xA
 
-    def iscontrol(self):
+    def iscontrol(self) -> bool:
         return bool(self & 0x08)
 
 
@@ -190,21 +202,35 @@ NULL_MASK = struct.pack("!I", 0)
 
 
 class ParseFailed(Exception):
-    def __init__(self, msg, code=CloseReason.PROTOCOL_ERROR):
+    def __init__(
+        self, msg: str, code: CloseReason = CloseReason.PROTOCOL_ERROR
+    ) -> None:
         super().__init__(msg)
         self.code = code
 
 
-Header = namedtuple("Header", "fin rsv opcode payload_len masking_key".split())
+class RsvBits(NamedTuple):
+    rsv1: bool
+    rsv2: bool
+    rsv3: bool
 
 
-Frame = namedtuple("Frame", "opcode payload frame_finished message_finished".split())
+class Header(NamedTuple):
+    fin: bool
+    rsv: RsvBits
+    opcode: Opcode
+    payload_len: int
+    masking_key: bytes
 
 
-RsvBits = namedtuple("RsvBits", "rsv1 rsv2 rsv3".split())
+class Frame(NamedTuple):
+    opcode: Opcode
+    payload: Union[bytes, str, Tuple[int, str]]
+    frame_finished: bool
+    message_finished: bool
 
 
-def _truncate_utf8(data, nbytes):
+def _truncate_utf8(data: bytes, nbytes: int) -> bytes:
     if len(data) <= nbytes:
         return data
 
@@ -221,16 +247,16 @@ def _truncate_utf8(data, nbytes):
 
 
 class Buffer:
-    def __init__(self, initial_bytes=None):
+    def __init__(self, initial_bytes: bytes = None) -> None:
         self.buffer = bytearray()
         self.bytes_used = 0
         if initial_bytes:
             self.feed(initial_bytes)
 
-    def feed(self, new_bytes):
+    def feed(self, new_bytes: bytes) -> None:
         self.buffer += new_bytes
 
-    def consume_at_most(self, nbytes):
+    def consume_at_most(self, nbytes: int) -> bytes:
         if not nbytes:
             return bytearray()
 
@@ -238,30 +264,30 @@ class Buffer:
         self.bytes_used += len(data)
         return data
 
-    def consume_exactly(self, nbytes):
+    def consume_exactly(self, nbytes: int) -> bytes:
         if len(self.buffer) - self.bytes_used < nbytes:
             return None
 
         return self.consume_at_most(nbytes)
 
-    def commit(self):
+    def commit(self) -> None:
         # In CPython 3.4+, del[:n] is amortized O(n), *not* quadratic
         del self.buffer[: self.bytes_used]
         self.bytes_used = 0
 
-    def rollback(self):
+    def rollback(self) -> None:
         self.bytes_used = 0
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.buffer)
 
 
 class MessageDecoder:
-    def __init__(self):
-        self.opcode = None
-        self.decoder = None
+    def __init__(self) -> None:
+        self.opcode: Optional[Opcode] = None
+        self.decoder: Optional[IncrementalDecoder] = None
 
-    def process_frame(self, frame):
+    def process_frame(self, frame: Frame) -> Frame:
         assert not frame.opcode.iscontrol()
 
         if self.opcode is None:
@@ -277,9 +303,9 @@ class MessageDecoder:
         finished = frame.frame_finished and frame.message_finished
 
         if self.decoder is not None:
-            data = self.decode_payload(frame.payload, finished)
+            data = self.decode_payload(frame.payload, finished)  # type: ignore
         else:
-            data = frame.payload
+            data = frame.payload  # type: ignore
 
         frame = Frame(self.opcode, data, frame.frame_finished, finished)
 
@@ -289,7 +315,7 @@ class MessageDecoder:
 
         return frame
 
-    def decode_payload(self, data, finished):
+    def decode_payload(self, data: bytes, finished: bool) -> str:
         try:
             return self.decoder.decode(data, finished)
         except UnicodeDecodeError as exc:
@@ -297,22 +323,22 @@ class MessageDecoder:
 
 
 class FrameDecoder:
-    def __init__(self, client, extensions=None):
+    def __init__(self, client: bool, extensions: List["Extension"] = None) -> None:
         self.client = client
         self.extensions = extensions or []
 
         self.buffer = Buffer()
 
-        self.header = None
-        self.effective_opcode = None
-        self.masker = None
+        self.header: Optional[Header] = None
+        self.effective_opcode: Optional[Opcode] = None
+        self.masker: Union[None, XorMaskerNull, XorMaskerSimple] = None
         self.payload_required = 0
         self.payload_consumed = 0
 
-    def receive_bytes(self, data):
+    def receive_bytes(self, data: bytes) -> None:
         self.buffer.feed(data)
 
-    def process_buffer(self):
+    def process_buffer(self) -> Frame:
         if not self.header:
             if not self.parse_header():
                 return None
@@ -332,7 +358,9 @@ class FrameDecoder:
         payload = self.masker.process(payload)
 
         for extension in self.extensions:
-            payload = extension.frame_inbound_payload_data(self, payload)
+            payload = extension.frame_inbound_payload_data(  # type: ignore
+                self, payload
+            )
             if isinstance(payload, CloseReason):
                 raise ParseFailed("error in extension", payload)
 
@@ -357,7 +385,7 @@ class FrameDecoder:
 
         return frame
 
-    def parse_header(self):
+    def parse_header(self) -> bool:
         data = self.buffer.consume_exactly(2)
         if data is None:
             self.buffer.rollback()
@@ -410,7 +438,7 @@ class FrameDecoder:
         self.payload_consumed = 0
         return True
 
-    def parse_extended_payload_length(self, opcode, payload_len):
+    def parse_extended_payload_length(self, opcode: Opcode, payload_len: int) -> int:
         if opcode.iscontrol() and payload_len > MAX_PAYLOAD_NORMAL:
             raise ParseFailed("Control frame with payload len > 125")
         if payload_len == PAYLOAD_LENGTH_TWO_BYTE:
@@ -438,7 +466,9 @@ class FrameDecoder:
 
         return payload_len
 
-    def extension_processing(self, opcode, rsv, payload_len):
+    def extension_processing(
+        self, opcode: Opcode, rsv: RsvBits, payload_len: int
+    ) -> None:
         rsv_used = [False, False, False]
         for extension in self.extensions:
             result = extension.frame_inbound_header(self, opcode, rsv, payload_len)
@@ -453,7 +483,7 @@ class FrameDecoder:
 
 
 class FrameProtocol:
-    def __init__(self, client, extensions):
+    def __init__(self, client: bool, extensions: List["Extension"]) -> None:
         self.client = client
         self.extensions = [ext for ext in extensions if ext.enabled()]
 
@@ -462,9 +492,9 @@ class FrameProtocol:
         self._message_decoder = MessageDecoder()
         self._parse_more = self._parse_more_gen()
 
-        self._outbound_opcode = None
+        self._outbound_opcode: Optional[Opcode] = None
 
-    def _process_close(self, frame):
+    def _process_close(self, frame: Frame) -> Frame:
         data = frame.payload
 
         if not data:
@@ -474,7 +504,7 @@ class FrameProtocol:
         elif len(data) == 1:
             raise ParseFailed("CLOSE with 1 byte payload")
         else:
-            (code,) = struct.unpack("!H", data[:2])
+            (code,) = struct.unpack("!H", data[:2])  # type: ignore
             if code < MIN_CLOSE_REASON or code > MAX_CLOSE_REASON:
                 raise ParseFailed("CLOSE with invalid code")
             try:
@@ -486,7 +516,7 @@ class FrameProtocol:
             if not isinstance(code, CloseReason) and code <= MAX_PROTOCOL_CLOSE_REASON:
                 raise ParseFailed("CLOSE with unknown reserved code")
             try:
-                reason = data[2:].decode("utf-8")
+                reason = data[2:].decode("utf-8")  # type: ignore
             except UnicodeDecodeError as exc:
                 raise ParseFailed(
                     "Error decoding CLOSE reason: " + str(exc),
@@ -496,7 +526,7 @@ class FrameProtocol:
 
         return Frame(frame.opcode, data, frame.frame_finished, frame.message_finished)
 
-    def _parse_more_gen(self):
+    def _parse_more_gen(self) -> Generator[Frame, None, None]:
         # Consume as much as we can from self._buffer, yielding events, and
         # then yield None when we need more data. Or raise ParseFailed.
 
@@ -517,17 +547,17 @@ class FrameProtocol:
 
             yield frame
 
-    def receive_bytes(self, data):
+    def receive_bytes(self, data: bytes) -> None:
         self._frame_decoder.receive_bytes(data)
 
-    def received_frames(self):
+    def received_frames(self) -> Generator[Frame, None, None]:
         for event in self._parse_more:
             if event is None:
                 break
             else:
                 yield event
 
-    def close(self, code=None, reason=None):
+    def close(self, code: Optional[int] = None, reason: Optional[str] = None) -> bytes:
         payload = bytearray()
         if code is None and reason is not None:
             raise TypeError("cannot specify a reason without a code")
@@ -542,18 +572,20 @@ class FrameProtocol:
 
         return self._serialize_frame(Opcode.CLOSE, payload)
 
-    def ping(self, payload=b""):
+    def ping(self, payload: bytes = b"") -> bytes:
         return self._serialize_frame(Opcode.PING, payload)
 
-    def pong(self, payload=b""):
+    def pong(self, payload: bytes = b"") -> bytes:
         return self._serialize_frame(Opcode.PONG, payload)
 
-    def send_data(self, payload=b"", fin=True):
+    def send_data(  # type: ignore
+        self, payload: AnyStr = b"", fin: bool = True
+    ) -> bytes:
         if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
         elif isinstance(payload, str):
             opcode = Opcode.TEXT
-            payload = payload.encode("utf-8")
+            payload = payload.encode("utf-8")  # type: ignore
         else:
             raise ValueError("Must provide bytes or text")
 
@@ -567,16 +599,20 @@ class FrameProtocol:
         if fin:
             self._outbound_opcode = None
 
-        return self._serialize_frame(opcode, payload, fin)
+        return self._serialize_frame(opcode, payload, fin)  # type: ignore
 
-    def _make_fin_rsv_opcode(self, fin, rsv, opcode):
-        fin = int(fin) << 7
-        rsv = (int(rsv.rsv1) << 6) + (int(rsv.rsv2) << 5) + (int(rsv.rsv3) << 4)
-        opcode = int(opcode)
+    def _make_fin_rsv_opcode(self, fin: bool, rsv: RsvBits, opcode: Opcode) -> int:
+        fin = int(fin) << 7  # type: ignore
+        rsv = (  # type: ignore
+            (int(rsv.rsv1) << 6) + (int(rsv.rsv2) << 5) + (int(rsv.rsv3) << 4)
+        )
+        opcode = int(opcode)  # type: ignore
 
-        return fin | rsv | opcode
+        return fin | rsv | opcode  # type: ignore
 
-    def _serialize_frame(self, opcode, payload=b"", fin=True):
+    def _serialize_frame(
+        self, opcode: Opcode, payload: bytes = b"", fin: bool = True
+    ) -> bytes:
         rsv = RsvBits(False, False, False)
         for extension in reversed(self.extensions):
             rsv, payload = extension.frame_outbound(self, opcode, rsv, payload, fin)

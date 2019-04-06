@@ -21,7 +21,7 @@ from wsproto.utilities import LocalProtocolError
 
 @pytest.mark.parametrize("client_sends", [True, False])
 @pytest.mark.parametrize("final", [True, False])
-def test_send_message(client_sends, final):
+def test_send_message(client_sends: bool, final: bool) -> None:
     client = Connection(CLIENT)
     server = Connection(SERVER)
 
@@ -33,7 +33,9 @@ def test_send_message(client_sends, final):
         remote = client
 
     data = b"x" * 23
-    remote.receive_data(local.send(BytesMessage(data=data, message_finished=final)))
+    remote.receive_data(
+        local.send(BytesMessage(data=data, message_finished=final))  # type: ignore
+    )
     event = next(remote.events())
     assert isinstance(event, BytesMessage)
     assert event.data == data
@@ -45,7 +47,7 @@ def test_send_message(client_sends, final):
     "code, reason",
     [(CloseReason.NORMAL_CLOSURE, "bye"), (CloseReason.GOING_AWAY, "👋👋")],
 )
-def test_closure(client_sends, code, reason):
+def test_closure(client_sends: bool, code: CloseReason, reason: str) -> None:
     client = Connection(CLIENT)
     server = Connection(SERVER)
 
@@ -75,7 +77,7 @@ def test_closure(client_sends, code, reason):
     assert local.state is ConnectionState.CLOSED
 
 
-def test_abnormal_closure():
+def test_abnormal_closure() -> None:
     client = Connection(CLIENT)
     client.receive_data(None)
     event = next(client.events())
@@ -84,7 +86,7 @@ def test_abnormal_closure():
     assert client.state is ConnectionState.CLOSED
 
 
-def test_close_whilst_closing():
+def test_close_whilst_closing() -> None:
     client = Connection(CLIENT)
     client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
     with pytest.raises(LocalProtocolError):
@@ -92,7 +94,7 @@ def test_close_whilst_closing():
 
 
 @pytest.mark.parametrize("client_sends", [True, False])
-def test_ping_pong(client_sends):
+def test_ping_pong(client_sends: bool) -> None:
     client = Connection(CLIENT)
     server = Connection(SERVER)
 
@@ -115,7 +117,7 @@ def test_ping_pong(client_sends):
     assert event.payload == payload
 
 
-def test_unsolicited_pong():
+def test_unsolicited_pong() -> None:
     client = Connection(CLIENT)
     server = Connection(SERVER)
 
@@ -127,20 +129,22 @@ def test_unsolicited_pong():
 
 
 @pytest.mark.parametrize("split_message", [True, False])
-def test_data(split_message):
+def test_data(split_message: bool) -> None:
     client = Connection(CLIENT)
     server = Connection(SERVER)
 
     data = "ƒñö®∂😎"
     server.receive_data(
-        client.send(TextMessage(data=data, message_finished=not split_message))
+        client.send(
+            TextMessage(data=data, message_finished=not split_message)  # type: ignore
+        )
     )
     event = next(server.events())
     assert isinstance(event, TextMessage)
     assert event.message_finished is not split_message
 
 
-def test_frame_protocol_gets_fed_garbage():
+def test_frame_protocol_gets_fed_garbage() -> None:
     client = Connection(CLIENT)
 
     payload = b"x" * 23
@@ -152,13 +156,13 @@ def test_frame_protocol_gets_fed_garbage():
     assert event.code == CloseReason.PROTOCOL_ERROR
 
 
-def test_send_invalid_event():
+def test_send_invalid_event() -> None:
     client = Connection(CLIENT)
     with pytest.raises(LocalProtocolError):
         client.send(Request(target="/", host="wsproto"))
 
 
-def test_receive_data_when_closed():
+def test_receive_data_when_closed() -> None:
     client = Connection(CLIENT)
     client._state = ConnectionState.CLOSED
     with pytest.raises(LocalProtocolError):

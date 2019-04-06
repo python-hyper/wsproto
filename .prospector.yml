@@ -1,5 +1,6 @@
 pylint:
   disable:
+    - cyclic-import
     - unused-argument
     - useless-object-inheritance
 

@@ -8,6 +8,10 @@ Utility functions that do not belong in a separate module.
 import base64
 import hashlib
 import os
+from typing import Dict, List, Optional
+
+from .events import Event
+from .typing import Headers
 
 # RFC6455, Section 1.3 - Opening Handshake
 ACCEPT_GUID = b"258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -42,19 +46,18 @@ class RemoteProtocolError(ProtocolError):
 
     """
 
-    def __init__(self, message, event_hint=None):
-        # type: (str, Optional[Event]) -> None
+    def __init__(self, message: str, event_hint: Optional[Event] = None) -> None:
         self.event_hint = event_hint
         super().__init__(message)
 
 
 # Some convenience utilities for working with HTTP headers
-def normed_header_dict(h11_headers):
+def normed_header_dict(h11_headers: Headers) -> Dict[bytes, bytes]:
     # This mangles Set-Cookie headers. But it happens that we don't care about
     # any of those, so it's OK. For every other HTTP header, if there are
     # multiple instances then you're allowed to join them together with
     # commas.
-    name_to_values = {}
+    name_to_values: Dict[bytes, List[bytes]] = {}
     for name, value in h11_headers:
         name_to_values.setdefault(name, []).append(value)
     name_to_normed_value = {}
@@ -68,17 +71,17 @@ def normed_header_dict(h11_headers):
 # fine, because the ABNF is just 1#token. But for the extension lists, it's
 # wrong, because those can contain quoted strings, which can in turn contain
 # commas. XX FIXME
-def split_comma_header(value):
+def split_comma_header(value: bytes) -> List[str]:
     return [piece.decode("ascii").strip() for piece in value.split(b",")]
 
 
-def generate_nonce():
+def generate_nonce() -> bytes:
     # os.urandom may be overkill for this use case, but I don't think this
     # is a bottleneck, and better safe than sorry...
     return base64.b64encode(os.urandom(16))
 
 
-def generate_accept_token(token):
+def generate_accept_token(token: bytes) -> bytes:
     accept_token = token + ACCEPT_GUID
     accept_token = hashlib.sha1(accept_token).digest()
     return base64.b64encode(accept_token)
