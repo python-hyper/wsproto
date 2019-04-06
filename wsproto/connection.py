@@ -39,7 +39,7 @@ CLIENT = ConnectionType.CLIENT
 SERVER = ConnectionType.SERVER
 
 
-class Connection(object):
+class Connection:
     """
     A low-level WebSocket connection object.
 

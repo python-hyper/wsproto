@@ -11,21 +11,7 @@ import wsproto.extensions as wpext
 import wsproto.frame_protocol as fp
 
 
-class FakeValidator(object):
-    def __init__(self):
-        self.validated = b""
-
-        self.valid = True
-        self.ends_on_complete = True
-        self.octet = 0
-        self.code_point = 0
-
-    def validate(self, data):
-        self.validated += data
-        return (self.valid, self.ends_on_complete, self.octet, self.code_point)
-
-
-class TestBuffer(object):
+class TestBuffer:
     def test_consume_at_most_zero_bytes(self):
         buf = fp.Buffer(b"xxyyy")
         assert buf.consume_at_most(0) == bytearray()
@@ -91,7 +77,7 @@ class TestBuffer(object):
         assert len(buf) == len(data)
 
 
-class TestMessageDecoder(object):
+class TestMessageDecoder:
     def test_single_binary_frame(self):
         payload = b"x" * 23
         decoder = fp.MessageDecoder()
@@ -125,7 +111,7 @@ class TestMessageDecoder(object):
         assert frame.payload == payload
 
     def test_single_text_frame(self):
-        text_payload = u"fñör∂"
+        text_payload = "fñör∂"
         binary_payload = text_payload.encode("utf8")
         decoder = fp.MessageDecoder()
         frame = fp.Frame(
@@ -141,7 +127,7 @@ class TestMessageDecoder(object):
         assert frame.payload == text_payload
 
     def test_follow_on_text_frame(self):
-        text_payload = u"fñör∂"
+        text_payload = "fñör∂"
         binary_payload = text_payload.encode("utf8")
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.TEXT
@@ -165,7 +151,7 @@ class TestMessageDecoder(object):
         assert frame.payload == text_payload
 
     def test_final_text_frame(self):
-        text_payload = u"fñör∂"
+        text_payload = "fñör∂"
         binary_payload = text_payload.encode("utf8")
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.TEXT
@@ -231,7 +217,7 @@ class TestMessageDecoder(object):
             decoder.process_frame(frame)
 
     def test_incomplete_unicode(self):
-        payload = u"fñör∂"
+        payload = "fñör∂"
         payload = payload.encode("utf8")
         payload = payload[:4]
 
@@ -248,7 +234,7 @@ class TestMessageDecoder(object):
         assert excinfo.value.code is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     def test_not_even_unicode(self):
-        payload = u"fñörd"
+        payload = "fñörd"
         payload = payload.encode("iso-8859-1")
 
         decoder = fp.MessageDecoder()
@@ -279,7 +265,7 @@ class TestMessageDecoder(object):
         assert excinfo.value.code is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     def test_split_message(self):
-        text_payload = u"x" * 65535
+        text_payload = "x" * 65535
         payload = text_payload.encode("utf-8")
         split = 32777
 
@@ -308,7 +294,7 @@ class TestMessageDecoder(object):
         assert frame.payload == text_payload[split:]
 
     def test_split_unicode_message(self):
-        text_payload = u"∂" * 64
+        text_payload = "∂" * 64
         payload = text_payload.encode("utf-8")
         split = 64
 
@@ -346,57 +332,8 @@ class TestMessageDecoder(object):
         )
         frame = decoder.process_frame(frame)
 
-    def test_text_message_hits_validator(self, monkeypatch):
-        validator = FakeValidator()
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
 
-        text_payload = u"fñör∂"
-        binary_payload = text_payload.encode("utf8")
-        self.send_frame_to_validator(binary_payload, True)
-
-        assert validator.validated == binary_payload
-
-    def test_message_validation_failure_fails_properly(self, monkeypatch):
-        validator = FakeValidator()
-        validator.valid = False
-
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
-
-        with pytest.raises(fp.ParseFailed):
-            self.send_frame_to_validator(b"", True)
-
-    def test_message_validation_finish_on_incomplete(self, monkeypatch):
-        validator = FakeValidator()
-        validator.valid = True
-        validator.ends_on_complete = False
-
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
-
-        with pytest.raises(fp.ParseFailed):
-            self.send_frame_to_validator(b"", True)
-
-    def test_message_validation_unfinished_on_incomplete(self, monkeypatch):
-        validator = FakeValidator()
-        validator.valid = True
-        validator.ends_on_complete = False
-
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
-
-        self.send_frame_to_validator(b"", False)
-
-    def test_message_no_validation_can_still_fail(self, monkeypatch):
-        validator = FakeValidator()
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
-
-        payload = u"fñörd"
-        payload = payload.encode("iso-8859-1")
-
-        with pytest.raises(fp.ParseFailed) as exc:
-            self.send_frame_to_validator(payload, True)
-        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
-
-
-class TestFrameDecoder(object):
+class TestFrameDecoder:
     def _single_frame_test(
         self, client, frame_bytes, opcode, payload, frame_finished, message_finished
     ):
@@ -733,7 +670,7 @@ class TestFrameDecoder(object):
         )
 
 
-class TestFrameDecoderExtensions(object):
+class TestFrameDecoderExtensions:
     class FakeExtension(wpext.Extension):
         name = "fake"
 
@@ -770,14 +707,14 @@ class TestFrameDecoderExtensions(object):
             if self._fail_inbound_complete:
                 return fp.CloseReason.ABNORMAL_CLOSURE
             if fin and self._inbound_rsv_bit_set:
-                return u"™".encode("utf-8")
+                return "™".encode("utf-8")
 
         def frame_outbound(self, proto, opcode, rsv, data, fin):
             if opcode is fp.Opcode.TEXT:
                 rsv = fp.RsvBits(rsv.rsv1, rsv.rsv2, True)
                 self._outbound_rsv_bit_set = True
             if fin and self._outbound_rsv_bit_set:
-                data += u"®".encode("utf-8")
+                data += "®".encode("utf-8")
                 self._outbound_rsv_bit_set = False
             return rsv, data
 
@@ -821,7 +758,7 @@ class TestFrameDecoderExtensions(object):
         ext = self.FakeExtension()
         decoder = fp.FrameDecoder(client=True, extensions=[ext])
 
-        payload = u"fñör∂"
+        payload = "fñör∂"
         expected_payload = payload.upper().encode("utf-8")
         bytes_payload = payload.encode("utf-8")
         frame_bytes = b"\x11" + bytearray([len(bytes_payload)]) + bytes_payload
@@ -838,7 +775,7 @@ class TestFrameDecoderExtensions(object):
         ext = self.FakeExtension()
         decoder = fp.FrameDecoder(client=True, extensions=[ext])
 
-        payload = u"fñör∂"
+        payload = "fñör∂"
         expected_payload = payload.encode("utf-8")
         bytes_payload = payload.encode("utf-8")
         frame_bytes = b"\x01" + bytearray([len(bytes_payload)]) + bytes_payload
@@ -868,8 +805,8 @@ class TestFrameDecoderExtensions(object):
         ext = self.FakeExtension()
         decoder = fp.FrameDecoder(client=True, extensions=[ext])
 
-        payload = u"fñör∂"
-        expected_payload = (payload + u"™").upper().encode("utf-8")
+        payload = "fñör∂"
+        expected_payload = (payload + "™").upper().encode("utf-8")
         bytes_payload = payload.encode("utf-8")
         frame_bytes = b"\x91" + bytearray([len(bytes_payload)]) + bytes_payload
 
@@ -886,7 +823,7 @@ class TestFrameDecoderExtensions(object):
         ext = self.FakeExtension()
         decoder = fp.FrameDecoder(client=True, extensions=[ext])
 
-        payload = u"fñör∂"
+        payload = "fñör∂"
         expected_payload = payload.encode("utf-8")
         bytes_payload = payload.encode("utf-8")
         frame_bytes = b"\x81" + bytearray([len(bytes_payload)]) + bytes_payload
@@ -916,26 +853,26 @@ class TestFrameDecoderExtensions(object):
     def test_outbound_handling_single_frame(self):
         ext = self.FakeExtension()
         proto = fp.FrameProtocol(client=False, extensions=[ext])
-        payload = u"😃😄🙃😉"
+        payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=True)
-        payload = (payload + u"®").encode("utf8")
+        payload = (payload + "®").encode("utf8")
         assert data == b"\x91" + bytearray([len(payload)]) + payload
 
     def test_outbound_handling_multiple_frames(self):
         ext = self.FakeExtension()
         proto = fp.FrameProtocol(client=False, extensions=[ext])
-        payload = u"😃😄🙃😉"
+        payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=False)
         payload = payload.encode("utf8")
         assert data == b"\x11" + bytearray([len(payload)]) + payload
 
-        payload = u"¯\_(ツ)_/¯"
+        payload = r"¯\_(ツ)_/¯"
         data = proto.send_data(payload, fin=True)
-        payload = (payload + u"®").encode("utf8")
+        payload = (payload + "®").encode("utf8")
         assert data == b"\x80" + bytearray([len(payload)]) + payload
 
 
-class TestFrameProtocolReceive(object):
+class TestFrameProtocolReceive:
     def test_long_text_message(self):
         payload = "x" * 65535
         encoded_payload = payload.encode("utf-8")
@@ -1005,10 +942,10 @@ class TestFrameProtocolReceive(object):
         self._close_test(fp.CloseReason.NORMAL_CLOSURE)
 
     def test_close_easy_payload(self):
-        self._close_test(fp.CloseReason.NORMAL_CLOSURE, u"tarah old chap")
+        self._close_test(fp.CloseReason.NORMAL_CLOSURE, "tarah old chap")
 
     def test_close_utf8_payload(self):
-        self._close_test(fp.CloseReason.NORMAL_CLOSURE, u"fñør∂")
+        self._close_test(fp.CloseReason.NORMAL_CLOSURE, "fñør∂")
 
     def test_close_bad_utf8_payload(self):
         payload = unhexlify("cebae1bdb9cf83cebcceb5eda080656469746564")
@@ -1017,7 +954,7 @@ class TestFrameProtocolReceive(object):
         assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     def test_close_incomplete_utf8_payload(self):
-        payload = u"fñør∂".encode("utf8")[:-1]
+        payload = "fñør∂".encode("utf8")[:-1]
         with pytest.raises(fp.ParseFailed) as exc:
             self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason_bytes=payload)
         assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
@@ -1035,53 +972,8 @@ class TestFrameProtocolReceive(object):
         assert len(frame.payload) == len(payload)
         assert frame.payload == payload
 
-    def test_close_reasons_get_utf8_validated(self, monkeypatch):
-        validator = FakeValidator()
-        reason = u"ƒñø®∂"
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
 
-        self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
-
-        assert validator.validated == reason.encode("utf8")
-
-    def test_close_reason_failing_validation_fails(self, monkeypatch):
-        validator = FakeValidator()
-        validator.valid = False
-        reason = u"ƒñø®∂"
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
-
-        with pytest.raises(fp.ParseFailed) as exc:
-            self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
-        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
-
-    def test_close_reason_with_incomplete_utf8_fails(self, monkeypatch):
-        validator = FakeValidator()
-        validator.ends_on_complete = False
-        reason = u"ƒñø®∂"
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
-
-        with pytest.raises(fp.ParseFailed) as exc:
-            self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
-        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
-
-    def test_close_no_validation(self, monkeypatch):
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: None)
-        reason = u"ƒñø®∂"
-        self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason=reason)
-
-    def test_close_no_validation_can_still_fail(self, monkeypatch):
-        validator = FakeValidator()
-        monkeypatch.setattr(fp, "Utf8Validator", lambda: validator)
-
-        reason = u"fñörd"
-        reason = reason.encode("iso-8859-1")
-
-        with pytest.raises(fp.ParseFailed) as exc:
-            self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason_bytes=reason)
-        assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
-
-
-class TestFrameProtocolSend(object):
+class TestFrameProtocolSend:
     def test_simplest_possible_close(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
         data = proto.close()
@@ -1094,7 +986,7 @@ class TestFrameProtocolSend(object):
 
     def test_reasoned_close(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
-        reason = u"¯\_(ツ)_/¯"
+        reason = r"¯\_(ツ)_/¯"
         expected_payload = struct.pack(
             "!H", fp.CloseReason.NORMAL_CLOSURE
         ) + reason.encode("utf8")
@@ -1103,7 +995,7 @@ class TestFrameProtocolSend(object):
 
     def test_overly_reasoned_close(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
-        reason = u"¯\_(ツ)_/¯" * 10
+        reason = r"¯\_(ツ)_/¯" * 10
         data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE, reason=reason)
         assert bytes(data[0:1]) == b"\x88"
         assert len(data) <= 127
@@ -1126,7 +1018,7 @@ class TestFrameProtocolSend(object):
 
     def test_ping_with_payload(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = u"¯\_(ツ)_/¯".encode("utf8")
+        payload = r"¯\_(ツ)_/¯".encode("utf8")
         data = proto.ping(payload)
         assert data == b"\x89" + bytearray([len(payload)]) + payload
 
@@ -1137,7 +1029,7 @@ class TestFrameProtocolSend(object):
 
     def test_pong_with_payload(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = u"¯\_(ツ)_/¯".encode("utf8")
+        payload = r"¯\_(ツ)_/¯".encode("utf8")
         data = proto.pong(payload)
         assert data == b"\x8a" + bytearray([len(payload)]) + payload
 
@@ -1149,7 +1041,7 @@ class TestFrameProtocolSend(object):
 
     def test_single_short_text_data(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = u"😃😄🙃😉"
+        payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=True)
         payload = payload.encode("utf8")
         assert data == b"\x81" + bytearray([len(payload)]) + payload
@@ -1166,19 +1058,19 @@ class TestFrameProtocolSend(object):
 
     def test_multiple_short_text_data(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = u"😃😄🙃😉"
+        payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=False)
         payload = payload.encode("utf8")
         assert data == b"\x01" + bytearray([len(payload)]) + payload
 
-        payload = u"🙈🙉🙊"
+        payload = "🙈🙉🙊"
         data = proto.send_data(payload, fin=True)
         payload = payload.encode("utf8")
         assert data == b"\x80" + bytearray([len(payload)]) + payload
 
     def test_mismatched_data_messages1(self):
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = u"😃😄🙃😉"
+        payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=False)
         payload = payload.encode("utf8")
         assert data == b"\x01" + bytearray([len(payload)]) + payload
@@ -1193,7 +1085,7 @@ class TestFrameProtocolSend(object):
         data = proto.send_data(payload, fin=False)
         assert data == b"\x02" + bytearray([len(payload)]) + payload
 
-        payload = u"✔️☑️✅✔︎☑"
+        payload = "✔️☑️✅✔︎☑"
         with pytest.raises(TypeError):
             proto.send_data(payload)
 

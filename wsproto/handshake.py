@@ -24,7 +24,7 @@ from .utilities import (
 WEBSOCKET_VERSION = b"13"
 
 
-class H11Handshake(object):
+class H11Handshake:
     """A Handshake implementation for HTTP/1.1 connections."""
 
     def __init__(self, connection_type):

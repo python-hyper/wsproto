@@ -43,7 +43,7 @@ def test_send_message(client_sends, final):
 @pytest.mark.parametrize("client_sends", [True, False])
 @pytest.mark.parametrize(
     "code, reason",
-    [(CloseReason.NORMAL_CLOSURE, u"bye"), (CloseReason.GOING_AWAY, u"👋👋")],
+    [(CloseReason.NORMAL_CLOSURE, "bye"), (CloseReason.GOING_AWAY, "👋👋")],
 )
 def test_closure(client_sends, code, reason):
     client = Connection(CLIENT)
@@ -131,7 +131,7 @@ def test_data(split_message):
     client = Connection(CLIENT)
     server = Connection(SERVER)
 
-    data = u"ƒñö®∂😎"
+    data = "ƒñö®∂😎"
     server.receive_data(
         client.send(TextMessage(data=data, message_finished=not split_message))
     )

@@ -45,7 +45,7 @@ class RemoteProtocolError(ProtocolError):
     def __init__(self, message, event_hint=None):
         # type: (str, Optional[Event]) -> None
         self.event_hint = event_hint
-        super(RemoteProtocolError, self).__init__(message)
+        super().__init__(message)
 
 
 # Some convenience utilities for working with HTTP headers

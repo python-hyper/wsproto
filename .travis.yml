@@ -17,8 +17,6 @@ env:
 matrix:
   include:
     # Main tests on supported Python versions.
-    - python: 2.7
-      env: TOXENV=py27
     - python: 3.5
       env: TOXENV=py35
     - python: 3.6
@@ -27,8 +25,6 @@ matrix:
       env: TOXENV=py37
       dist: xenial
       sudo: true # required workaround for https://github.com/travis-ci/travis-ci/issues/9815
-    - python: 2.7
-      env: TOXENV=py27 EXTRA_DEPS=wsaccel
     - python: 3.5
       env: TOXENV=py35 EXTRA_DEPS=wsaccel
     - python: 3.6
@@ -37,8 +33,6 @@ matrix:
       env: TOXENV=py37 EXTRA_DEPS=wsaccel
       dist: xenial
       sudo: true # required workaround for https://github.com/travis-ci/travis-ci/issues/9815
-    - python: 2.7
-      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=client
     - python: 3.5
       env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=client
     - python: 3.6
@@ -47,8 +41,6 @@ matrix:
       env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=client
       dist: xenial
       sudo: true # required workaround for https://github.com/travis-ci/travis-ci/issues/9815
-    - python: 2.7
-      env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=server
     - python: 3.5
       env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=server
     - python: 3.6
@@ -57,8 +49,6 @@ matrix:
       env: TOXENV=autobahn EXTRA_DEPS=wsaccel SIDE=server
       dist: xenial
       sudo: true # required workaround for https://github.com/travis-ci/travis-ci/issues/9815
-    - python: "pypy-5.7.1"
-      env: TOXENV=pypy
     - python: "pypy3.5-5.7.1-beta"
       env: TOXENV=pypy
 
@@ -67,7 +57,7 @@ matrix:
       env: TOXENV=lint
     - python: 3.6
       env: TOXENV=docs
-    - python: "3.6"
+    - python: 3.6
       env: TOXENV=packaging
 
 install:
