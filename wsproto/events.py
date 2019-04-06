@@ -5,58 +5,22 @@ wsproto/events
 
 Events that result from processing data on a WebSocket connection.
 """
+from abc import ABC
+from dataclasses import dataclass, field
+from typing import Generic, List, Optional, Tuple, TypeVar, Union
+
+from .extensions import Extension
 
 
-class Event:
+class Event(ABC):
     """
     Base class for wsproto events.
     """
 
-    _fields = []
-    _defaults = {}
-
-    def __init__(self, **kwargs):
-        allowed = set(self._fields)
-        for kwarg in kwargs:
-            if kwarg not in allowed:
-                raise TypeError(
-                    "unrecognized kwarg {} for {}".format(
-                        kwarg, self.__class__.__name__
-                    )
-                )
-        required = allowed.difference(self._defaults)
-        for field in required:
-            if field not in kwargs:
-                raise TypeError(
-                    "missing required kwarg {} for {}".format(
-                        field, self.__class__.__name__
-                    )
-                )
-        defaults = {
-            key: value() if callable(value) else value
-            for key, value in self._defaults.items()
-        }
-        self.__dict__.update(defaults)
-        self.__dict__.update(kwargs)
-
-    def __repr__(self):
-        name = self.__class__.__name__
-        kwarg_strs = [
-            "{}={}".format(field, self.__dict__[field]) for field in self._fields
-        ]
-        kwarg_str = ", ".join(kwarg_strs)
-        return "{}({})".format(name, kwarg_str)
-
-    def __eq__(self, other):
-        return self.__class__ == other.__class__ and self.__dict__ == other.__dict__
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    # This is an unhashable type.
-    __hash__ = None
+    pass
 
 
+@dataclass(frozen=True)
 class Request(Event):
     """The beginning of a Websocket connection, the HTTP Upgrade request
 
@@ -65,32 +29,37 @@ class Request(Event):
 
     Fields:
 
-    .. attribute:: extensions (Union[List[Extension], List[str]])
+    .. attribute:: extensions
+
+       The proposed extensions.
 
     .. attribute:: extra_headers
 
        The additional request headers, excluding extensions, host, subprotocols,
        and version headers.
 
-    .. attribute:: host (str)
+    .. attribute:: host
 
        The hostname, or host header value.
 
-    .. attribute:: subprotocols List[str]
-
-       A list of subprotocols ordered by preference.
-
-    .. attribute:: target (str)
+    .. attribute:: subprotocols
 
        A list of the subprotocols proposed in the request, as a list
        of strings.
 
+    .. attribute:: target
+
+       The request target (path and query string)
     """
 
-    _fields = ["extensions", "extra_headers", "host", "subprotocols", "target"]
-    _defaults = {"extensions": list, "extra_headers": list, "subprotocols": list}
+    host: str
+    target: str
+    extensions: Union[List[Extension], List[str]] = field(default_factory=list)
+    extra_headers: List[Tuple[bytes, bytes]] = field(default_factory=list)
+    subprotocols: List[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
 class AcceptConnection(Event):
     """The acceptance of a Websocket upgrade request.
 
@@ -100,21 +69,23 @@ class AcceptConnection(Event):
 
     Fields:
 
-    .. attribute: extra_headers (List[Tuple[bytes, bytes]])
+    .. attribute: extra_headers
 
        Any additional (non websocket related) headers present in the
        acceptance response.
 
-    .. attribute: subprotocol (Optional[str])
+    .. attribute: subprotocol
 
-       The accepted subprotocol to use. Optional.
+       The accepted subprotocol to use.
 
     """
 
-    _fields = ["extensions", "extra_headers", "subprotocol"]
-    _defaults = {"extensions": list, "extra_headers": list, "subprotocol": None}
+    subprotocol: Optional[str] = None
+    extensions: List[Extension] = field(default_factory=list)
+    extra_headers: List[Tuple[bytes, bytes]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
 class RejectConnection(Event):
     """The rejection of a Websocket upgrade request, the HTTP response.
 
@@ -140,10 +111,12 @@ class RejectConnection(Event):
 
     """
 
-    _fields = ["headers", "has_body", "status_code"]
-    _defaults = {"headers": list, "has_body": False, "status_code": 400}
+    status_code: int = 400
+    headers: List[Tuple[bytes, bytes]] = field(default_factory=list)
+    has_body: bool = False
 
 
+@dataclass(frozen=True)
 class RejectData(Event):
     """The rejection HTTP response body.
 
@@ -159,10 +132,11 @@ class RejectData(Event):
 
     """
 
-    _fields = ["body_finished", "data"]
-    _defaults = {"body_finished": True}
+    data: bytes
+    body_finished: bool = True
 
 
+@dataclass(frozen=True)
 class CloseConnection(Event):
 
     """The end of a Websocket connection, represents a closure frame.
@@ -185,24 +159,21 @@ class CloseConnection(Event):
 
     """
 
-    _fields = ["code", "reason"]
-    _defaults = {"reason": None}
+    code: int
+    reason: Optional[str] = None
 
     def response(self):
         return CloseConnection(code=self.code, reason=self.reason)
 
 
-class Message(Event):
+T = TypeVar("T", bytes, str)
+
+
+@dataclass(frozen=True)
+class Message(Event, Generic[T]):
     """The websocket data message.
 
     Fields:
-
-    .. attribute:: data
-
-       The message data as byte string, can be decoded as UTF-8 for
-       TEXT messages.  This only represents a single chunk of data and
-       not a full WebSocket message.  You need to buffer and
-       reassemble these chunks to get the full message.
 
     .. attribute:: frame_finished
 
@@ -217,25 +188,48 @@ class Message(Event):
 
     """
 
-    _fields = ["data", "frame_finished", "message_finished"]
-    _defaults = {"frame_finished": True, "message_finished": True}
+    data: T
+    frame_finished: bool = True
+    message_finished: bool = True
 
 
-class TextMessage(Message):
-    """This event is fired when a data frame with TEXT payload is received."""
+@dataclass(frozen=True)
+class TextMessage(Message[str]):
+    """This event is fired when a data frame with TEXT payload is received.
 
-    pass
+    Fields:
 
+    .. attribute:: data
 
-class BytesMessage(Message):
-    """This event is fired when a data frame with BINARY payload is
-    received.
+       The message data as string, This only represents a single chunk
+       of data and not a full WebSocket message.  You need to buffer
+       and reassemble these chunks to get the full message.
 
     """
 
     pass
 
 
+@dataclass(frozen=True)
+class BytesMessage(Message[bytes]):
+    """This event is fired when a data frame with BINARY payload is
+    received.
+
+    Fields:
+
+    .. attribute:: data
+
+       The message data as byte string, can be decoded as UTF-8 for
+       TEXT messages.  This only represents a single chunk of data and
+       not a full WebSocket message.  You need to buffer and
+       reassemble these chunks to get the full message.
+
+    """
+
+    pass
+
+
+@dataclass(frozen=True)
 class Ping(Event):
     """The Ping event can be sent to trigger a ping frame and is fired
     when a Ping is received.
@@ -249,13 +243,13 @@ class Ping(Event):
        An optional payload to emit with the ping frame.
     """
 
-    _fields = ["payload"]
-    _defaults = {"payload": b""}
+    payload: bytes = b""
 
     def response(self):
         return Pong(payload=self.payload)
 
 
+@dataclass(frozen=True)
 class Pong(Event):
     """The Pong event is fired when a Pong is received.
 
@@ -267,5 +261,4 @@ class Pong(Event):
 
     """
 
-    _fields = ["payload"]
-    _defaults = {"payload": b""}
+    payload: bytes = b""

@@ -53,6 +53,7 @@ setup(
         'Programming Language :: Python :: Implementation :: PyPy',
     ],
     install_requires=[
+        "dataclasses ; python_version < '3.7'",
         'h11 ~= 0.8.1',  # means: 0.8.x where x >= 1
     ],
 )

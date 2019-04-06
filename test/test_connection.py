@@ -33,7 +33,7 @@ def test_send_message(client_sends, final):
         remote = client
 
     data = b"x" * 23
-    remote.receive_data(local.send(Message(data=data, message_finished=final)))
+    remote.receive_data(local.send(BytesMessage(data=data, message_finished=final)))
     event = next(remote.events())
     assert isinstance(event, BytesMessage)
     assert event.data == data
