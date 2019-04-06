@@ -327,11 +327,11 @@ class H11Handshake:
             offers = {e.name: e.offer() for e in request.extensions}
             extensions = []
             for name, params in offers.items():
+                name = name.encode("ascii")
                 if params is True:
-                    extensions.append(name.encode("ascii"))
+                    extensions.append(name)
                 elif params:
-                    # py34 annoyance: doesn't support bytestring formatting
-                    extensions.append(("%s; %s" % (name, params)).encode("ascii"))
+                    extensions.append(b"%s; %s" % (name, params.encode("ascii")))
             if extensions:
                 headers.append((b"Sec-WebSocket-Extensions", b", ".join(extensions)))
 
@@ -428,15 +428,14 @@ def server_extensions_handshake(requested, supported):
     if accepts:
         extensions = []
         for name, params in accepts.items():
+            name = name.encode("ascii")
             if params is True:
-                extensions.append(name.encode("ascii"))
+                extensions.append(name)
             else:
-                # py34 annoyance: doesn't support bytestring formatting
-                params = params.decode("ascii")
-                if params == "":
-                    extensions.append(("%s" % (name)).encode("ascii"))
+                if params == b"":
+                    extensions.append(b"%s" % (name))
                 else:
-                    extensions.append(("%s; %s" % (name, params)).encode("ascii"))
+                    extensions.append(b"%s; %s" % (name, params))
         return b", ".join(extensions)
 
     return None

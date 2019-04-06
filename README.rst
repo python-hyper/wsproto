@@ -23,7 +23,7 @@ of data actions and WebSocket frames. RFC6455 and Compression Extensions for
 WebSocket via `RFC7692 <https://tools.ietf.org/html/rfc7692>`_ are fully
 supported.
 
-wsproto supports Python 3.5 or higher.
+wsproto supports Python 3.6.1 or higher.
 
 To install it, just run:
 
