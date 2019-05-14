@@ -49,19 +49,12 @@ def handle_connection(stream):
     loop:
 
     1) Read data from network into wsproto
-    2) Get next wsproto event
-    3) Handle event
-    4) Send data from wsproto to network
+    2) Get new events and handle them
+    3) Send data from wsproto to network
 
     :param stream: a socket stream
     '''
     ws = WSConnection(ConnectionType.SERVER)
-
-    # events is a generator that yields websocket event objects. Usually you
-    # would say `for event in ws.events()`, but the synchronous nature of this
-    # server requires us to use next(event) instead so that we can interleave
-    # the network I/O.
-    events = ws.events()
     running = True
 
     while running:
@@ -70,36 +63,31 @@ def handle_connection(stream):
         print('Received {} bytes'.format(len(in_data)))
         ws.receive_data(in_data)
 
-        # 2) Get next wsproto event
-        try:
-            event = next(events)
-        except StopIteration:
-            print('Client connection dropped unexpectedly')
-            return
-
-        # 3) Handle event
-        if isinstance(event, Request):
-            # Negotiate new WebSocket connection
-            print('Accepting WebSocket upgrade')
-            out_data = ws.send(AcceptConnection())
-        elif isinstance(event, CloseConnection):
-            # Print log message and break out
-            print('Connection closed: code={}/{} reason={}'.format(
-                event.code.value, event.code.name, event.reason))
-            out_data = ws.send(event.response())
-            running = False
-        elif isinstance(event, TextMessage):
-            # Reverse text and send it back to wsproto
-            print('Received request and sending response')
-            out_data = ws.send(Message(data=event.data[::-1]))
-        elif isinstance(event, Ping):
-            # wsproto handles ping events for you by placing a pong frame in
-            # the outgoing buffer. You should not call pong() unless you want to
-            # send an unsolicited pong frame.
-            print('Received ping and sending pong')
-            out_data = ws.send(event.response())
-        else:
-            print('Unknown event: {!r}'.format(event))
+        # 2) Get new events and handle them
+        out_data = b''
+        for event in ws.events():
+            if isinstance(event, Request):
+                # Negotiate new WebSocket connection
+                print('Accepting WebSocket upgrade')
+                out_data += ws.send(AcceptConnection())
+            elif isinstance(event, CloseConnection):
+                # Print log message and break out
+                print('Connection closed: code={}/{} reason={}'.format(
+                    event.code.value, event.code.name, event.reason))
+                out_data += ws.send(event.response())
+                running = False
+            elif isinstance(event, TextMessage):
+                # Reverse text and send it back to wsproto
+                print('Received request and sending response')
+                out_data += ws.send(Message(data=event.data[::-1]))
+            elif isinstance(event, Ping):
+                # wsproto handles ping events for you by placing a pong frame in
+                # the outgoing buffer. You should not call pong() unless you want to
+                # send an unsolicited pong frame.
+                print('Received ping and sending pong')
+                out_data += ws.send(event.response())
+            else:
+                print('Unknown event: {!r}'.format(event))
 
         # 4) Send data from wsproto to network
         print('Sending {} bytes'.format(len(out_data)))

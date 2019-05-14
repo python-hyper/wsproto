@@ -30,6 +30,14 @@ class Request(Event):
 
     Fields:
 
+    .. attribute:: host
+
+       (Required) The hostname, or host header value.
+
+    .. attribute:: target
+
+       (Required) The request target (path and query string)
+
     .. attribute:: extensions
 
        The proposed extensions.
@@ -39,18 +47,10 @@ class Request(Event):
        The additional request headers, excluding extensions, host, subprotocols,
        and version headers.
 
-    .. attribute:: host
-
-       The hostname, or host header value.
-
     .. attribute:: subprotocols
 
        A list of the subprotocols proposed in the request, as a list
        of strings.
-
-    .. attribute:: target
-
-       The request target (path and query string)
     """
 
     host: str
@@ -72,12 +72,12 @@ class AcceptConnection(Event):
 
     Fields:
 
-    .. attribute: extra_headers
+    .. attribute:: extra_headers
 
        Any additional (non websocket related) headers present in the
        acceptance response.
 
-    .. attribute: subprotocol
+    .. attribute:: subprotocol
 
        The accepted subprotocol to use.
 
@@ -131,7 +131,7 @@ class RejectData(Event):
 
     .. attribute:: data (bytes)
 
-       The raw body data.
+       (Required) The raw body data.
 
     """
 
@@ -144,16 +144,17 @@ class CloseConnection(Event):
 
     """The end of a Websocket connection, represents a closure frame.
 
-    This event is fired after the connection is considered closed.
-
-    wsproto automatically emits a CLOSE frame when it receives one, to
-    complete the close-handshake.
+    **wsproto does not automatically send a response to a close event.** To
+    comply with the RFC you MUST send a close event back to the remote WebSocket
+    if you have not already sent one. The :meth:`response` method provides a
+    suitable event for this purpose, and you should check if a response needs
+    to be sent by checking :func:`wsproto.WSConnection.state`.
 
     Fields:
 
     .. attribute:: code
 
-       The integer close code to indicate why the connection
+       (Required) The integer close code to indicate why the connection
        has closed.
 
     .. attribute:: reason
@@ -166,6 +167,7 @@ class CloseConnection(Event):
     reason: Optional[str] = None
 
     def response(self) -> "CloseConnection":
+        """ Generate an RFC-compliant close frame to send back to the peer. """
         return CloseConnection(code=self.code, reason=self.reason)
 
 
@@ -177,6 +179,13 @@ class Message(Event, Generic[T]):
     """The websocket data message.
 
     Fields:
+
+    .. attribute:: data
+
+       (Required) The message data as byte string, can be decoded as UTF-8 for
+       TEXT messages.  This only represents a single chunk of data and
+       not a full WebSocket message.  You need to buffer and
+       reassemble these chunks to get the full message.
 
     .. attribute:: frame_finished
 
@@ -226,7 +235,6 @@ class BytesMessage(Message[bytes]):
        TEXT messages.  This only represents a single chunk of data and
        not a full WebSocket message.  You need to buffer and
        reassemble these chunks to get the full message.
-
     """
 
     pass
@@ -237,7 +245,9 @@ class Ping(Event):
     """The Ping event can be sent to trigger a ping frame and is fired
     when a Ping is received.
 
-    wsproto automatically emits a PONG frame with the same payload.
+    **wsproto does not automatically send a pong response to a ping event.** To
+    comply with the RFC you MUST send a pong even as soon as is practical. The
+    :meth:`response` method provides a suitable event for this purpose.
 
     Fields:
 
@@ -249,6 +259,7 @@ class Ping(Event):
     payload: bytes = b""
 
     def response(self) -> "Pong":
+        """ Generate an RFC-compliant :class:`Pong` response to this ping. """
         return Pong(payload=self.payload)
 
 
