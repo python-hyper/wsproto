@@ -55,6 +55,8 @@ class H11Handshake:
         This will either return the connection or raise a
         LocalProtocolError if the connection has not yet been
         established.
+
+        :rtype: h11.Connection
         """
         return self._connection
 
@@ -64,6 +66,8 @@ class H11Handshake:
         This should be used if the request has already be received and
         parsed.
 
+        :param list headers: HTTP headers represented as a list of 2-tuples.
+        :param str path: A URL path.
         """
         if self.client:
             raise LocalProtocolError(
@@ -80,6 +84,8 @@ class H11Handshake:
         a LocalProtocolError if the event is not valid given the
         state.
 
+        :returns: Data to send to the WebSocket peer.
+        :rtype: bytes
         """
         data = b""
         if isinstance(event, Request):
@@ -102,6 +108,7 @@ class H11Handshake:
         A list of events that the remote peer triggered by sending
         this data can be retrieved with :meth:`events`.
 
+        :param bytes data: Data received from the WebSocket peer.
         """
         self._h11_connection.receive_data(data)
         while True:
@@ -152,6 +159,11 @@ class H11Handshake:
                     self._events.append(self._process_connection_request(event))
 
     def events(self) -> Generator[Event, None, None]:
+        """Return a generator that provides any events that have been generated
+        by protocol activity.
+
+        :returns: a generator that yields H11 events.
+        """
         while self._events:
             yield self._events.popleft()
 

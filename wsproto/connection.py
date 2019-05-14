@@ -28,16 +28,22 @@ class ConnectionState(Enum):
     """
     RFC 6455, Section 4 - Opening Handshake
     """
-
+    #: The opening handshake is in progress.
     CONNECTING = 0
+    #: The opening handshake is complete.
     OPEN = 1
+    #: The remote WebSocket has initiated a connection close.
     REMOTE_CLOSING = 2
+    #: The local WebSocket (i.e. this instance) has initiated a connection close.
     LOCAL_CLOSING = 3
+    #: The closing handshake has completed.
     CLOSED = 4
+    #: The connection was rejected during the opening handshake.
     REJECTING = 5
 
 
 class ConnectionType(Enum):
+    """ An enumeration of connection types. """
     #: This connection will act as client and talk to a remote server
     CLIENT = 1
 

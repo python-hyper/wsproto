@@ -16,13 +16,27 @@ __version__ = "0.14.0+dev"
 
 
 class WSConnection:
+    """
+    Represents the local end of a WebSocket connection to a remote peer.
+    """
     def __init__(self, connection_type: ConnectionType) -> None:
+        """
+        Constructor
+
+        :param wsproto.connection.ConnectionType connection_type: Controls
+            whether the library behaves as a client or as a server.
+        """
+        # type: (ConnectionType) -> None
         self.client = connection_type is ConnectionType.CLIENT
         self.handshake = H11Handshake(connection_type)
         self.connection: Optional[Connection] = None
 
     @property
     def state(self) -> ConnectionState:
+        """
+        :returns: Connection state
+        :rtype: wsproto.connection.ConnectionState
+        """
         if self.connection is None:  # noqa
             return self.handshake.state
         else:
@@ -32,6 +46,16 @@ class WSConnection:
         self.handshake.initiate_upgrade_connection(headers, path)
 
     def send(self, event: Event) -> bytes:
+        """
+        Generate network data for the specified event.
+
+        When you want to communicate with a WebSocket peer, you should construct
+        an event and pass it to this method. This method will return the bytes
+        that you should send to the peer.
+
+        :param wsproto.events.Event event: The event to generate data for
+        :returns bytes: The data to send to the peer
+        """
         data = b""
         if self.connection is None:
             data += self.handshake.send(event)
@@ -41,6 +65,14 @@ class WSConnection:
         return data
 
     def receive_data(self, data: bytes) -> None:
+        """
+        Feed network data into the connection instance.
+
+        After calling this method, you should call :meth:`events` to see if the
+        received data triggered any new events.
+
+        :param bytes data: Data received from remote peer
+        """
         if self.connection is None:
             self.handshake.receive_data(data)
             self.connection = self.handshake.connection
@@ -48,6 +80,12 @@ class WSConnection:
             self.connection.receive_data(data)
 
     def events(self) -> Generator[Event, None, None]:
+        """
+        A generator that yields pending events.
+
+        Each event is an instance of a subclass of
+        :class:`wsproto.events.Event`.
+        """
         for event in self.handshake.events():
             yield event
         if self.connection is not None:

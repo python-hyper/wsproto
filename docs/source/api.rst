@@ -16,6 +16,13 @@ Connection
 ----------
 
 .. autoclass:: wsproto.WSConnection
+   :special-members: __init__
+   :members:
+
+.. autoclass:: wsproto.ConnectionType
+   :members:
+
+.. autoclass:: wsproto.connection.ConnectionState
    :members:
 
 Handshake
@@ -30,6 +37,9 @@ Handshake
 
 Events
 ------
+
+Event constructors accept any field as a keyword argument. Some fields are
+required, while others have default values.
 
 .. autoclass:: wsproto.events.Event
    :members:
