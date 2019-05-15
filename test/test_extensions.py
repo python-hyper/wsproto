@@ -17,7 +17,7 @@ class TestExtension(object):
 
     def test_finalize(self):
         ext = wpext.Extension()
-        assert ext.finalize(None) is None
+        ext.finalize(None)
 
     def test_frame_inbound_header(self):
         ext = wpext.Extension()
@@ -26,7 +26,7 @@ class TestExtension(object):
 
     def test_frame_inbound_payload_data(self):
         ext = wpext.Extension()
-        data = object()
+        data = b""
         assert ext.frame_inbound_payload_data(None, data) == data
 
     def test_frame_inbound_complete(self):
@@ -36,5 +36,5 @@ class TestExtension(object):
     def test_frame_outbound(self):
         ext = wpext.Extension()
         rsv = fp.RsvBits(True, True, True)
-        data = object()
+        data = b""
         assert ext.frame_outbound(None, None, rsv, data, None) == (rsv, data)

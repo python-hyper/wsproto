@@ -37,7 +37,7 @@ def test_rejected_handshake():
 def test_initiate_upgrade_as_client():
     client = H11Handshake(CLIENT)
     with pytest.raises(LocalProtocolError):
-        client.initiate_upgrade_connection([], b"/")
+        client.initiate_upgrade_connection([], "/")
 
 
 def test_send_invalid_event():

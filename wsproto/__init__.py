@@ -8,12 +8,12 @@ A WebSocket implementation.
 from .connection import ConnectionType
 from .handshake import H11Handshake
 
-__version__ = "0.13.0+dev"
+__version__ = "0.14.0+dev"
 
 
 class WSConnection(object):
     def __init__(self, connection_type):
-        # type: (ConnectionType) -> None:
+        # type: (ConnectionType) -> None
         self.client = connection_type is ConnectionType.CLIENT
         self.handshake = H11Handshake(connection_type)
         self.connection = None

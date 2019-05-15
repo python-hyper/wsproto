@@ -67,7 +67,7 @@ class Connection(object):
         return self._state
 
     def send(self, event):
-        # type: (wsproto.events.Event) -> bytes:
+        # type: (wsproto.events.Event) -> bytes
         data = b""
         if isinstance(event, Message):
             data += self._proto.send_data(event.data, event.message_finished)

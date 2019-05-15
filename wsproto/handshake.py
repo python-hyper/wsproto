@@ -270,7 +270,7 @@ class H11Handshake(object):
         return self._h11_connection.send(response)
 
     def _reject(self, event):
-        # type: (RejectConnection) -> bytes:
+        # type: (RejectConnection) -> bytes
         if self.state != ConnectionState.CONNECTING:
             raise LocalProtocolError(
                 "Connection cannot be rejected in state %s" % self.state
@@ -278,7 +278,7 @@ class H11Handshake(object):
 
         headers = event.headers
         if not event.has_body:
-            headers.append(("content-length", "0"))
+            headers.append((b"content-length", b"0"))
         response = h11.Response(status_code=event.status_code, headers=headers)
         data = self._h11_connection.send(response)
         self._state = ConnectionState.REJECTING
@@ -288,7 +288,7 @@ class H11Handshake(object):
         return data
 
     def _send_reject_data(self, event):
-        # type: (RejectData) -> bytes:
+        # type: (RejectData) -> bytes
         if self.state != ConnectionState.REJECTING:
             raise LocalProtocolError(
                 "Cannot send rejection data in state {}".format(self.state)

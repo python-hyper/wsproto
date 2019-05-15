@@ -1,6 +1,16 @@
-0.14.0 Unreleased
+0.15.0 Unreleased
 -----------------
 
+
+0.14.0 2019-04-06
+-----------------
+
+* Bugfix clarify subprotocol type as str not bytes.
+* Support HTTP/2 WebSockets. This requires a HTTP/2 parser (not
+  included), with hyper-h2 recommended. It renames
+  ``handshake_extensions`` and hence is a breaking change.
+* Bugfix badly formatted type hints.
+* Bugfix minor issues identified by type checking.
 
 0.13.0 2019-01-24
 -----------------
