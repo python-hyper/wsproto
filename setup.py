@@ -35,7 +35,7 @@ setup(
     author='Benno Rice',
     author_email='benno@jeamland.net',
     url='https://github.com/python-hyper/wsproto/',
-    packages=find_packages(),
+    packages=find_packages(exclude=['test']),
     package_data={'': ['LICENSE', 'README.rst']},
     package_dir={'wsproto': 'wsproto'},
     include_package_data=True,
