@@ -8,7 +8,7 @@ A WebSocket implementation.
 from .connection import ConnectionType
 from .handshake import H11Handshake
 
-__version__ = "0.14.0+dev"
+__version__ = "0.14.1"
 
 
 class WSConnection(object):
