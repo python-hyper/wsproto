@@ -1,6 +1,12 @@
 0.15.0 Unreleased
 -----------------
 
+0.14.1 2019-05-30
+-----------------
+
+* Loosen the h11 requirement to >= 0.8.1 as wsproto is compatible with
+  0.9 onwards.
+* Stop installing a "test" package on installation.
 
 0.14.0 2019-04-06
 -----------------
