@@ -21,7 +21,7 @@
 0.13.0 2019-01-24
 -----------------
 
-* Introduce a send method on the conenction which accepts the new
+* Introduce a send method on the connection which accepts the new
   events. This requires the following usage changes, ::
 
     connection.accept(subprotocol=subprotocol) -> connection.send(AcceptConnection(subprotocol=subprotocol))
