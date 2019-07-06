@@ -1,8 +1,6 @@
 # Things that would be nice:
 # - less hard-coding of paths here
 
-from __future__ import print_function
-
 import argparse
 import copy
 import errno
@@ -12,6 +10,7 @@ import socket
 import subprocess
 import sys
 import time
+from typing import Any, Dict, List, Tuple
 
 PORT = 8642
 
@@ -63,11 +62,11 @@ CASES = {
 }
 
 
-def say(*args):
+def say(*args: Any) -> None:  # type: ignore
     print("run-autobahn-tests.py:", *args)
 
 
-def setup_venv():
+def setup_venv() -> None:
     if not os.path.exists("autobahntestsuite-venv"):
         say("Creating Python 2.7 environment and installing autobahntestsuite")
         subprocess.check_call(
@@ -78,7 +77,7 @@ def setup_venv():
         )
 
 
-def wait_for_listener(port):
+def wait_for_listener(port: int) -> None:
     while True:
         sock = socket.socket()
         try:
@@ -94,7 +93,7 @@ def wait_for_listener(port):
             sock.close()
 
 
-def coverage(command, coverage_settings):
+def coverage(command: List[str], coverage_settings: Dict[str, str]) -> List[str]:
     if not coverage_settings["enabled"]:
         return [sys.executable] + command
 
@@ -108,7 +107,7 @@ def coverage(command, coverage_settings):
     ] + command
 
 
-def summarize(report_path):
+def summarize(report_path: str) -> Tuple[int, int]:
     with open(os.path.join(report_path, "index.json")) as f:
         result_summary = json.load(f)["wsproto"]
     failed = 0
@@ -131,7 +130,9 @@ def summarize(report_path):
     return failed, total
 
 
-def run_client_tests(cases, coverage_settings):
+def run_client_tests(
+    cases: List[str], coverage_settings: Dict[str, str]
+) -> Tuple[int, int]:
     say("Starting autobahntestsuite server")
     server_config = copy.deepcopy(SERVER_CONFIG)
     server_config["cases"] = cases
@@ -162,7 +163,9 @@ def run_client_tests(cases, coverage_settings):
     return summarize("reports/clients")
 
 
-def run_server_tests(cases, coverage_settings):
+def run_server_tests(
+    cases: List[str], coverage_settings: Dict[str, str]
+) -> Tuple[int, int]:
     say("Starting wsproto test server")
     server = subprocess.Popen(coverage(["./test_server.py"], coverage_settings))
     try:
@@ -194,7 +197,7 @@ def run_server_tests(cases, coverage_settings):
     return summarize("reports/servers")
 
 
-def main():
+def main() -> None:
     if not os.path.exists("test_client.py"):
         say("Run me from the compliance/ directory")
         sys.exit(2)
