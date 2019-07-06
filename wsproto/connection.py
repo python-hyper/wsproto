@@ -8,7 +8,7 @@ An implementation of a WebSocket connection.
 
 from collections import deque
 from enum import Enum
-from typing import Generator, List, Optional
+from typing import Deque, Generator, List, Optional
 
 from .events import (
     BytesMessage,
@@ -78,7 +78,7 @@ class Connection:
         trailing_data: bytes = b"",
     ) -> None:
         self.client = connection_type is ConnectionType.CLIENT
-        self._events = deque()  # type: ignore
+        self._events: Deque[Event] = deque()
         self._proto = FrameProtocol(self.client, extensions or [])
         self._state = ConnectionState.OPEN
         self.receive_data(trailing_data)
@@ -148,29 +148,34 @@ class Connection:
             for frame in self._proto.received_frames():
                 if frame.opcode is Opcode.PING:
                     assert frame.frame_finished and frame.message_finished
-                    yield Ping(payload=frame.payload)  # type: ignore
+                    assert isinstance(frame.payload, (bytes, bytearray))
+                    yield Ping(payload=frame.payload)
 
                 elif frame.opcode is Opcode.PONG:
                     assert frame.frame_finished and frame.message_finished
-                    yield Pong(payload=frame.payload)  # type: ignore
+                    assert isinstance(frame.payload, (bytes, bytearray))
+                    yield Pong(payload=frame.payload)
 
                 elif frame.opcode is Opcode.CLOSE:
+                    assert isinstance(frame.payload, tuple)
                     code, reason = frame.payload
                     if self.state is ConnectionState.LOCAL_CLOSING:
                         self._state = ConnectionState.CLOSED
                     else:
                         self._state = ConnectionState.REMOTE_CLOSING
-                    yield CloseConnection(code=code, reason=reason)  # type: ignore
+                    yield CloseConnection(code=code, reason=reason)
 
                 elif frame.opcode is Opcode.TEXT:
-                    yield TextMessage(  # type: ignore
+                    assert isinstance(frame.payload, str)
+                    yield TextMessage(
                         data=frame.payload,
                         frame_finished=frame.frame_finished,
                         message_finished=frame.message_finished,
                     )
 
                 elif frame.opcode is Opcode.BINARY:
-                    yield BytesMessage(  # type: ignore
+                    assert isinstance(frame.payload, (bytes, bytearray))
+                    yield BytesMessage(
                         data=frame.payload,
                         frame_finished=frame.frame_finished,
                         message_finished=frame.message_finished,

@@ -32,7 +32,9 @@ def _make_connection_request(request_headers: Headers, method: str = "GET") -> R
     server.receive_data(
         client.send(h11.Request(method=method, target="/", headers=request_headers))
     )
-    return next(server.events())  # type: ignore
+    event = next(server.events())
+    assert isinstance(event, Request)
+    return event
 
 
 def test_connection_request() -> None:

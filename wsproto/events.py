@@ -7,7 +7,7 @@ Events that result from processing data on a WebSocket connection.
 """
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Generic, List, Optional, TypeVar, Union
+from typing import Generic, List, Optional, Sequence, TypeVar, Union
 
 from .extensions import Extension
 from .typing import Headers
@@ -55,7 +55,7 @@ class Request(Event):
 
     host: str
     target: str
-    extensions: Union[List[Extension], List[str]] = field(  # type: ignore
+    extensions: Union[Sequence[Extension], Sequence[str]] = field(  # type: ignore
         default_factory=list
     )
     extra_headers: Headers = field(default_factory=list)
@@ -235,7 +235,8 @@ class TextMessage(Message[str]):
 
     """
 
-    pass
+    # https://github.com/python/mypy/issues/5744
+    data: str
 
 
 @dataclass(frozen=True)
@@ -253,7 +254,8 @@ class BytesMessage(Message[bytes]):
        reassemble these chunks to get the full message.
     """
 
-    pass
+    # https://github.com/python/mypy/issues/5744
+    data: bytes
 
 
 @dataclass(frozen=True)

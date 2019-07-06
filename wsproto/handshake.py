@@ -332,12 +332,11 @@ class H11Handshake:
             extensions = []
             for name, params in offers.items():
                 name = name.encode("ascii")
-                if params is True:
-                    extensions.append(name)
-                elif params:
-                    extensions.append(
-                        b"%s; %s" % (name, params.encode("ascii"))  # type: ignore
-                    )
+                if isinstance(params, bool):
+                    if params:
+                        extensions.append(name)
+                else:
+                    extensions.append(b"%s; %s" % (name, params.encode("ascii")))
             if extensions:
                 headers.append((b"Sec-WebSocket-Extensions", b", ".join(extensions)))
 
@@ -429,22 +428,24 @@ def server_extensions_handshake(
         for extension in supported:
             if extension.name == name:
                 accept = extension.accept(offer)
-                if accept is True:
-                    accepts[extension.name] = True
-                elif accept is not False and accept is not None:
-                    accepts[extension.name] = accept.encode("ascii")  # type: ignore
+                if isinstance(accept, bool):
+                    if accept:
+                        accepts[extension.name] = True
+                elif accept is not None:
+                    accepts[extension.name] = accept.encode("ascii")
 
     if accepts:
         extensions: List[bytes] = []
         for name, params in accepts.items():
-            name = name.encode("ascii")  # type: ignore
-            if params is True:
-                extensions.append(name)  # type: ignore
+            name_bytes = name.encode("ascii")
+            if isinstance(params, bool):
+                assert params
+                extensions.append(name_bytes)
             else:
                 if params == b"":
-                    extensions.append(b"%s" % (name))
+                    extensions.append(b"%s" % (name_bytes))
                 else:
-                    extensions.append(b"%s; %s" % (name, params))
+                    extensions.append(b"%s; %s" % (name_bytes, params))
         return b", ".join(extensions)
 
     return None

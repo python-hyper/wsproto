@@ -11,16 +11,7 @@ import os
 import struct
 from codecs import getincrementaldecoder, IncrementalDecoder
 from enum import IntEnum
-from typing import (
-    AnyStr,
-    Generator,
-    List,
-    NamedTuple,
-    Optional,
-    Tuple,
-    TYPE_CHECKING,
-    Union,
-)
+from typing import Generator, List, NamedTuple, Optional, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from .extensions import Extension  # noqa
@@ -302,10 +293,11 @@ class MessageDecoder:
 
         finished = frame.frame_finished and frame.message_finished
 
-        if self.decoder is not None:
-            data = self.decode_payload(frame.payload, finished)  # type: ignore
+        if self.decoder is None:
+            data = frame.payload
         else:
-            data = frame.payload  # type: ignore
+            assert isinstance(frame.payload, (bytes, bytearray))
+            data = self.decode_payload(frame.payload, finished)
 
         frame = Frame(self.opcode, data, frame.frame_finished, finished)
 
@@ -358,11 +350,10 @@ class FrameDecoder:
         payload = self.masker.process(payload)
 
         for extension in self.extensions:
-            payload = extension.frame_inbound_payload_data(  # type: ignore
-                self, payload
-            )
-            if isinstance(payload, CloseReason):
-                raise ParseFailed("error in extension", payload)
+            payload_ = extension.frame_inbound_payload_data(self, payload)
+            if isinstance(payload_, CloseReason):
+                raise ParseFailed("error in extension", payload_)
+            payload = payload_
 
         if finished:
             final = bytearray()
@@ -496,6 +487,7 @@ class FrameProtocol:
 
     def _process_close(self, frame: Frame) -> Frame:
         data = frame.payload
+        assert isinstance(data, (bytes, bytearray))
 
         if not data:
             # "If this Close control frame contains no status code, _The
@@ -504,7 +496,7 @@ class FrameProtocol:
         elif len(data) == 1:
             raise ParseFailed("CLOSE with 1 byte payload")
         else:
-            (code,) = struct.unpack("!H", data[:2])  # type: ignore
+            (code,) = struct.unpack("!H", data[:2])
             if code < MIN_CLOSE_REASON or code > MAX_CLOSE_REASON:
                 raise ParseFailed("CLOSE with invalid code")
             try:
@@ -516,7 +508,7 @@ class FrameProtocol:
             if not isinstance(code, CloseReason) and code <= MAX_PROTOCOL_CLOSE_REASON:
                 raise ParseFailed("CLOSE with unknown reserved code")
             try:
-                reason = data[2:].decode("utf-8")  # type: ignore
+                reason = data[2:].decode("utf-8")
             except UnicodeDecodeError as exc:
                 raise ParseFailed(
                     "Error decoding CLOSE reason: " + str(exc),
@@ -578,14 +570,14 @@ class FrameProtocol:
     def pong(self, payload: bytes = b"") -> bytes:
         return self._serialize_frame(Opcode.PONG, payload)
 
-    def send_data(  # type: ignore
-        self, payload: AnyStr = b"", fin: bool = True
+    def send_data(
+        self, payload: Union[bytes, bytearray, str] = b"", fin: bool = True
     ) -> bytes:
         if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
         elif isinstance(payload, str):
             opcode = Opcode.TEXT
-            payload = payload.encode("utf-8")  # type: ignore
+            payload = payload.encode("utf-8")
         else:
             raise ValueError("Must provide bytes or text")
 
@@ -599,16 +591,14 @@ class FrameProtocol:
         if fin:
             self._outbound_opcode = None
 
-        return self._serialize_frame(opcode, payload, fin)  # type: ignore
+        return self._serialize_frame(opcode, payload, fin)
 
     def _make_fin_rsv_opcode(self, fin: bool, rsv: RsvBits, opcode: Opcode) -> int:
-        fin = int(fin) << 7  # type: ignore
-        rsv = (  # type: ignore
-            (int(rsv.rsv1) << 6) + (int(rsv.rsv2) << 5) + (int(rsv.rsv3) << 4)
-        )
-        opcode = int(opcode)  # type: ignore
+        fin_bits = int(fin) << 7
+        rsv_bits = (int(rsv.rsv1) << 6) + (int(rsv.rsv2) << 5) + (int(rsv.rsv3) << 4)
+        opcode_bits = int(opcode)
 
-        return fin | rsv | opcode  # type: ignore
+        return fin_bits | rsv_bits | opcode_bits
 
     def _serialize_frame(
         self, opcode: Opcode, payload: bytes = b"", fin: bool = True
