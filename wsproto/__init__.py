@@ -19,6 +19,7 @@ class WSConnection:
     """
     Represents the local end of a WebSocket connection to a remote peer.
     """
+
     def __init__(self, connection_type: ConnectionType) -> None:
         """
         Constructor

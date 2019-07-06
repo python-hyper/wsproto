@@ -28,6 +28,7 @@ class ConnectionState(Enum):
     """
     RFC 6455, Section 4 - Opening Handshake
     """
+
     #: The opening handshake is in progress.
     CONNECTING = 0
     #: The opening handshake is complete.
@@ -44,6 +45,7 @@ class ConnectionState(Enum):
 
 class ConnectionType(Enum):
     """ An enumeration of connection types. """
+
     #: This connection will act as client and talk to a remote server
     CLIENT = 1
 
