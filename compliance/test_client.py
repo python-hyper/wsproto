@@ -1,5 +1,6 @@
 import json
 import socket
+from typing import Optional
 from urllib.parse import urlparse
 
 from wsproto import WSConnection
@@ -21,7 +22,7 @@ AGENT = "wsproto"
 CONNECTION_EXCEPTIONS = (ConnectionError, OSError)
 
 
-def get_case_count(server):
+def get_case_count(server: str) -> int:
     uri = urlparse(server + "/getCaseCount")
     connection = WSConnection(CLIENT)
     sock = socket.socket()
@@ -29,10 +30,10 @@ def get_case_count(server):
 
     sock.sendall(connection.send(Request(host=uri.netloc, target=uri.path)))
 
-    case_count = None
+    case_count: Optional[int] = None
     while case_count is None:
-        data = sock.recv(65535)
-        connection.receive_data(data)
+        in_data = sock.recv(65535)
+        connection.receive_data(in_data)
         data = ""
         out_data = b""
         for event in connection.events():
@@ -52,7 +53,7 @@ def get_case_count(server):
     return case_count
 
 
-def run_case(server, case, agent):
+def run_case(server: str, case: int, agent: str) -> None:
     uri = urlparse(server + "/runCase?case=%d&agent=%s" % (case, agent))
     connection = WSConnection(CLIENT)
     sock = socket.socket()
@@ -71,7 +72,7 @@ def run_case(server, case, agent):
 
     while not closed:
         try:
-            data = sock.recv(65535)
+            data: Optional[bytes] = sock.recv(65535)
         except CONNECTION_EXCEPTIONS:
             data = None
         connection.receive_data(data or None)
@@ -97,7 +98,7 @@ def run_case(server, case, agent):
             break
 
 
-def update_reports(server, agent):
+def update_reports(server: str, agent: str) -> None:
     uri = urlparse(server + "/updateReports?agent=%s" % agent)
     connection = WSConnection(CLIENT)
     sock = socket.socket()
@@ -137,7 +138,7 @@ CASE = None
 # 13.1.1 = 394
 
 
-def run_tests(server, agent):
+def run_tests(server: str, agent: str) -> None:
     case_count = get_case_count(server)
     if CASE is not None:
         print(">>>>> Running test case %d" % CASE)
