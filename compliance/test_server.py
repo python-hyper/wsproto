@@ -8,6 +8,7 @@ from wsproto.extensions import PerMessageDeflate
 
 count = 0
 
+
 def new_conn(sock):
     global count
     print("test_server.py received connection {}".format(count))
@@ -25,9 +26,13 @@ def new_conn(sock):
         outgoing_data = b""
         for event in ws.events():
             if isinstance(event, Request):
-                outgoing_data += ws.send(AcceptConnection(extensions=[PerMessageDeflate()]))
+                outgoing_data += ws.send(
+                    AcceptConnection(extensions=[PerMessageDeflate()])
+                )
             elif isinstance(event, Message):
-                outgoing_data += ws.send(Message(data=event.data, message_finished=event.message_finished))
+                outgoing_data += ws.send(
+                    Message(data=event.data, message_finished=event.message_finished)
+                )
             elif isinstance(event, Ping):
                 outgoing_data += ws.send(event.response())
             elif isinstance(event, CloseConnection):
@@ -45,7 +50,8 @@ def new_conn(sock):
 
     sock.close()
 
-def start_listener(host='127.0.0.1', port=8642, shutdown_port=8643):
+
+def start_listener(host="127.0.0.1", port=8642, shutdown_port=8643):
     server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((host, port))
@@ -67,7 +73,8 @@ def start_listener(host='127.0.0.1', port=8642, shutdown_port=8643):
             else:
                 done = True
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         start_listener()
     except KeyboardInterrupt:
