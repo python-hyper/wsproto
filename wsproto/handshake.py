@@ -169,7 +169,7 @@ class H11Handshake:
 
     ############ Server mode methods
 
-    def _process_connection_request(self, event: h11.Request) -> Request:
+    def _process_connection_request(self, event: h11.Request) -> Request:  # noqa: MC0001
         if event.method != b"GET":
             raise RemoteProtocolError(
                 "Request method must be GET", event_hint=RejectConnection()
@@ -227,6 +227,10 @@ class H11Handshake:
         if version is None:
             raise RemoteProtocolError(
                 "Missing header, 'Sec-WebSocket-Version'", event_hint=RejectConnection()
+            )
+        if host is None:
+            raise RemoteProtocolError(
+                "Missing header, 'Host'", event_hint=RejectConnection()
             )
 
         self._initiating_request = Request(
