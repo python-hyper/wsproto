@@ -4,17 +4,25 @@ from urllib.parse import urlparse
 
 from wsproto import WSConnection
 from wsproto.connection import CLIENT
-from wsproto.events import AcceptConnection, CloseConnection, Ping, Request, TextMessage, Message
+from wsproto.events import (
+    AcceptConnection,
+    CloseConnection,
+    Message,
+    Ping,
+    Request,
+    TextMessage,
+)
 from wsproto.extensions import PerMessageDeflate
 from wsproto.frame_protocol import CloseReason
 
-SERVER = 'ws://127.0.0.1:8642'
-AGENT = 'wsproto'
+SERVER = "ws://127.0.0.1:8642"
+AGENT = "wsproto"
 
 CONNECTION_EXCEPTIONS = (ConnectionError, OSError)
 
+
 def get_case_count(server):
-    uri = urlparse(server + '/getCaseCount')
+    uri = urlparse(server + "/getCaseCount")
     connection = WSConnection(CLIENT)
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
@@ -32,7 +40,9 @@ def get_case_count(server):
                 data += event.data
                 if event.message_finished:
                     case_count = json.loads(data)
-                    out_data += connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+                    out_data += connection.send(
+                        CloseConnection(code=CloseReason.NORMAL_CLOSURE)
+                    )
             try:
                 sock.sendall(out_data)
             except CONNECTION_EXCEPTIONS:
@@ -41,17 +51,21 @@ def get_case_count(server):
     sock.close()
     return case_count
 
+
 def run_case(server, case, agent):
-    uri = urlparse(server + '/runCase?case=%d&agent=%s' % (case, agent))
+    uri = urlparse(server + "/runCase?case=%d&agent=%s" % (case, agent))
     connection = WSConnection(CLIENT)
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
     sock.sendall(
-        connection.send(Request(
-            host=uri.netloc, target='%s?%s' % (uri.path, uri.query),
-            extensions=[PerMessageDeflate()],
-        ))
+        connection.send(
+            Request(
+                host=uri.netloc,
+                target="%s?%s" % (uri.path, uri.query),
+                extensions=[PerMessageDeflate()],
+            )
+        )
     )
     closed = False
 
@@ -64,7 +78,9 @@ def run_case(server, case, agent):
         out_data = b""
         for event in connection.events():
             if isinstance(event, Message):
-                out_data += connection.send(Message(data=event.data, message_finished=event.message_finished))
+                out_data += connection.send(
+                    Message(data=event.data, message_finished=event.message_finished)
+                )
             elif isinstance(event, Ping):
                 out_data += connection.send(event.response())
             elif isinstance(event, CloseConnection):
@@ -80,14 +96,17 @@ def run_case(server, case, agent):
             closed = True
             break
 
+
 def update_reports(server, agent):
-    uri = urlparse(server + '/updateReports?agent=%s' % agent)
+    uri = urlparse(server + "/updateReports?agent=%s" % agent)
     connection = WSConnection(CLIENT)
     sock = socket.socket()
     sock.connect((uri.hostname, uri.port or 80))
 
     sock.sendall(
-        connection.send(Request(host=uri.netloc, target='%s?%s' % (uri.path, uri.query)))
+        connection.send(
+            Request(host=uri.netloc, target="%s?%s" % (uri.path, uri.query))
+        )
     )
     closed = False
 
@@ -96,13 +115,16 @@ def update_reports(server, agent):
         connection.receive_data(data)
         for event in connection.events():
             if isinstance(event, AcceptConnection):
-                sock.sendall(connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE)))
+                sock.sendall(
+                    connection.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+                )
                 try:
                     sock.close()
                 except CONNECTION_EXCEPTIONS:
                     pass
                 finally:
                     closed = True
+
 
 CASE = None
 # 1.1.1 = 1
@@ -113,6 +135,7 @@ CASE = None
 # 6.1.1 = 64
 # 12.1.1 = 304
 # 13.1.1 = 394
+
 
 def run_tests(server, agent):
     case_count = get_case_count(server)
@@ -126,5 +149,6 @@ def run_tests(server, agent):
         print("\nRan %d cases." % case_count)
     update_reports(server, agent)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests(SERVER, AGENT)
