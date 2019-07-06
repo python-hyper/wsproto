@@ -917,7 +917,10 @@ class TestFrameProtocolReceive:
         assert frame.payload == payload
 
     def _close_test(
-        self, code: Optional[int], reason: str = None, reason_bytes: bytes = None
+        self,
+        code: Optional[int],
+        reason: Optional[str] = None,
+        reason_bytes: Optional[bytes] = None,
     ) -> None:
         payload = b""
         if code:

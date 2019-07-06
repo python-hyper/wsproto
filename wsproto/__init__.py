@@ -64,7 +64,7 @@ class WSConnection:
             data += self.connection.send(event)
         return data
 
-    def receive_data(self, data: bytes) -> None:
+    def receive_data(self, data: Optional[bytes]) -> None:
         """
         Feed network data into the connection instance.
 

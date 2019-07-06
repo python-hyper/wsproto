@@ -211,7 +211,7 @@ class Header(NamedTuple):
     rsv: RsvBits
     opcode: Opcode
     payload_len: int
-    masking_key: bytes
+    masking_key: Optional[bytes]
 
 
 class Frame(NamedTuple):
@@ -238,7 +238,7 @@ def _truncate_utf8(data: bytes, nbytes: int) -> bytes:
 
 
 class Buffer:
-    def __init__(self, initial_bytes: bytes = None) -> None:
+    def __init__(self, initial_bytes: Optional[bytes] = None) -> None:
         self.buffer = bytearray()
         self.bytes_used = 0
         if initial_bytes:
@@ -255,7 +255,7 @@ class Buffer:
         self.bytes_used += len(data)
         return data
 
-    def consume_exactly(self, nbytes: int) -> bytes:
+    def consume_exactly(self, nbytes: int) -> Optional[bytes]:
         if len(self.buffer) - self.bytes_used < nbytes:
             return None
 
@@ -297,7 +297,10 @@ class MessageDecoder:
             data = frame.payload
         else:
             assert isinstance(frame.payload, (bytes, bytearray))
-            data = self.decode_payload(frame.payload, finished)
+            try:
+                data = self.decoder.decode(frame.payload, finished)
+            except UnicodeDecodeError as exc:
+                raise ParseFailed(str(exc), CloseReason.INVALID_FRAME_PAYLOAD_DATA)
 
         frame = Frame(self.opcode, data, frame.frame_finished, finished)
 
@@ -307,15 +310,11 @@ class MessageDecoder:
 
         return frame
 
-    def decode_payload(self, data: bytes, finished: bool) -> str:
-        try:
-            return self.decoder.decode(data, finished)
-        except UnicodeDecodeError as exc:
-            raise ParseFailed(str(exc), CloseReason.INVALID_FRAME_PAYLOAD_DATA)
-
 
 class FrameDecoder:
-    def __init__(self, client: bool, extensions: List["Extension"] = None) -> None:
+    def __init__(
+        self, client: bool, extensions: Optional[List["Extension"]] = None
+    ) -> None:
         self.client = client
         self.extensions = extensions or []
 
@@ -330,10 +329,14 @@ class FrameDecoder:
     def receive_bytes(self, data: bytes) -> None:
         self.buffer.feed(data)
 
-    def process_buffer(self) -> Frame:
+    def process_buffer(self) -> Optional[Frame]:
         if not self.header:
             if not self.parse_header():
                 return None
+        # parse_header() sets these.
+        assert self.header is not None
+        assert self.masker is not None
+        assert self.effective_opcode is not None
 
         if len(self.buffer) < self.payload_required:
             return None
@@ -398,8 +401,8 @@ class FrameDecoder:
             raise ParseFailed("Invalid attempt to fragment control frame")
 
         has_mask = bool(data[1] & MASK_MASK)
-        payload_len = data[1] & PAYLOAD_LEN_MASK
-        payload_len = self.parse_extended_payload_length(opcode, payload_len)
+        payload_len_short = data[1] & PAYLOAD_LEN_MASK
+        payload_len = self.parse_extended_payload_length(opcode, payload_len_short)
         if payload_len is None:
             self.buffer.rollback()
             return False
@@ -429,7 +432,9 @@ class FrameDecoder:
         self.payload_consumed = 0
         return True
 
-    def parse_extended_payload_length(self, opcode: Opcode, payload_len: int) -> int:
+    def parse_extended_payload_length(
+        self, opcode: Opcode, payload_len: int
+    ) -> Optional[int]:
         if opcode.iscontrol() and payload_len > MAX_PAYLOAD_NORMAL:
             raise ParseFailed("Control frame with payload len > 125")
         if payload_len == PAYLOAD_LENGTH_TWO_BYTE:
@@ -518,7 +523,7 @@ class FrameProtocol:
 
         return Frame(frame.opcode, data, frame.frame_finished, frame.message_finished)
 
-    def _parse_more_gen(self) -> Generator[Frame, None, None]:
+    def _parse_more_gen(self) -> Generator[Optional[Frame], None, None]:
         # Consume as much as we can from self._buffer, yielding events, and
         # then yield None when we need more data. Or raise ParseFailed.
 
