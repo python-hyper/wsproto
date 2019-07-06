@@ -22,7 +22,7 @@ from wsproto.events import (
 RECEIVE_BYTES = 4096
 
 
-def main():
+def main() -> None:
     """Run the client."""
     try:
         host = sys.argv[1]
@@ -37,7 +37,7 @@ def main():
         print("\nReceived SIGINT: shutting down…")
 
 
-def wsproto_demo(host, port):
+def wsproto_demo(host: str, port: int) -> None:
     """
     Demonstrate wsproto:
 
@@ -46,8 +46,6 @@ def wsproto_demo(host, port):
     2) Send a message and display response
     3) Send ping and display pong
     4) Negotiate WebSocket closing handshake
-
-    :param stream: a socket stream
     """
 
     # 0) Open TCP connection
@@ -89,13 +87,13 @@ def wsproto_demo(host, port):
     net_recv(ws, conn)
 
 
-def net_send(out_data, conn):
+def net_send(out_data: bytes, conn: socket.socket) -> None:
     """ Write pending data from websocket to network. """
     print("Sending {} bytes".format(len(out_data)))
     conn.send(out_data)
 
 
-def net_recv(ws, conn):
+def net_recv(ws: WSConnection, conn: socket.socket) -> None:
     """ Read pending data from network into websocket. """
     in_data = conn.recv(RECEIVE_BYTES)
     if not in_data:
@@ -108,7 +106,7 @@ def net_recv(ws, conn):
         ws.receive_data(in_data)
 
 
-def handle_events(ws):
+def handle_events(ws: WSConnection) -> None:
     for event in ws.events():
         if isinstance(event, AcceptConnection):
             print("WebSocket negotiation complete")

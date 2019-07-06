@@ -22,7 +22,7 @@ MAX_CONNECTS = 5
 RECEIVE_BYTES = 4096
 
 
-def main():
+def main() -> None:
     """Run the server."""
     try:
         ip = sys.argv[1]
@@ -48,7 +48,7 @@ def main():
         print("Received SIGINT: shutting down…")
 
 
-def handle_connection(stream):
+def handle_connection(stream: socket.socket) -> None:
     """
     Handle a connection.
 
@@ -80,8 +80,8 @@ def handle_connection(stream):
             elif isinstance(event, CloseConnection):
                 # Print log message and break out
                 print(
-                    "Connection closed: code={}/{} reason={}".format(
-                        event.code.value, event.code.name, event.reason
+                    "Connection closed: code={} reason={}".format(
+                        event.code, event.reason
                     )
                 )
                 out_data += ws.send(event.response())
