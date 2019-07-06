@@ -33,9 +33,7 @@ def test_send_message(client_sends: bool, final: bool) -> None:
         remote = client
 
     data = b"x" * 23
-    remote.receive_data(
-        local.send(BytesMessage(data=data, message_finished=final))  # type: ignore
-    )
+    remote.receive_data(local.send(BytesMessage(data=data, message_finished=final)))
     event = next(remote.events())
     assert isinstance(event, BytesMessage)
     assert event.data == data
@@ -135,9 +133,7 @@ def test_data(split_message: bool) -> None:
 
     data = "ƒñö®∂😎"
     server.receive_data(
-        client.send(
-            TextMessage(data=data, message_finished=not split_message)  # type: ignore
-        )
+        client.send(TextMessage(data=data, message_finished=not split_message))
     )
     event = next(server.events())
     assert isinstance(event, TextMessage)

@@ -63,7 +63,7 @@ def test_connection_request_additional_headers() -> None:
 def test_connection_request_simple_extension() -> None:
     extension = FakeExtension(offer_response=True)
     request = _make_connection_request(
-        Request(host="localhost", target="/", extensions=[extension])  # type: ignore
+        Request(host="localhost", target="/", extensions=[extension])
     )
 
     headers = normed_header_dict(request.headers)
@@ -73,7 +73,7 @@ def test_connection_request_simple_extension() -> None:
 def test_connection_request_simple_extension_no_offer() -> None:
     extension = FakeExtension(offer_response=False)
     request = _make_connection_request(
-        Request(host="localhost", target="/", extensions=[extension])  # type: ignore
+        Request(host="localhost", target="/", extensions=[extension])
     )
 
     headers = normed_header_dict(request.headers)
@@ -81,15 +81,16 @@ def test_connection_request_simple_extension_no_offer() -> None:
 
 
 def test_connection_request_parametrised_extension() -> None:
-    extension = FakeExtension(offer_response="parameter1=value1; parameter2=value2")
+    offer_response = "parameter1=value1; parameter2=value2"
+    extension = FakeExtension(offer_response=offer_response)
     request = _make_connection_request(
-        Request(host="localhost", target="/", extensions=[extension])  # type: ignore
+        Request(host="localhost", target="/", extensions=[extension])
     )
 
     headers = normed_header_dict(request.headers)
     assert headers[b"sec-websocket-extensions"] == b"%s; %s" % (
         extension.name.encode("ascii"),
-        extension.offer_response.encode("ascii"),  # type: ignore
+        offer_response.encode("ascii"),
     )
 
 

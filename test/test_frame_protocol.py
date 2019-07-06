@@ -4,7 +4,7 @@ import itertools
 import struct
 from binascii import unhexlify
 from codecs import getincrementaldecoder
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 import pytest
 
@@ -98,7 +98,6 @@ class TestMessageDecoder:
         payload = b"x" * 23
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.BINARY
-        decoder.seen_first_frame = True  # type: ignore
         frame = fp.Frame(
             opcode=fp.Opcode.CONTINUATION,
             payload=payload,
@@ -132,7 +131,6 @@ class TestMessageDecoder:
         binary_payload = text_payload.encode("utf8")
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.TEXT
-        decoder.seen_first_frame = True  # type: ignore
         decoder.decoder = getincrementaldecoder("utf-8")()
 
         assert decoder.decoder.decode(binary_payload[:4]) == text_payload[:2]
@@ -156,7 +154,6 @@ class TestMessageDecoder:
         binary_payload = text_payload.encode("utf8")
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.TEXT
-        decoder.seen_first_frame = True  # type: ignore
         decoder.decoder = getincrementaldecoder("utf-8")()
 
         assert decoder.decoder.decode(binary_payload[:-2]) == text_payload[:-1]
@@ -192,7 +189,6 @@ class TestMessageDecoder:
         payload = b"x" * 23
         decoder = fp.MessageDecoder()
         decoder.opcode = fp.Opcode.BINARY
-        decoder.seen_first_frame = True  # type: ignore
         frame = fp.Frame(
             opcode=fp.Opcode.BINARY,
             payload=payload,
@@ -887,21 +883,21 @@ class TestFrameDecoderExtensions:
         proto = fp.FrameProtocol(client=False, extensions=[ext])
         payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=True)
-        payload = (payload + "®").encode("utf8")  # type: ignore
-        assert data == b"\x91" + bytearray([len(payload)]) + payload  # type: ignore
+        payload_bytes = (payload + "®").encode("utf8")
+        assert data == b"\x91" + bytearray([len(payload_bytes)]) + payload_bytes
 
     def test_outbound_handling_multiple_frames(self) -> None:
         ext = self.FakeExtension()
         proto = fp.FrameProtocol(client=False, extensions=[ext])
         payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=False)
-        payload = payload.encode("utf8")  # type: ignore
-        assert data == b"\x11" + bytearray([len(payload)]) + payload  # type: ignore
+        payload_bytes = payload.encode("utf8")
+        assert data == b"\x11" + bytearray([len(payload_bytes)]) + payload_bytes
 
         payload = r"¯\_(ツ)_/¯"
         data = proto.send_data(payload, fin=True)
-        payload = (payload + "®").encode("utf8")  # type: ignore
-        assert data == b"\x80" + bytearray([len(payload)]) + payload  # type: ignore
+        payload_bytes = (payload + "®").encode("utf8")
+        assert data == b"\x80" + bytearray([len(payload_bytes)]) + payload_bytes
 
 
 class TestFrameProtocolReceive:
@@ -1077,8 +1073,8 @@ class TestFrameProtocolSend:
         proto = fp.FrameProtocol(client=False, extensions=[])
         payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=True)
-        payload = payload.encode("utf8")  # type: ignore
-        assert data == b"\x81" + bytearray([len(payload)]) + payload  # type: ignore
+        payload_bytes = payload.encode("utf8")
+        assert data == b"\x81" + bytearray([len(payload_bytes)]) + payload_bytes
 
     def test_multiple_short_binary_data(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
@@ -1094,24 +1090,24 @@ class TestFrameProtocolSend:
         proto = fp.FrameProtocol(client=False, extensions=[])
         payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=False)
-        payload = payload.encode("utf8")  # type: ignore
-        assert data == b"\x01" + bytearray([len(payload)]) + payload  # type: ignore
+        payload_bytes = payload.encode("utf8")
+        assert data == b"\x01" + bytearray([len(payload_bytes)]) + payload_bytes
 
         payload = "🙈🙉🙊"
         data = proto.send_data(payload, fin=True)
-        payload = payload.encode("utf8")  # type: ignore
-        assert data == b"\x80" + bytearray([len(payload)]) + payload  # type: ignore
+        payload_bytes = payload.encode("utf8")
+        assert data == b"\x80" + bytearray([len(payload_bytes)]) + payload_bytes
 
     def test_mismatched_data_messages1(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
         payload = "😃😄🙃😉"
         data = proto.send_data(payload, fin=False)
-        payload = payload.encode("utf8")  # type: ignore
-        assert data == b"\x01" + bytearray([len(payload)]) + payload  # type: ignore
+        payload_bytes = payload.encode("utf8")
+        assert data == b"\x01" + bytearray([len(payload_bytes)]) + payload_bytes
 
-        payload = b"seriously, all ascii"  # type: ignore
+        payload_bytes = b"seriously, all ascii"
         with pytest.raises(TypeError):
-            proto.send_data(payload)
+            proto.send_data(payload_bytes)
 
     def test_mismatched_data_messages2(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
@@ -1119,9 +1115,9 @@ class TestFrameProtocolSend:
         data = proto.send_data(payload, fin=False)
         assert data == b"\x02" + bytearray([len(payload)]) + payload
 
-        payload = "✔️☑️✅✔︎☑"  # type: ignore
+        payload_str = "✔️☑️✅✔︎☑"
         with pytest.raises(TypeError):
-            proto.send_data(payload)
+            proto.send_data(payload_str)
 
     def test_message_length_max_short(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
@@ -1188,7 +1184,8 @@ class TestFrameProtocolSend:
 
     def test_data_we_have_no_idea_what_to_do_with(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = dict()  # type: ignore
+        payload: Dict[str, str] = dict()
 
         with pytest.raises(ValueError):
+            # Intentionally passing illegal type.
             proto.send_data(payload)  # type: ignore
