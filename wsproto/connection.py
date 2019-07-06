@@ -109,7 +109,7 @@ class Connection:
             raise LocalProtocolError("Event {} cannot be sent.".format(event))
         return data
 
-    def receive_data(self, data: bytes) -> None:
+    def receive_data(self, data: Optional[bytes]) -> None:
         """
         Pass some received data to the connection for handling.
 

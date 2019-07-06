@@ -13,28 +13,33 @@ class TestExtension:
 
     def test_accept(self) -> None:
         ext = wpext.Extension()
-        assert ext.accept(None) is None
+        offer = "myext"
+        assert ext.accept(offer) is None
 
     def test_finalize(self) -> None:
         ext = wpext.Extension()
-        ext.finalize(None)
+        offer = "myext"
+        ext.finalize(offer)
 
     def test_frame_inbound_header(self) -> None:
         ext = wpext.Extension()
-        result = ext.frame_inbound_header(None, None, None, None)
+        result = ext.frame_inbound_header(None, None, None, None)  # type: ignore
         assert result == fp.RsvBits(False, False, False)
 
     def test_frame_inbound_payload_data(self) -> None:
         ext = wpext.Extension()
         data = b""
-        assert ext.frame_inbound_payload_data(None, data) == data
+        assert ext.frame_inbound_payload_data(None, data) == data  # type: ignore
 
     def test_frame_inbound_complete(self) -> None:
         ext = wpext.Extension()
-        assert ext.frame_inbound_complete(None, None) is None
+        assert ext.frame_inbound_complete(None, None) is None  # type: ignore
 
     def test_frame_outbound(self) -> None:
         ext = wpext.Extension()
         rsv = fp.RsvBits(True, True, True)
         data = b""
-        assert ext.frame_outbound(None, None, rsv, data, None) == (rsv, data)
+        assert ext.frame_outbound(None, None, rsv, data, None) == (  # type: ignore
+            rsv,
+            data,
+        )

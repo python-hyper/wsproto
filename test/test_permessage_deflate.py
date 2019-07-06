@@ -296,7 +296,7 @@ class TestPerMessageDeflate:
         data += result4
 
         result5 = ext.frame_inbound_complete(proto, True)
-        assert not isinstance(result5, fp.CloseReason)
+        assert isinstance(result5, bytes)
         data += result5
 
         assert data == payload

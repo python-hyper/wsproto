@@ -13,7 +13,7 @@ from .frame_protocol import CloseReason, FrameDecoder, FrameProtocol, Opcode, Rs
 
 
 class Extension:
-    name: Optional[str] = None
+    name: str
 
     def enabled(self) -> bool:
         return False
@@ -21,7 +21,7 @@ class Extension:
     def offer(self) -> Union[bool, str]:
         pass
 
-    def accept(self, offer: str) -> Union[bool, str]:
+    def accept(self, offer: str) -> Optional[Union[bool, str]]:
         pass
 
     def finalize(self, offer: str) -> None:
@@ -123,7 +123,7 @@ class PerMessageDeflate(Extension):
 
         self._enabled = True
 
-    def _parse_params(self, params: str) -> Tuple[int, int]:
+    def _parse_params(self, params: str) -> Tuple[Optional[int], Optional[int]]:
         client_max_window_bits = None
         server_max_window_bits = None
 
@@ -198,6 +198,7 @@ class PerMessageDeflate(Extension):
     ) -> Union[bytes, CloseReason]:
         if not self._inbound_compressed or not self._inbound_is_compressible:
             return data
+        assert self._decompressor is not None
 
         try:
             return self._decompressor.decompress(bytes(data))
@@ -215,6 +216,7 @@ class PerMessageDeflate(Extension):
         if not self._inbound_compressed:
             self._inbound_compressed = None
             return None
+        assert self._decompressor is not None
 
         try:
             data = self._decompressor.decompress(b"\x00\x00\xff\xff")

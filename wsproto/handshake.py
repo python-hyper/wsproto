@@ -102,7 +102,7 @@ class H11Handshake:
             )
         return data
 
-    def receive_data(self, data: bytes) -> None:
+    def receive_data(self, data: Optional[bytes]) -> None:
         """Receive data from the remote.
 
         A list of events that the remote peer triggered by sending
@@ -243,6 +243,8 @@ class H11Handshake:
         return self._initiating_request
 
     def _accept(self, event: AcceptConnection) -> bytes:
+        # _accept is always called after _process_connection_request.
+        assert self._initiating_request is not None
         request_headers = normed_header_dict(self._initiating_request.extra_headers)
 
         nonce = request_headers[b"sec-websocket-key"]
@@ -354,6 +356,10 @@ class H11Handshake:
     def _establish_client_connection(
         self, event: h11.InformationalResponse
     ) -> AcceptConnection:  # noqa: MC0001
+        # _establish_client_connection is always called after _initiate_connection.
+        assert self._initiating_request is not None
+        assert self._nonce is not None
+
         accept = None
         connection_tokens = None
         accepts: List[str] = []
