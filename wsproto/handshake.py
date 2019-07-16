@@ -169,7 +169,9 @@ class H11Handshake:
 
     ############ Server mode methods
 
-    def _process_connection_request(self, event: h11.Request) -> Request:  # noqa: MC0001
+    def _process_connection_request(  # noqa: MC0001
+        self, event: h11.Request
+    ) -> Request:
         if event.method != b"GET":
             raise RemoteProtocolError(
                 "Request method must be GET", event_hint=RejectConnection()

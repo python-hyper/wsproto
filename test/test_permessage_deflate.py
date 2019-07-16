@@ -24,7 +24,7 @@ else:
 
 
 class TestPerMessageDeflate:
-    parameter_sets = [
+    parameter_sets: Sequence[Params] = [
         {
             "client_no_context_takeover": False,
             "client_max_window_bits": 15,
@@ -53,7 +53,7 @@ class TestPerMessageDeflate:
         {"server_no_context_takeover": True, "client_max_window_bits": 8},
         {"client_max_window_bits": None, "server_max_window_bits": None},
         {},
-    ]  # type: Sequence[Params]
+    ]
 
     def make_offer_string(self, params: Params) -> str:
         offer = ["permessage-deflate"]
