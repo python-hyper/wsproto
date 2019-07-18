@@ -1192,3 +1192,10 @@ class TestFrameProtocolSend:
         with pytest.raises(ValueError):
             # Intentionally passing illegal type.
             proto.send_data(payload)  # type: ignore
+
+
+def test_xor_mask_simple() -> None:
+    masker = fp.XorMaskerSimple(b"1234")
+    assert masker.process(b"some very long data for masking by websocket") == (
+        b"B]^Q\x11DVFH\x12_[_U\x13PPFR\x14W]A\x14\\S@_X\\T\x14SK\x13CTP@[RYV@"
+    )
