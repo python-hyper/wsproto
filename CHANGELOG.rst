@@ -1,5 +1,23 @@
-0.15.0 Unreleased
+0.15.0 2019-08-10
 -----------------
+
+*This contains all the Bugfixes in the 0.14 branch.*
+
+* Drop support for Python 2. Please pin to ~= 0.14.0 if you support
+  Python 2.
+* Drop support for Python 3.5, meaning the minimum supported version
+  is Python 3.6.1.
+* Switch events to be dataclass based, otherwise the API is
+  consistent.
+* Add type hints throughout and support PEP 561 via a py.typed
+  file. This should allow projects that use wsproto to type check their
+  usage of wsproto.
+* Bugfix prevent the test folder being installed as a package called
+  test.
+* Explicitly require Host header in handshake.
+* Drop wsaccel support and utilise the aiohttp/@willmcgugan masking
+  method. wsaccel is unmaintained and this new maksing method is
+  almost as quick.
 
 0.14.1 2019-05-30
 -----------------
