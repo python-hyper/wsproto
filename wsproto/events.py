@@ -18,7 +18,7 @@ class Event(ABC):
     Base class for wsproto events.
     """
 
-    pass
+    pass  # noqa
 
 
 @dataclass(frozen=True)

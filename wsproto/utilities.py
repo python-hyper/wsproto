@@ -29,7 +29,7 @@ class LocalProtocolError(ProtocolError):
 
     """
 
-    pass
+    pass  # noqa
 
 
 class RemoteProtocolError(ProtocolError):
