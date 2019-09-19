@@ -120,8 +120,8 @@ The method ``events()`` returns a generator which will yield events for all of
 the data currently in the ``wsproto`` internal buffer and then exit. Therefore,
 you should iterate over this generator after receiving new network data.
 
-For a more complete example, see `synchronous_client.py
-<https://github.com/python-hyper/wsproto/blob/master/example/synchronous_client.py>`_.
+For a more complete example, see `synchronous client
+<https://github.com/python-hyper/wsproto/blob/master/examples/synchronous/client.py>`_.
 
 WebSocket Servers
 -----------------
@@ -149,8 +149,11 @@ Alternatively a server can explicitly reject the connection by sending
 :class:`RejectConnection <wsproto.events.RejectConnection>` after
 receiving a ``Request`` event.
 
-For a more complete example, see `synchronous_server.py
-<https://github.com/python-hyper/wsproto/blob/master/example/synchronous_server.py>`_.
+For a more complete example, see `synchronous server
+<https://github.com/python-hyper/wsproto/blob/master/examples/synchronous/server.py>`_.
+
+Don't hesitate to look the `examples
+<https://github.com/python-hyper/wsproto/blob/master/examples>`_ present in the repository.
 
 Protocol Errors
 ---------------
