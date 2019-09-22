@@ -9,8 +9,8 @@ import re
 from enum import Enum
 from typing import Callable, Tuple, List, Dict, Any, Union, AnyStr
 
-from gevent import socket, spawn
-from gevent.event import AsyncResult
+from gevent import socket, spawn  # pylint: disable=import-error
+from gevent.event import AsyncResult  # pylint: disable=import-error
 from wsproto import WSConnection, ConnectionType
 from wsproto.connection import ConnectionState
 from wsproto.events import (
@@ -54,6 +54,7 @@ class Client:
     receive_bytes: int = 65535
     buffer_size: int = io.DEFAULT_BUFFER_SIZE
 
+    # noinspection PyTypeChecker
     def __init__(self, connect_uri: str, headers: Headers = None, extensions: List[str] = None,
                  sub_protocols: List[str] = None):
         self._check_ws_headers(headers)
@@ -166,12 +167,70 @@ class Client:
                           subprotocols=sub_protocols)
         self._sock.sendall(self._ws.send(request))
 
+    def _handle_accept(self, event: AcceptConnection) -> None:
+        self._handshake_finished.set()
+        if EventType.CONNECT in self._callbacks:
+            self._callbacks[EventType.CONNECT](self, event)
+
+    def _handle_reject(self, event: RejectConnection) -> None:
+        self._handshake_finished.set_exception(
+            ConnectionRejectedError(event.status_code, event.headers, b'')
+        )
+        self._running = False
+
+    def _handle_reject_data(self, event: RejectData, data: bytearray, status_code: int, headers: Headers) -> None:
+        data.extend(event.data)
+        if event.body_finished:
+            self._handshake_finished.set_exception(
+                ConnectionRejectedError(status_code, headers, data)
+            )
+            self._running = False
+
+    def _handle_close(self, event: CloseConnection) -> None:
+        self._running = False
+        if EventType.DISCONNECT in self._callbacks:
+            self._callbacks[EventType.DISCONNECT](event)
+        # if the server sends first a close connection we need to reply with another one
+        if self._ws.state is ConnectionState.REMOTE_CLOSING:
+            self._sock.sendall(self._ws.send(event.response()))
+
+    def _handle_ping(self, event: Ping) -> None:
+        if EventType.PING in self._callbacks:
+            self._callbacks[EventType.PING](event.payload)
+        self._sock.sendall(self._ws.send(event.response()))
+
+    def _handle_pong(self, event: Pong) -> None:
+        if EventType.PONG in self._callbacks:
+            self._callbacks[EventType.PONG](event.payload)
+
+    def _handle_text_or_json_message(self, event: TextMessage, text_message: List[str]) -> None:
+        text_message.append(event.data)
+        if event.message_finished:
+            if EventType.JSON_MESSAGE in self._callbacks:
+                str_message = ''.join(text_message)
+                try:
+                    self._callbacks[EventType.JSON_MESSAGE](self, json.loads(str_message))
+                    text_message.clear()
+                    return  # no need to process text handler if json handler already does the job
+                except json.JSONDecodeError:
+                    pass
+            if EventType.TEXT_MESSAGE in self._callbacks:
+                self._callbacks[EventType.TEXT_MESSAGE](self, ''.join(text_message))
+            text_message.clear()
+
+    def _handle_binary_message(self, event: BytesMessage, binary_message: bytearray) -> None:
+        binary_message.extend(event.data)
+        if event.message_finished:
+            if EventType.BINARY_MESSAGE in self._callbacks:
+                self._callbacks[EventType.BINARY_MESSAGE](self, binary_message)
+            binary_message.clear()
+
     def _run(self) -> None:
         reject_data = bytearray()
         reject_status_code = 400
         reject_headers = []
         text_message = []
-        byte_message = bytearray()
+        binary_message = bytearray()
 
         while self._running:
             data = self._sock.recv(self.receive_bytes)
@@ -181,68 +240,35 @@ class Client:
 
             for event in self._ws.events():
                 if isinstance(event, AcceptConnection):
-                    self._handshake_finished.set()
-                    if EventType.CONNECT in self._callbacks:
-                        self._callbacks[EventType.CONNECT](self, event)
+                    self._handle_accept(event)
 
-                if isinstance(event, RejectConnection):
+                elif isinstance(event, RejectConnection):
                     if not event.has_body:
-                        self._handshake_finished.set_exception(
-                            ConnectionRejectedError(event.status_code, event.headers, reject_data)
-                        )
-                        self._running = False
-                        break
+                        self._handle_reject(event)
                     else:
                         reject_status_code = event.status_code
                         reject_headers = event.headers
 
-                if isinstance(event, RejectData):
-                    reject_data.extend(event.data)
-                    if event.body_finished:
-                        self._handshake_finished.set_exception(
-                            ConnectionRejectedError(reject_status_code, reject_headers, reject_data)
-                        )
-                        self._running = False
-                        break
+                elif isinstance(event, RejectData):
+                    self._handle_reject_data(event, reject_data, reject_status_code, reject_headers)
 
-                if isinstance(event, CloseConnection):
-                    self._running = False
-                    if EventType.DISCONNECT in self._callbacks:
-                        self._callbacks[EventType.DISCONNECT](event)
-                    # if the server sends first a close connection we need to reply with another one
-                    if self._ws.state is ConnectionState.REMOTE_CLOSING:
-                        self._sock.sendall(self._ws.send(event.response()))
+                elif isinstance(event, CloseConnection):
+                    self._handle_close(event)
 
-                if isinstance(event, Ping):
-                    if EventType.PING in self._callbacks:
-                        self._callbacks[EventType.PING](event.payload)
-                    self._sock.sendall(self._ws.send(event.response()))
+                elif isinstance(event, Ping):
+                    self._handle_ping(event)
 
-                if isinstance(event, Pong):
-                    if EventType.PONG in self._callbacks:
-                        self._callbacks[EventType.PONG](event.payload)
+                elif isinstance(event, Pong):
+                    self._handle_pong(event)
 
-                if isinstance(event, TextMessage):
-                    text_message.append(event.data)
-                    if event.message_finished:
-                        if EventType.JSON_MESSAGE in self._callbacks:
-                            str_message = ''.join(text_message)
-                            try:
-                                self._callbacks[EventType.JSON_MESSAGE](self, json.loads(str_message))
-                                text_message.clear()
-                                continue  # no need to process text handler if json handler already does the job
-                            except json.JSONDecodeError:
-                                pass
-                        if EventType.TEXT_MESSAGE in self._callbacks:
-                            self._callbacks[EventType.TEXT_MESSAGE](self, ''.join(text_message))
-                        text_message.clear()
+                elif isinstance(event, TextMessage):
+                    self._handle_text_or_json_message(event, text_message)
 
-                if isinstance(event, BytesMessage):
-                    byte_message.extend(event.data)
-                    if event.message_finished:
-                        if EventType.BINARY_MESSAGE in self._callbacks:
-                            self._callbacks[EventType.BINARY_MESSAGE](self, byte_message)
-                        byte_message.clear()
+                elif isinstance(event, BytesMessage):
+                    self._handle_binary_message(event, binary_message)
+
+                else:
+                    print('unknown event', event)
 
         self._sock.close()
 
@@ -303,37 +329,30 @@ if __name__ == '__main__':
         print('connection accepted')
         print(event)
 
-
     @Client.on_disconnect
     def disconnect(event: CloseConnection) -> None:
         print('connection closed')
         print(event)
 
-
     @Client.on_ping
     def ping(payload: bytes) -> None:
         print('ping message:', payload)
-
 
     @Client.on_pong
     def pong(payload: bytes) -> None:
         print('pong message:', payload)
 
-
     @Client.on_json_message
     def handle_json_message(_, payload: Any) -> None:
         print('json message:', payload)
-
 
     @Client.on_text_message
     def handle_text_message(_, payload: str) -> None:
         print('text message:', payload)
 
-
     @Client.on_binary_message
     def handle_binary_message(_, payload: bytearray) -> None:
         print('binary message:', payload)
-
 
     with Client('ws://localhost:8080/foo') as client:
         client.ping()

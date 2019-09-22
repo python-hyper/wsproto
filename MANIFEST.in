@@ -1,5 +1,5 @@
 graft compliance
-graft example
+graft examples
 graft docs
 graft test
 graft wsproto

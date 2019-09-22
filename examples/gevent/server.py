@@ -11,8 +11,8 @@ import sys
 from abc import ABC, abstractmethod
 from typing import Tuple, AnyStr, Any
 
-from gevent import socket
-from gevent.server import StreamServer
+from gevent import socket  # pylint: disable=import-error
+from gevent.server import StreamServer  # pylint: disable=import-error
 from wsproto import WSConnection, ConnectionType
 from wsproto.connection import ConnectionState
 from wsproto.events import (
