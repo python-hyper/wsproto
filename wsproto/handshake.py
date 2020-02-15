@@ -6,7 +6,17 @@ wsproto/handshake
 An implementation of WebSocket handshakes.
 """
 from collections import deque
-from typing import Deque, Dict, Generator, List, Optional, Union
+from typing import (
+    cast,
+    Deque,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Union,
+)
 
 import h11
 
@@ -268,8 +278,9 @@ class H11Handshake:
             )
 
         if event.extensions:
-            accepts = server_extensions_handshake(  # type: ignore
-                self._initiating_request.extensions, event.extensions
+            accepts = server_extensions_handshake(
+                cast(Sequence[str], self._initiating_request.extensions),
+                event.extensions,
             )
             if accepts:
                 headers.append((b"Sec-WebSocket-Extensions", accepts))
@@ -407,8 +418,8 @@ class H11Handshake:
                     "unrecognized subprotocol {}".format(subprotocol),
                     event_hint=RejectConnection(),
                 )
-        extensions = client_extensions_handshake(  # type: ignore
-            accepts, self._initiating_request.extensions
+        extensions = client_extensions_handshake(
+            accepts, cast(Sequence[Extension], self._initiating_request.extensions)
         )
 
         self._connection = Connection(
@@ -428,7 +439,7 @@ class H11Handshake:
 
 
 def server_extensions_handshake(
-    requested: List[str], supported: List[Extension]
+    requested: Iterable[str], supported: List[Extension]
 ) -> Optional[bytes]:
     """Agree on the extensions to use returning an appropriate header value.
 
@@ -464,7 +475,7 @@ def server_extensions_handshake(
 
 
 def client_extensions_handshake(
-    accepted: List[str], supported: List[Extension]
+    accepted: Iterable[str], supported: Sequence[Extension]
 ) -> List[Extension]:
     # This raises RemoteProtocolError is the accepted extension is not
     # supported.

@@ -71,7 +71,7 @@ def wsproto_demo(host: str, port: int) -> None:
 
     # 3) Send ping and display pong
     payload = b"table tennis"
-    print("Sending ping: {}".format(payload))
+    print("Sending ping: {!r}".format(payload))
     net_send(ws.send(Ping(payload=payload)), conn)
     net_recv(ws, conn)
     handle_events(ws)
@@ -113,7 +113,7 @@ def handle_events(ws: WSConnection) -> None:
         elif isinstance(event, TextMessage):
             print("Received message: {}".format(event.data))
         elif isinstance(event, Pong):
-            print("Received pong: {}".format(event.payload))
+            print("Received pong: {!r}".format(event.payload))
         else:
             raise Exception("Do not know how to handle event: " + str(event))
 

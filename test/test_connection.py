@@ -71,7 +71,7 @@ def test_closure(client_sends: bool, code: CloseReason, reason: str) -> None:
     assert event.code is code
     assert event.reason == reason
 
-    assert remote.state is ConnectionState.CLOSED
+    assert remote.state is ConnectionState.CLOSED  # type: ignore
     assert local.state is ConnectionState.CLOSED
 
 
