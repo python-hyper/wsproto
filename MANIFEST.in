@@ -2,7 +2,7 @@ graft compliance
 graft example
 graft docs
 graft test
-graft wsproto
+graft src/wsproto
 prune docs/build
 prune compliance/autobahntestsuite-venv
 prune compliance/reports

@@ -13,7 +13,7 @@ with open(os.path.join(PROJECT_ROOT, 'README.rst')) as file_:
 
 # Get the version
 version_regex = r'__version__ = ["\']([^"\']*)["\']'
-with open(os.path.join(PROJECT_ROOT, 'wsproto/__init__.py')) as file_:
+with open(os.path.join(PROJECT_ROOT, 'src/wsproto/__init__.py')) as file_:
     text = file_.read()
     match = re.search(version_regex, text)
 
@@ -35,9 +35,9 @@ setup(
     author='Benno Rice',
     author_email='benno@jeamland.net',
     url='https://github.com/python-hyper/wsproto/',
-    packages=find_packages(exclude=['test']),
+    packages=find_packages("src"),
+    package_dir={"": "src"},
     package_data={'': ['LICENSE', 'README.rst']},
-    package_dir={'wsproto': 'wsproto'},
     python_requires=">=3.6.1",
     include_package_data=True,
     license='MIT',
