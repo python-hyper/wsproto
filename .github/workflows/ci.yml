@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  tox:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 5
+      matrix:
+        python-version:
+        - 3.6
+        - 3.7
+        - 3.8
+
+    steps:
+    - uses: actions/checkout@master
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install tox
+      run: |
+        python -m pip install --upgrade pip setuptools
+        pip install --upgrade tox tox-gh-actions
+    - name: Initialize tox envs
+      run: |
+        tox --parallel auto --notest
+    - name: Test with tox
+      run: |
+        tox --parallel 0
+
+  autobahn:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        side: [client, server]
+
+    steps:
+    - uses: actions/checkout@master
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.8
+    - name: Install tox
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade tox
+    - name: Initialize tox envs
+      run: |
+        tox --parallel auto --notest -e autobahn
+    - name: Run autobahn
+      run: |
+        tox --parallel 0 -e autobahn
+      env:
+        SIDE: ${{ matrix.side }}
