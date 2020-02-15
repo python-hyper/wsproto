@@ -222,7 +222,7 @@ class Message(Event, Generic[T]):
 
 
 @dataclass(frozen=True)
-class TextMessage(Message[str]):
+class TextMessage(Message[str]):  # pylint: disable=unsubscriptable-object
     """This event is fired when a data frame with TEXT payload is received.
 
     Fields:
@@ -240,7 +240,7 @@ class TextMessage(Message[str]):
 
 
 @dataclass(frozen=True)
-class BytesMessage(Message[bytes]):
+class BytesMessage(Message[bytes]):  # pylint: disable=unsubscriptable-object
     """This event is fired when a data frame with BINARY payload is
     received.
 

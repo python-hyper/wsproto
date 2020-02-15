@@ -203,7 +203,7 @@ def main() -> None:
         sys.exit(2)
     coverage_settings = {"coveragerc": "../.coveragerc"}
     try:
-        import wsproto
+        import wsproto  # pylint: disable=import-outside-toplevel
     except ImportError:
         say("wsproto must be on python path -- set PYTHONPATH or install it")
         sys.exit(2)
