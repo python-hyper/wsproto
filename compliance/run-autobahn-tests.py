@@ -25,7 +25,7 @@ CLIENT_CONFIG = {
         }
     ],
     "cases": ["*"],
-    "exclude-cases": [],
+    "exclude-cases": ["13.3.*", "13.5.*", "13.7.*"],
     "exclude-agent-cases": {},
 }
 
@@ -35,7 +35,7 @@ SERVER_CONFIG = {
     "outdir": "./reports/clients",
     "webport": 8080,
     "cases": ["*"],
-    "exclude-cases": [],
+    "exclude-cases": ["13.3.*", "13.5.*", "13.7.*"],
     "exclude-agent-cases": {},
 }
 

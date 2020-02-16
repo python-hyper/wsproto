@@ -71,13 +71,13 @@ class PerMessageDeflate(Extension):
         server_max_window_bits: Optional[int] = None,
     ) -> None:
         self.client_no_context_takeover = client_no_context_takeover
-        if client_max_window_bits is None:
-            client_max_window_bits = self.DEFAULT_CLIENT_MAX_WINDOW_BITS
-        self.client_max_window_bits = client_max_window_bits
         self.server_no_context_takeover = server_no_context_takeover
-        if server_max_window_bits is None:
-            server_max_window_bits = self.DEFAULT_SERVER_MAX_WINDOW_BITS
-        self.server_max_window_bits = server_max_window_bits
+        self._client_max_window_bits = self.DEFAULT_CLIENT_MAX_WINDOW_BITS
+        self._server_max_window_bits = self.DEFAULT_SERVER_MAX_WINDOW_BITS
+        if client_max_window_bits is not None:
+            self.client_max_window_bits = client_max_window_bits
+        if server_max_window_bits is not None:
+            self.server_max_window_bits = server_max_window_bits
 
         self._compressor: Optional[zlib._Compress] = None  # noqa
         self._decompressor: Optional[zlib._Decompress] = None  # noqa
@@ -89,6 +89,26 @@ class PerMessageDeflate(Extension):
         self._inbound_compressed: Optional[bool] = None
 
         self._enabled = False
+
+    @property
+    def client_max_window_bits(self) -> int:
+        return self._client_max_window_bits
+
+    @client_max_window_bits.setter
+    def client_max_window_bits(self, value: int) -> None:
+        if value < 9 or value > 15:
+            raise ValueError("Window size must be between 9 and 15 inclusive")
+        self._client_max_window_bits = value
+
+    @property
+    def server_max_window_bits(self) -> int:
+        return self._server_max_window_bits
+
+    @server_max_window_bits.setter
+    def server_max_window_bits(self, value: int) -> None:
+        if value < 9 or value > 15:
+            raise ValueError("Window size must be between 9 and 15 inclusive")
+        self._server_max_window_bits = value
 
     def _compressible_opcode(self, opcode: Opcode) -> bool:
         return opcode in (Opcode.TEXT, Opcode.BINARY, Opcode.CONTINUATION)
@@ -146,25 +166,27 @@ class PerMessageDeflate(Extension):
 
         return client_max_window_bits, server_max_window_bits
 
-    def accept(self, offer: str) -> Union[bool, str]:
+    def accept(self, offer: str) -> Union[bool, None, str]:
         client_max_window_bits, server_max_window_bits = self._parse_params(offer)
-
-        self._enabled = True
 
         parameters = []
 
         if self.client_no_context_takeover:
             parameters.append("client_no_context_takeover")
-        if client_max_window_bits is not None:
-            parameters.append("client_max_window_bits=%d" % client_max_window_bits)
-            self.client_max_window_bits = client_max_window_bits
         if self.server_no_context_takeover:
             parameters.append("server_no_context_takeover")
-        if server_max_window_bits is not None:
-            parameters.append("server_max_window_bits=%d" % server_max_window_bits)
-            self.server_max_window_bits = server_max_window_bits
-
-        return "; ".join(parameters)
+        try:
+            if client_max_window_bits is not None:
+                parameters.append("client_max_window_bits=%d" % client_max_window_bits)
+                self.client_max_window_bits = client_max_window_bits
+            if server_max_window_bits is not None:
+                parameters.append("server_max_window_bits=%d" % server_max_window_bits)
+                self.server_max_window_bits = server_max_window_bits
+        except ValueError:
+            return None
+        else:
+            self._enabled = True
+            return "; ".join(parameters)
 
     def frame_inbound_header(
         self,

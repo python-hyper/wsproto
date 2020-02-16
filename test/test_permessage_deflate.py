@@ -45,12 +45,12 @@ class TestPerMessageDeflate:
         },
         {
             "client_no_context_takeover": True,
-            "client_max_window_bits": 8,
+            "client_max_window_bits": 9,
             "server_no_context_takeover": True,
             "server_max_window_bits": 9,
         },
         {"client_no_context_takeover": True, "server_max_window_bits": 9},
-        {"server_no_context_takeover": True, "client_max_window_bits": 8},
+        {"server_no_context_takeover": True, "client_max_window_bits": 9},
         {"client_max_window_bits": None, "server_max_window_bits": None},
         {},
     ]
