@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
-
 import zlib
 from typing import cast, Dict, Optional, Sequence, TYPE_CHECKING, Union
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 
-import wsproto.extensions as wpext
-import wsproto.frame_protocol as fp
+from wsproto import extensions as wpext, frame_protocol as fp
 
 if TYPE_CHECKING:
     from mypy_extensions import TypedDict

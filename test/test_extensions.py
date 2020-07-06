@@ -1,5 +1,4 @@
-import wsproto.extensions as wpext
-import wsproto.frame_protocol as fp
+from wsproto import extensions as wpext, frame_protocol as fp
 
 
 class TestExtension:
