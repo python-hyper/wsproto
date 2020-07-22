@@ -1,11 +1,12 @@
+========================================================
 Pure Python, pure state-machine WebSocket implementation
 ========================================================
 
-.. image:: https://travis-ci.org/python-hyper/wsproto.svg?branch=master
-    :target: https://travis-ci.org/python-hyper/wsproto
+.. image:: https://github.com/python-hyper/wsproto/workflows/CI/badge.svg
+    :target: https://github.com/python-hyper/wsproto/actions
     :alt: Build status
 .. image:: https://readthedocs.org/projects/wsproto/badge/?version=latest
-    :target: http://wsproto.readthedocs.io/en/latest/?badge=latest
+    :target: https://wsproto.readthedocs.io/en/latest/
     :alt: Documentation Status
 .. image:: https://codecov.io/gh/python-hyper/wsproto/branch/master/graph/badge.svg
     :target: https://codecov.io/gh/python-hyper/wsproto
