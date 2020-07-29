@@ -4,7 +4,10 @@ Pure Python, pure state-machine WebSocket implementation
 
 .. image:: https://github.com/python-hyper/wsproto/workflows/CI/badge.svg
     :target: https://github.com/python-hyper/wsproto/actions
-    :alt: Build status
+    :alt: Build Status
+.. image:: https://codecov.io/gh/python-hyper/wsproto/branch/master/graph/badge.svg
+    :target: https://codecov.io/gh/python-hyper/wsproto
+    :alt: Code Coverage
 .. image:: https://readthedocs.org/projects/wsproto/badge/?version=latest
     :target: https://wsproto.readthedocs.io/en/latest/
     :alt: Documentation Status
