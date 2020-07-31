@@ -32,14 +32,14 @@ setup(
     version=version,
     description='WebSockets state-machine based protocol implementation',
     long_description=long_description,
-    long_description_content_type="text/x-rst",
+    long_description_content_type='text/x-rst',
     author='Benno Rice',
     author_email='benno@jeamland.net',
     url='https://github.com/python-hyper/wsproto/',
     packages=find_packages(where="src"),
     package_data={'': ['LICENSE', 'README.rst', 'CHANGELOG.rst']},
-    package_dir={"": "src"},
-    python_requires=">=3.6.1",
+    package_dir={'': 'src'},
+    python_requires='>=3.6.1',
     include_package_data=True,
     license='MIT License',
     classifiers=[
@@ -56,6 +56,6 @@ setup(
     ],
     install_requires=[
         "dataclasses ; python_version < '3.7'",
-        'h11 >= 0.8.1',
+        'h11>=0.9.0,<1',
     ],
 )
