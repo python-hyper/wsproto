@@ -27,7 +27,7 @@ with open(os.path.join(PROJECT_ROOT, '../../', 'src/wsproto/__init__.py')) as fi
 
 # -- Project information -----------------------------------------------------
 
-project = 'hpack'
+project = 'wsproto'
 copyright = '2020, Benno Rice'
 author = 'Benno Rice'
 release = version
