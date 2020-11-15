@@ -12,7 +12,7 @@ from enum import IntEnum
 from typing import Generator, List, NamedTuple, Optional, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from .extensions import Extension  # noqa
+    from .extensions import Extension  # pragma: no cover
 
 
 _XOR_TABLE = [bytes(a ^ b for a in range(256)) for b in range(256)]
@@ -23,7 +23,7 @@ class XorMaskerSimple:
         self._masking_key = masking_key
 
     def process(self, data: bytes) -> bytes:
-        if data:  # pylint:disable=no-else-return
+        if data:
             data_array = bytearray(data)
             a, b, c, d = (_XOR_TABLE[n] for n in self._masking_key)
             data_array[::4] = data_array[::4].translate(a)
@@ -31,7 +31,7 @@ class XorMaskerSimple:
             data_array[2::4] = data_array[2::4].translate(c)
             data_array[3::4] = data_array[3::4].translate(d)
 
-            # Rotate the maksing key so that the next usage continues
+            # Rotate the masking key so that the next usage continues
             # with the next key element, rather than restarting.
             key_rotation = len(data) % 4
             self._masking_key = (
@@ -39,8 +39,7 @@ class XorMaskerSimple:
             )
 
             return bytes(data_array)
-        else:
-            return data
+        return data
 
 
 class XorMaskerNull:
@@ -75,7 +74,7 @@ class Opcode(IntEnum):
     RFC 6455, Section 5.2 - Base Framing Protocol
     """
 
-    #: Contiuation frame
+    #: Continuation frame
     CONTINUATION = 0x0
 
     #: Text message

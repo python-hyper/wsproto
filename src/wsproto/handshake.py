@@ -224,7 +224,7 @@ class H11Handshake:
                 "Missing header, 'Sec-WebSocket-Version'",
                 event_hint=RejectConnection(
                     headers=[(b"Sec-WebSocket-Version", WEBSOCKET_VERSION)],
-                    status_code=426,
+                    status_code=426 if version else 400,
                 ),
             )
         if key is None:
@@ -234,10 +234,6 @@ class H11Handshake:
         if upgrade.lower() != b"websocket":
             raise RemoteProtocolError(
                 "Missing header, 'Upgrade: WebSocket'", event_hint=RejectConnection()
-            )
-        if version is None:
-            raise RemoteProtocolError(
-                "Missing header, 'Sec-WebSocket-Version'", event_hint=RejectConnection()
             )
         if host is None:
             raise RemoteProtocolError(

@@ -1,5 +1,3 @@
-# These tests test the behaviours expected of wsproto in when the
-# connection is a server.
 from typing import cast, List, Optional, Tuple
 
 import h11

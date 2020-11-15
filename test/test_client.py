@@ -1,12 +1,10 @@
-# These tests test the behaviours expected of wsproto in when the
-# connection is a client.
 from typing import List, Optional
 
 import h11
 import pytest
 
 from wsproto import WSConnection
-from wsproto.connection import CLIENT
+from wsproto.connection import CLIENT, ConnectionState
 from wsproto.events import (
     AcceptConnection,
     Event,
@@ -18,6 +16,7 @@ from wsproto.extensions import Extension
 from wsproto.typing import Headers
 from wsproto.utilities import (
     generate_accept_token,
+    LocalProtocolError,
     normed_header_dict,
     RemoteProtocolError,
 )
@@ -102,6 +101,42 @@ def test_connection_request_subprotocols() -> None:
     assert headers[b"sec-websocket-protocol"] == b"one, two"
 
 
+def test_connection_send_state() -> None:
+    client = WSConnection(CLIENT)
+    assert client.state is ConnectionState.CONNECTING
+
+    server = h11.Connection(h11.SERVER)
+    server.receive_data(
+        client.send(
+            Request(
+                host="localhost",
+                target="/",
+            )
+        )
+    )
+    headers = normed_header_dict(server.next_event().headers)
+    response = h11.InformationalResponse(
+        status_code=101,
+        headers=[
+            (b"connection", b"Upgrade"),
+            (b"upgrade", b"WebSocket"),
+            (
+                b"Sec-WebSocket-Accept",
+                generate_accept_token(headers[b"sec-websocket-key"]),
+            ),
+        ],
+    )
+    client.receive_data(server.send(response))
+    assert len(list(client.events())) == 1
+    assert client.state is ConnectionState.OPEN  # type: ignore # https://github.com/python/mypy/issues/9005
+
+    with pytest.raises(LocalProtocolError) as excinfo:
+        client.send(Request(host="localhost", target="/"))
+
+    client.receive_data(b"foobar")
+    assert len(list(client.events())) == 1
+
+
 def _make_handshake(
     response_status: int,
     response_headers: Headers,
@@ -110,6 +145,8 @@ def _make_handshake(
     auto_accept_key: bool = True,
 ) -> List[Event]:
     client = WSConnection(CLIENT)
+    assert client.state is ConnectionState.CONNECTING
+
     server = h11.Connection(h11.SERVER)
     server.receive_data(
         client.send(
@@ -134,6 +171,7 @@ def _make_handshake(
         status_code=response_status, headers=response_headers
     )
     client.receive_data(server.send(response))
+    assert client.state is not ConnectionState.CONNECTING
 
     return list(client.events())
 
