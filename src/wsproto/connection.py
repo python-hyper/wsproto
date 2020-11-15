@@ -132,6 +132,8 @@ class Connection:
             self._proto.receive_bytes(data)
         elif self.state is ConnectionState.CLOSED:
             raise LocalProtocolError("Connection already closed.")
+        else:
+            pass  # pragma: no cover
 
     def events(self) -> Generator[Event, None, None]:
         """
@@ -179,5 +181,8 @@ class Connection:
                         frame_finished=frame.frame_finished,
                         message_finished=frame.message_finished,
                     )
+
+                else:
+                    pass  # pragma: no cover
         except ParseFailed as exc:
             yield CloseConnection(code=exc.code, reason=str(exc))

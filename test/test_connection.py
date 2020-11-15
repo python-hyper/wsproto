@@ -68,6 +68,9 @@ def test_closure(client_sends: bool, code: CloseReason, reason: str) -> None:
     assert remote.state is ConnectionState.CLOSED  # type: ignore[comparison-overlap]
     assert local.state is ConnectionState.CLOSED
 
+    with pytest.raises(LocalProtocolError):
+        local.receive_data(b"foobar")
+
 
 def test_abnormal_closure() -> None:
     client = Connection(CLIENT)

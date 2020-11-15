@@ -36,10 +36,9 @@ class WSConnection:
         :returns: Connection state
         :rtype: wsproto.connection.ConnectionState
         """
-        if self.connection is None:  # noqa
+        if self.connection is None:
             return self.handshake.state
-        else:
-            return self.connection.state
+        return self.connection.state
 
     def initiate_upgrade_connection(self, headers: Headers, path: str) -> None:
         self.handshake.initiate_upgrade_connection(headers, path)
