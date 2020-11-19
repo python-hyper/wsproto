@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 wsproto/frame_protocol
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -410,7 +409,7 @@ class FrameDecoder:
         try:
             opcode = Opcode(opcode)
         except ValueError:
-            raise ParseFailed("Invalid opcode {:#x}".format(opcode))
+            raise ParseFailed(f"Invalid opcode {opcode:#x}")
 
         if opcode.iscontrol() and not fin:
             raise ParseFailed("Invalid attempt to fragment control frame")

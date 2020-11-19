@@ -12,14 +12,14 @@ count = 0
 
 def new_conn(sock: socket.socket) -> None:
     global count
-    print("test_server.py received connection {}".format(count))
+    print(f"test_server.py received connection {count}")
     count += 1
     ws = WSConnection(SERVER)
     closed = False
     while not closed:
         try:
             data: Optional[bytes] = sock.recv(65535)
-        except socket.error:
+        except OSError:
             data = None
 
         ws.receive_data(data or None)
@@ -46,7 +46,7 @@ def new_conn(sock: socket.socket) -> None:
 
         try:
             sock.sendall(outgoing_data)
-        except socket.error:
+        except OSError:
             closed = True
 
     sock.close()

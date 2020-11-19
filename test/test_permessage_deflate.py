@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import zlib
 from typing import cast, Dict, Optional, Sequence, TYPE_CHECKING, Union
 

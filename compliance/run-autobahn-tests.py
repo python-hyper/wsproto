@@ -20,7 +20,7 @@ CLIENT_CONFIG = {
     "servers": [
         {
             "agent": "wsproto",
-            "url": "ws://localhost:{}".format(PORT),
+            "url": f"ws://localhost:{PORT}",
             "options": {"version": 18},
         }
     ],
@@ -30,7 +30,7 @@ CLIENT_CONFIG = {
 }
 
 SERVER_CONFIG = {
-    "url": "ws://localhost:{}".format(PORT),
+    "url": f"ws://localhost:{PORT}",
     "options": {"failByDrop": False},
     "outdir": "./reports/clients",
     "webport": 8080,
@@ -43,7 +43,7 @@ CASES = {
     "all": ["*"],
     "fast": [
         # The core functionality tests
-        *["{}.*".format(i) for i in range(1, 12)],
+        *[f"{i}.*" for i in range(1, 12)],
         # Compression tests -- in each section, the tests get progressively
         # slower until they're taking 10s of seconds apiece. And it's
         # mostly stress tests, without much extra coverage to show for
@@ -82,7 +82,7 @@ def wait_for_listener(port: int) -> None:
         sock = socket.socket()
         try:
             sock.connect(("localhost", port))
-        except socket.error as exc:
+        except OSError as exc:
             if exc.errno == errno.ECONNREFUSED:
                 time.sleep(0.01)
             else:
@@ -240,9 +240,7 @@ def main() -> None:
         say("Unrecognized mode, try 'client' or 'server'")
         sys.exit(2)
 
-    say(
-        "in {} mode: failed {} out of {} total".format(args.MODE.upper(), failed, total)
-    )
+    say(f"in {args.MODE.upper()} mode: failed {failed} out of {total} total")
 
     if failed:
         say("Test failed")

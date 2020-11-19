@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 wsproto
 ~~~~~~~
@@ -86,11 +85,9 @@ class WSConnection:
         Each event is an instance of a subclass of
         :class:`wsproto.events.Event`.
         """
-        for event in self.handshake.events():
-            yield event
+        yield from self.handshake.events()
         if self.connection is not None:
-            for event in self.connection.events():
-                yield event
+            yield from self.connection.events()
 
 
 __all__ = ("ConnectionType", "WSConnection")

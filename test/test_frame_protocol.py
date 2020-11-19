@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import itertools
 import struct
 from binascii import unhexlify
@@ -212,7 +211,7 @@ class TestMessageDecoder:
             decoder.process_frame(frame)
 
     def test_incomplete_unicode(self) -> None:
-        payload = "fñör∂".encode("utf8")
+        payload = "fñör∂".encode()
         payload = payload[:4]
 
         decoder = fp.MessageDecoder()
@@ -725,7 +724,7 @@ class TestFrameDecoderExtensions:
             if self._fail_inbound_complete:
                 return fp.CloseReason.ABNORMAL_CLOSURE
             if fin and self._inbound_rsv_bit_set:
-                return "™".encode("utf-8")
+                return "™".encode()
             return None
 
         def frame_outbound(
@@ -740,7 +739,7 @@ class TestFrameDecoderExtensions:
                 rsv = fp.RsvBits(rsv.rsv1, rsv.rsv2, True)
                 self._outbound_rsv_bit_set = True
             if fin and self._outbound_rsv_bit_set:
-                data += "®".encode("utf-8")
+                data += "®".encode()
                 self._outbound_rsv_bit_set = False
             return rsv, data
 
@@ -985,7 +984,7 @@ class TestFrameProtocolReceive:
         assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     def test_close_incomplete_utf8_payload(self) -> None:
-        payload = "fñør∂".encode("utf8")[:-1]
+        payload = "fñør∂".encode()[:-1]
         with pytest.raises(fp.ParseFailed) as exc:
             self._close_test(fp.CloseReason.NORMAL_CLOSURE, reason_bytes=payload)
         assert exc.value.code == fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
@@ -1049,7 +1048,7 @@ class TestFrameProtocolSend:
 
     def test_ping_with_payload(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = r"¯\_(ツ)_/¯".encode("utf8")
+        payload = r"¯\_(ツ)_/¯".encode()
         data = proto.ping(payload)
         assert data == b"\x89" + bytearray([len(payload)]) + payload
 
@@ -1060,7 +1059,7 @@ class TestFrameProtocolSend:
 
     def test_pong_with_payload(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = r"¯\_(ツ)_/¯".encode("utf8")
+        payload = r"¯\_(ツ)_/¯".encode()
         data = proto.pong(payload)
         assert data == b"\x8a" + bytearray([len(payload)]) + payload
 

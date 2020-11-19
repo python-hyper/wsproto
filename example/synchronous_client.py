@@ -49,7 +49,7 @@ def wsproto_demo(host: str, port: int) -> None:
     """
 
     # 0) Open TCP connection
-    print("Connecting to {}:{}".format(host, port))
+    print(f"Connecting to {host}:{port}")
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     conn.connect((host, port))
 
@@ -64,14 +64,14 @@ def wsproto_demo(host: str, port: int) -> None:
 
     # 2) Send a message and display response
     message = "wsproto is great"
-    print("Sending message: {}".format(message))
+    print(f"Sending message: {message}")
     net_send(ws.send(Message(data=message)), conn)
     net_recv(ws, conn)
     handle_events(ws)
 
     # 3) Send ping and display pong
     payload = b"table tennis"
-    print("Sending ping: {!r}".format(payload))
+    print(f"Sending ping: {payload!r}")
     net_send(ws.send(Ping(payload=payload)), conn)
     net_recv(ws, conn)
     handle_events(ws)
@@ -111,9 +111,9 @@ def handle_events(ws: WSConnection) -> None:
         if isinstance(event, AcceptConnection):
             print("WebSocket negotiation complete")
         elif isinstance(event, TextMessage):
-            print("Received message: {}".format(event.data))
+            print(f"Received message: {event.data}")
         elif isinstance(event, Pong):
-            print("Received pong: {!r}".format(event.payload))
+            print(f"Received pong: {event.payload!r}")
         else:
             raise Exception("Do not know how to handle event: " + str(event))
 
