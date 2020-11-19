@@ -2,7 +2,6 @@ import zlib
 from typing import cast, Optional, Sequence, TYPE_CHECKING
 
 import pytest
-from _pytest.monkeypatch import MonkeyPatch
 
 from wsproto import extensions as wpext, frame_protocol as fp
 
@@ -348,7 +347,7 @@ class TestPerMessageDeflate:
         result2 = ext.frame_inbound_payload_data(proto, compressed_payload)
         assert result2 is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
-    def test_inbound_bad_zlib_decoder_end_state(self, monkeypatch: MonkeyPatch) -> None:
+    def test_inbound_bad_zlib_decoder_end_state(self) -> None:
         compressed_payload = b"x" * 23
 
         ext = wpext.PerMessageDeflate()
@@ -371,9 +370,9 @@ class TestPerMessageDeflate:
             def flush(self) -> None:
                 raise zlib.error()
 
-        monkeypatch.setattr(ext, "_decompressor", FailDecompressor())
-
+        ext._decompressor = cast("zlib._Decompress", FailDecompressor())
         result2 = ext.frame_inbound_complete(proto, True)
+
         assert result2 is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
 
     @pytest.mark.parametrize(
