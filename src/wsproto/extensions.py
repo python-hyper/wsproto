@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 wsproto/extensions
 ~~~~~~~~~~~~~~~~~~
@@ -306,7 +305,7 @@ class PerMessageDeflate(Extension):
         if self.server_no_context_takeover:
             descr.append("server_no_context_takeover")
 
-        return "<%s %s>" % (self.__class__.__name__, "; ".join(descr))
+        return "<{} {}>".format(self.__class__.__name__, "; ".join(descr))
 
 
 #: SUPPORTED_EXTENSIONS maps all supported extension names to their class.

@@ -263,16 +263,16 @@ def test_handshake_with_extension_params() -> None:
         [
             (
                 b"Sec-Websocket-Extensions",
-                ("%s; %s" % (extension.name, offered_params)).encode("ascii"),
+                (f"{extension.name}; {offered_params}").encode("ascii"),
             )
         ],
         extensions=[extension],
     )
 
     headers = normed_header_dict(response.headers)
-    assert extension.offered == "%s; %s" % (extension.name, offered_params)
+    assert extension.offered == f"{extension.name}; {offered_params}"
     assert headers[b"sec-websocket-extensions"] == (
-        "%s; %s" % (extension.name, accepted_params)
+        f"{extension.name}; {accepted_params}"
     ).encode("ascii")
 
 

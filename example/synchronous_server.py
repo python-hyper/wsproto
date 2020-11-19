@@ -97,7 +97,7 @@ def handle_connection(stream: socket.socket) -> None:
                 print("Received ping and sending pong")
                 out_data += ws.send(event.response())
             else:
-                print("Unknown event: {!r}".format(event))
+                print(f"Unknown event: {event!r}")
 
         # 4) Send data from wsproto to network
         print("Sending {} bytes".format(len(out_data)))

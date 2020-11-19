@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 wsproto/handshake
 ~~~~~~~~~~~~~~~~~~
@@ -108,7 +107,7 @@ class H11Handshake:
             data += self._send_reject_data(event)
         else:
             raise LocalProtocolError(
-                "Event {} cannot be sent during the handshake".format(event)
+                f"Event {event} cannot be sent during the handshake"
             )
         return data
 
@@ -270,9 +269,7 @@ class H11Handshake:
 
         if event.subprotocol is not None:
             if event.subprotocol not in self._initiating_request.subprotocols:
-                raise LocalProtocolError(
-                    "unexpected subprotocol {}".format(event.subprotocol)
-                )
+                raise LocalProtocolError(f"unexpected subprotocol {event.subprotocol}")
             headers.append(
                 (b"Sec-WebSocket-Protocol", event.subprotocol.encode("ascii"))
             )
@@ -315,7 +312,7 @@ class H11Handshake:
     def _send_reject_data(self, event: RejectData) -> bytes:
         if self.state != ConnectionState.REJECTING:
             raise LocalProtocolError(
-                "Cannot send rejection data in state {}".format(self.state)
+                f"Cannot send rejection data in state {self.state}"
             )
 
         data = self._h11_connection.send(h11.Data(data=event.data))
@@ -415,7 +412,7 @@ class H11Handshake:
             subprotocol = subprotocol.decode("ascii")
             if subprotocol not in self._initiating_request.subprotocols:
                 raise RemoteProtocolError(
-                    "unrecognized subprotocol {}".format(subprotocol),
+                    f"unrecognized subprotocol {subprotocol}",
                     event_hint=RejectConnection(),
                 )
         extensions = client_extensions_handshake(
@@ -489,6 +486,6 @@ def client_extensions_handshake(
                 break
         else:
             raise RemoteProtocolError(
-                "unrecognized extension {}".format(name), event_hint=RejectConnection()
+                f"unrecognized extension {name}", event_hint=RejectConnection()
             )
     return extensions

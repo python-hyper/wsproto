@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 wsproto/connection
 ~~~~~~~~~~~~~~~~~~
@@ -106,7 +105,7 @@ class Connection:
             else:
                 self._state = ConnectionState.LOCAL_CLOSING
         else:
-            raise LocalProtocolError("Event {} cannot be sent.".format(event))
+            raise LocalProtocolError(f"Event {event} cannot be sent.")
         return data
 
     def receive_data(self, data: Optional[bytes]) -> None:

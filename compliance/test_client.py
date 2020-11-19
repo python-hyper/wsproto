@@ -63,7 +63,7 @@ def run_case(server: str, case: int, agent: str) -> None:
         connection.send(
             Request(
                 host=uri.netloc,
-                target="%s?%s" % (uri.path, uri.query),
+                target=f"{uri.path}?{uri.query}",
                 extensions=[PerMessageDeflate()],
             )
         )
@@ -105,9 +105,7 @@ def update_reports(server: str, agent: str) -> None:
     sock.connect((uri.hostname, uri.port or 80))
 
     sock.sendall(
-        connection.send(
-            Request(host=uri.netloc, target="%s?%s" % (uri.path, uri.query))
-        )
+        connection.send(Request(host=uri.netloc, target=f"{uri.path}?{uri.query}"))
     )
     closed = False
 
