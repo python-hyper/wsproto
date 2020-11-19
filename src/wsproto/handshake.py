@@ -344,15 +344,18 @@ class H11Handshake:
             )
 
         if request.extensions:
-            offers = {e.name: e.offer() for e in request.extensions}  # type: ignore
+            offers: Dict[str, Union[str, bool]] = {}
+            for e in request.extensions:
+                assert isinstance(e, Extension)
+                offers[e.name] = e.offer()
             extensions = []
             for name, params in offers.items():
-                name = name.encode("ascii")
+                bname = name.encode("ascii")
                 if isinstance(params, bool):
                     if params:
-                        extensions.append(name)
+                        extensions.append(bname)
                 else:
-                    extensions.append(b"%s; %s" % (name, params.encode("ascii")))
+                    extensions.append(b"%s; %s" % (bname, params.encode("ascii")))
             if extensions:
                 headers.append((b"Sec-WebSocket-Extensions", b", ".join(extensions)))
 

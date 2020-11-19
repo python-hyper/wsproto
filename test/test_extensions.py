@@ -22,23 +22,23 @@ class TestExtension:
 
     def test_frame_inbound_header(self) -> None:
         ext = wpext.Extension()
-        result = ext.frame_inbound_header(None, None, None, None)  # type: ignore
+        result = ext.frame_inbound_header(None, None, None, None)  # type: ignore[arg-type]
         assert result == fp.RsvBits(False, False, False)
 
     def test_frame_inbound_payload_data(self) -> None:
         ext = wpext.Extension()
         data = b""
-        assert ext.frame_inbound_payload_data(None, data) == data  # type: ignore
+        assert ext.frame_inbound_payload_data(None, data) == data  # type: ignore[arg-type]
 
     def test_frame_inbound_complete(self) -> None:
         ext = wpext.Extension()
-        assert ext.frame_inbound_complete(None, None) is None  # type: ignore
+        assert ext.frame_inbound_complete(None, None) is None  # type: ignore[arg-type]
 
     def test_frame_outbound(self) -> None:
         ext = wpext.Extension()
         rsv = fp.RsvBits(True, True, True)
         data = b""
-        assert ext.frame_outbound(None, None, rsv, data, None) == (  # type: ignore
+        assert ext.frame_outbound(None, None, rsv, data, None) == (  # type: ignore[arg-type]
             rsv,
             data,
         )

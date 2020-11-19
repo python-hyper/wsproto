@@ -10,7 +10,7 @@ import socket
 import subprocess
 import sys
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 PORT = 8642
 
@@ -62,7 +62,7 @@ CASES = {
 }
 
 
-def say(*args: Any) -> None:  # type: ignore
+def say(*args: object) -> None:
     print("run-autobahn-tests.py:", *args)
 
 
