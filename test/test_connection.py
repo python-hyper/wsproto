@@ -1,19 +1,15 @@
-import itertools
-
 import pytest
 
 from wsproto.connection import CLIENT, Connection, ConnectionState, SERVER
 from wsproto.events import (
-    AcceptConnection,
     BytesMessage,
     CloseConnection,
-    Message,
     Ping,
     Pong,
     Request,
     TextMessage,
 )
-from wsproto.frame_protocol import CloseReason, FrameProtocol
+from wsproto.frame_protocol import CloseReason
 from wsproto.utilities import LocalProtocolError
 
 

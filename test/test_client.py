@@ -1,6 +1,6 @@
 # These tests test the behaviours expected of wsproto in when the
 # connection is a client.
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import h11
 import pytest
@@ -15,7 +15,6 @@ from wsproto.events import (
     Request,
 )
 from wsproto.extensions import Extension
-from wsproto.frame_protocol import CloseReason
 from wsproto.typing import Headers
 from wsproto.utilities import (
     generate_accept_token,
