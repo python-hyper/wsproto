@@ -15,7 +15,6 @@ from wsproto.events import (
     Request,
 )
 from wsproto.extensions import Extension
-from wsproto.frame_protocol import CloseReason
 from wsproto.typing import Headers
 from wsproto.utilities import (
     generate_accept_token,
