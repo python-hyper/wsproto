@@ -3,6 +3,7 @@ graft compliance
 graft example
 graft docs
 graft test
+graft bench
 prune docs/build
 prune compliance/reports
 prune compliance/auto-tests-server-config.json
