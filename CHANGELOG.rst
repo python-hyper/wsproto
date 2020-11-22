@@ -5,7 +5,7 @@ Release History
 ---------
 
 - Prevent invalid window bit sizes.
-- Added support for Python 3.8.
+- Added support for Python 3.8 and 3.9.
 
 
 0.15.0 (2019-08-10)
