@@ -1,11 +1,12 @@
 Release History
 ===============
 
-1.0.0+dev
----------
+1.0.0 (2020-11-22)
+------------------
 
-- Prevent invalid window bit sizes.
 - Added support for Python 3.8 and 3.9.
+- Prevent invalid window bit sizes.
+- Various docs, type checking, tooling and testing improvements.
 
 
 0.15.0 (2019-08-10)
