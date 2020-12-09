@@ -4,6 +4,8 @@ Release History
 Unreleased
 ----------
 
+- Bugfix: When a close frame with status NO_STATUS_RCVD is sent, send
+  and empty payload.
 - <ToDo: add new entries here>
 
 
