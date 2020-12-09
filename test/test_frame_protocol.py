@@ -1036,9 +1036,14 @@ class TestFrameProtocolSend:
         with pytest.raises(TypeError):
             proto.close(reason="termites")
 
-    def test_local_only_close_reason(self) -> None:
+    def test_no_status_rcvd_close_reason(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
         data = proto.close(code=fp.CloseReason.NO_STATUS_RCVD)
+        assert data == b"\x88\x00"
+
+    def test_local_only_close_reason(self) -> None:
+        proto = fp.FrameProtocol(client=False, extensions=[])
+        data = proto.close(code=fp.CloseReason.ABNORMAL_CLOSURE)
         assert data == b"\x88\x02\x03\xe8"
 
     def test_ping_without_payload(self) -> None:

@@ -569,7 +569,9 @@ class FrameProtocol:
 
     def close(self, code: Optional[int] = None, reason: Optional[str] = None) -> bytes:
         payload = bytearray()
-        if code is None and reason is not None:
+        if code is CloseReason.NO_STATUS_RCVD:
+            code = None
+        if code is None and reason:
             raise TypeError("cannot specify a reason without a code")
         if code in LOCAL_ONLY_CLOSE_REASONS:
             code = CloseReason.NORMAL_CLOSURE
