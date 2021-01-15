@@ -11,9 +11,6 @@ Pure Python, pure state-machine WebSocket implementation
 .. image:: https://readthedocs.org/projects/wsproto/badge/?version=latest
     :target: https://wsproto.readthedocs.io/en/latest/
     :alt: Documentation Status
-.. image:: https://codecov.io/gh/python-hyper/wsproto/branch/master/graph/badge.svg
-    :target: https://codecov.io/gh/python-hyper/wsproto
-    :alt: Code coverage
 .. image:: https://img.shields.io/badge/chat-join_now-brightgreen.svg
     :target: https://gitter.im/python-hyper/community
     :alt: Chat community
