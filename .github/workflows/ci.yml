@@ -39,7 +39,7 @@ jobs:
         file: ./coverage.xml
 
   autobahn:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     strategy:
       matrix:
         side: [client, server]
