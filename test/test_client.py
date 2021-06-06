@@ -130,7 +130,7 @@ def test_connection_send_state() -> None:
     assert len(list(client.events())) == 1
     assert client.state is ConnectionState.OPEN  # type: ignore # https://github.com/python/mypy/issues/9005
 
-    with pytest.raises(LocalProtocolError) as excinfo:
+    with pytest.raises(LocalProtocolError):
         client.send(Request(host="localhost", target="/"))
 
     client.receive_data(b"foobar")
@@ -202,20 +202,20 @@ def test_handshake_extra_accept_headers() -> None:
 @pytest.mark.parametrize("extra_headers", [[], [(b"connection", b"Keep-Alive")]])
 def test_handshake_response_broken_connection_header(extra_headers: Headers) -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        events = _make_handshake(101, [(b"upgrade", b"WebSocket")] + extra_headers)
+        _make_handshake(101, [(b"upgrade", b"WebSocket")] + extra_headers)
     assert str(excinfo.value) == "Missing header, 'Connection: Upgrade'"
 
 
 @pytest.mark.parametrize("extra_headers", [[], [(b"upgrade", b"h2")]])
 def test_handshake_response_broken_upgrade_header(extra_headers: Headers) -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        events = _make_handshake(101, [(b"connection", b"Upgrade")] + extra_headers)
+        _make_handshake(101, [(b"connection", b"Upgrade")] + extra_headers)
     assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
 
 
 def test_handshake_response_missing_websocket_key_header() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        events = _make_handshake(
+        _make_handshake(
             101,
             [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")],
             auto_accept_key=False,
@@ -238,7 +238,7 @@ def test_handshake_with_subprotocol() -> None:
 
 def test_handshake_bad_subprotocol() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        events = _make_handshake(
+        _make_handshake(
             101,
             [
                 (b"connection", b"Upgrade"),
@@ -265,7 +265,7 @@ def test_handshake_with_extension() -> None:
 
 def test_handshake_bad_extension() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        events = _make_handshake(
+        _make_handshake(
             101,
             [
                 (b"connection", b"Upgrade"),

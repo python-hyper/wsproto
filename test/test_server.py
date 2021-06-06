@@ -62,7 +62,7 @@ def test_connection_request() -> None:
 
 def test_connection_request_bad_method() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        event = _make_connection_request(
+        _make_connection_request(
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, Upgrade"),
@@ -77,7 +77,7 @@ def test_connection_request_bad_method() -> None:
 
 def test_connection_request_bad_connection_header() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        event = _make_connection_request(
+        _make_connection_request(
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, No-Upgrade"),
@@ -91,7 +91,7 @@ def test_connection_request_bad_connection_header() -> None:
 
 def test_connection_request_bad_upgrade_header() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        event = _make_connection_request(
+        _make_connection_request(
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, Upgrade"),
@@ -106,7 +106,7 @@ def test_connection_request_bad_upgrade_header() -> None:
 @pytest.mark.parametrize("version", [b"12", b"not-a-digit"])
 def test_connection_request_bad_version_header(version: bytes) -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        event = _make_connection_request(
+        _make_connection_request(
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, Upgrade"),
@@ -123,7 +123,7 @@ def test_connection_request_bad_version_header(version: bytes) -> None:
 
 def test_connection_request_key_header() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        event = _make_connection_request(
+        _make_connection_request(
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, Upgrade"),

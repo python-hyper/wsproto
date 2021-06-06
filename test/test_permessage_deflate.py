@@ -304,7 +304,7 @@ class TestPerMessageDeflate:
         proto = fp.FrameProtocol(client=client, extensions=[ext])
 
         # A PING frame
-        result = ext.frame_inbound_header(
+        ext.frame_inbound_header(
             proto, fp.Opcode.PING, fp.RsvBits(False, False, False), 0
         )
         result2 = ext.frame_inbound_payload_data(proto, b"")
