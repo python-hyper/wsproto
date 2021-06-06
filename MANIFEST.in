@@ -1,4 +1,4 @@
-graft src
+graft src/wsproto
 graft compliance
 graft example
 graft docs
