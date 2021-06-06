@@ -1,8 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import re
-import sys
 
 from setuptools import setup, find_packages
 
@@ -11,21 +10,14 @@ PROJECT_ROOT = os.path.dirname(__file__)
 with open(os.path.join(PROJECT_ROOT, 'README.rst')) as file_:
     long_description = file_.read()
 
-# Get the version
 version_regex = r'__version__ = ["\']([^"\']*)["\']'
 with open(os.path.join(PROJECT_ROOT, 'src/wsproto/__init__.py')) as file_:
     text = file_.read()
     match = re.search(version_regex, text)
-
     if match:
         version = match.group(1)
     else:
         raise RuntimeError("No version number found!")
-
-# Stealing this from Cory Benfield who stole it from Kenneth Reitz
-if sys.argv[-1] == 'publish':
-    os.system('python setup.py sdist upload')
-    sys.exit()
 
 setup(
     name='wsproto',
@@ -37,10 +29,9 @@ setup(
     author_email='benno@jeamland.net',
     url='https://github.com/python-hyper/wsproto/',
     packages=find_packages(where="src"),
-    package_data={'': ['LICENSE', 'README.rst', 'CHANGELOG.rst']},
+    package_data={'wsproto': ['py.typed']},
     package_dir={'': 'src'},
     python_requires='>=3.6.1',
-    include_package_data=True,
     license='MIT License',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
