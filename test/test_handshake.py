@@ -1,7 +1,7 @@
 import pytest
 
 from wsproto.connection import CLIENT, ConnectionState, SERVER
-from wsproto.events import AcceptConnection, Ping, RejectConnection, Request
+from wsproto.events import AcceptConnection, Ping, Request
 from wsproto.handshake import H11Handshake
 from wsproto.utilities import LocalProtocolError, RemoteProtocolError
 

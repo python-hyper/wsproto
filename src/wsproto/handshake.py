@@ -176,7 +176,7 @@ class H11Handshake:
         while self._events:
             yield self._events.popleft()
 
-    ############ Server mode methods
+    # Server mode methods
 
     def _process_connection_request(  # noqa: MC0001
         self, event: h11.Request
@@ -317,7 +317,7 @@ class H11Handshake:
             self._state = ConnectionState.CLOSED
         return data
 
-    ############ Client mode methods
+    # Client mode methods
 
     def _initiate_connection(self, request: Request) -> bytes:
         self._initiating_request = request
