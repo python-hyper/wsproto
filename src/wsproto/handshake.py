@@ -198,7 +198,7 @@ class H11Handshake:
             if name == b"connection":
                 connection_tokens = split_comma_header(value)
             elif name == b"host":
-                host = value.decode("ascii")
+                host = value.decode("idna")
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-extensions":
                 extensions = split_comma_header(value)
@@ -324,7 +324,7 @@ class H11Handshake:
         self._nonce = generate_nonce()
 
         headers = [
-            (b"Host", request.host.encode("ascii")),
+            (b"Host", request.host.encode("idna")),
             (b"Upgrade", b"WebSocket"),
             (b"Connection", b"Upgrade"),
             (b"Sec-WebSocket-Key", self._nonce),
