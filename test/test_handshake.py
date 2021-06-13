@@ -10,7 +10,7 @@ def test_successful_handshake() -> None:
     client = H11Handshake(CLIENT)
     server = H11Handshake(SERVER)
 
-    server.receive_data(client.send(Request(host="localhost", target="/")))
+    server.receive_data(client.send(Request(host="芝士汉堡.localhost", target="/")))
     assert isinstance(next(server.events()), Request)
 
     client.receive_data(server.send(AcceptConnection()))
