@@ -88,13 +88,13 @@ def wsproto_demo(host: str, port: int) -> None:
 
 
 def net_send(out_data: bytes, conn: socket.socket) -> None:
-    """ Write pending data from websocket to network. """
+    """Write pending data from websocket to network."""
     print("Sending {} bytes".format(len(out_data)))
     conn.send(out_data)
 
 
 def net_recv(ws: WSConnection, conn: socket.socket) -> None:
-    """ Read pending data from network into websocket. """
+    """Read pending data from network into websocket."""
     in_data = conn.recv(RECEIVE_BYTES)
     if not in_data:
         # A receive of zero bytes indicates the TCP socket has been closed. We
