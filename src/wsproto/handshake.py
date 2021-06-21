@@ -286,7 +286,7 @@ class H11Handshake:
             event.extensions,
         )
         self._state = ConnectionState.OPEN
-        return self._h11_connection.send(response)
+        return self._h11_connection.send(response)  # type: ignore[no-any-return]
 
     def _reject(self, event: RejectConnection) -> bytes:
         if self.state != ConnectionState.CONNECTING:
@@ -303,7 +303,7 @@ class H11Handshake:
         if not event.has_body:
             data += self._h11_connection.send(h11.EndOfMessage())
             self._state = ConnectionState.CLOSED
-        return data
+        return data  # type: ignore[no-any-return]
 
     def _send_reject_data(self, event: RejectData) -> bytes:
         if self.state != ConnectionState.REJECTING:
@@ -315,7 +315,7 @@ class H11Handshake:
         if event.body_finished:
             data += self._h11_connection.send(h11.EndOfMessage())
             self._state = ConnectionState.CLOSED
-        return data
+        return data  # type: ignore[no-any-return]
 
     # Client mode methods
 
@@ -360,7 +360,7 @@ class H11Handshake:
             target=request.target.encode("ascii"),
             headers=headers + request.extra_headers,
         )
-        return self._h11_connection.send(upgrade)
+        return self._h11_connection.send(upgrade)  # type: ignore[no-any-return]
 
     def _establish_client_connection(
         self, event: h11.InformationalResponse

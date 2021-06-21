@@ -43,7 +43,7 @@ class ConnectionState(Enum):
 
 
 class ConnectionType(Enum):
-    """ An enumeration of connection types. """
+    """An enumeration of connection types."""
 
     #: This connection will act as client and talk to a remote server
     CLIENT = 1

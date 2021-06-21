@@ -182,7 +182,7 @@ class CloseConnection(Event):
     reason: Optional[str] = None
 
     def response(self) -> "CloseConnection":
-        """ Generate an RFC-compliant close frame to send back to the peer. """
+        """Generate an RFC-compliant close frame to send back to the peer."""
         return CloseConnection(code=self.code, reason=self.reason)
 
 
@@ -276,7 +276,7 @@ class Ping(Event):
     payload: bytes = b""
 
     def response(self) -> "Pong":
-        """ Generate an RFC-compliant :class:`Pong` response to this ping. """
+        """Generate an RFC-compliant :class:`Pong` response to this ping."""
         return Pong(payload=self.payload)
 
 
