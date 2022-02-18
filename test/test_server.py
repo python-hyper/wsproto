@@ -205,30 +205,24 @@ def _make_handshake(
 def test_handshake() -> None:
     response, nonce = _make_handshake([])
 
-    response.headers = sorted(response.headers)  # For test determinism
-    assert response == h11.InformationalResponse(
-        status_code=101,
-        headers=[
-            (b"connection", b"Upgrade"),
-            (b"sec-websocket-accept", generate_accept_token(nonce)),
-            (b"upgrade", b"WebSocket"),
-        ],
-    )
+    assert response.status_code == 101
+    assert sorted(response.headers) == [
+        (b"connection", b"Upgrade"),
+        (b"sec-websocket-accept", generate_accept_token(nonce)),
+        (b"upgrade", b"WebSocket"),
+    ]
 
 
 def test_handshake_extra_headers() -> None:
     response, nonce = _make_handshake([], accept_headers=[(b"X-Foo", b"bar")])
 
-    response.headers = sorted(response.headers)  # For test determinism
-    assert response == h11.InformationalResponse(
-        status_code=101,
-        headers=[
-            (b"connection", b"Upgrade"),
-            (b"sec-websocket-accept", generate_accept_token(nonce)),
-            (b"upgrade", b"WebSocket"),
-            (b"x-foo", b"bar"),
-        ],
-    )
+    assert response.status_code == 101
+    assert sorted(response.headers) == [
+        (b"connection", b"Upgrade"),
+        (b"sec-websocket-accept", generate_accept_token(nonce)),
+        (b"upgrade", b"WebSocket"),
+        (b"x-foo", b"bar"),
+    ]
 
 
 @pytest.mark.parametrize("accept_subprotocol", ["one", "two"])
