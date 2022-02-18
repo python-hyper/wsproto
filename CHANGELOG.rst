@@ -4,7 +4,7 @@ Release History
 Unreleased
 ----------
 
-- <ToDo: add new entries here>
+- Added support for Python 3.10.
 
 
 1.0.0 (2020-11-22)
