@@ -119,7 +119,7 @@ class H11Handshake:
 
         :param bytes data: Data received from the WebSocket peer.
         """
-        self._h11_connection.receive_data(data)
+        self._h11_connection.receive_data(data or b"")
         while True:
             try:
                 event = self._h11_connection.next_event()
@@ -141,7 +141,7 @@ class H11Handshake:
                     else:
                         self._events.append(
                             RejectConnection(
-                                headers=event.headers,
+                                headers=list(event.headers),
                                 status_code=event.status_code,
                                 has_body=False,
                             )
@@ -151,7 +151,7 @@ class H11Handshake:
                     self._state = ConnectionState.REJECTING
                     self._events.append(
                         RejectConnection(
-                            headers=event.headers,
+                            headers=list(event.headers),
                             status_code=event.status_code,
                             has_body=True,
                         )
@@ -286,7 +286,7 @@ class H11Handshake:
             event.extensions,
         )
         self._state = ConnectionState.OPEN
-        return self._h11_connection.send(response)  # type: ignore[no-any-return]
+        return self._h11_connection.send(response) or b""
 
     def _reject(self, event: RejectConnection) -> bytes:
         if self.state != ConnectionState.CONNECTING:
@@ -294,16 +294,16 @@ class H11Handshake:
                 "Connection cannot be rejected in state %s" % self.state
             )
 
-        headers = event.headers
+        headers = list(event.headers)
         if not event.has_body:
             headers.append((b"content-length", b"0"))
         response = h11.Response(status_code=event.status_code, headers=headers)
-        data = self._h11_connection.send(response)
+        data = self._h11_connection.send(response) or b""
         self._state = ConnectionState.REJECTING
         if not event.has_body:
-            data += self._h11_connection.send(h11.EndOfMessage())
+            data += self._h11_connection.send(h11.EndOfMessage()) or b""
             self._state = ConnectionState.CLOSED
-        return data  # type: ignore[no-any-return]
+        return data
 
     def _send_reject_data(self, event: RejectData) -> bytes:
         if self.state != ConnectionState.REJECTING:
@@ -311,11 +311,11 @@ class H11Handshake:
                 f"Cannot send rejection data in state {self.state}"
             )
 
-        data = self._h11_connection.send(h11.Data(data=event.data))
+        data = self._h11_connection.send(h11.Data(data=event.data)) or b""
         if event.body_finished:
-            data += self._h11_connection.send(h11.EndOfMessage())
+            data += self._h11_connection.send(h11.EndOfMessage()) or b""
             self._state = ConnectionState.CLOSED
-        return data  # type: ignore[no-any-return]
+        return data
 
     # Client mode methods
 
@@ -360,7 +360,7 @@ class H11Handshake:
             target=request.target.encode("ascii"),
             headers=headers + request.extra_headers,
         )
-        return self._h11_connection.send(upgrade)  # type: ignore[no-any-return]
+        return self._h11_connection.send(upgrade) or b""
 
     def _establish_client_connection(
         self, event: h11.InformationalResponse
@@ -387,7 +387,7 @@ class H11Handshake:
                 accept = value
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-protocol":
-                subprotocol = value
+                subprotocol = value.decode("ascii")
                 continue  # Skip appending to headers
             elif name == b"upgrade":
                 upgrade = value
@@ -408,7 +408,6 @@ class H11Handshake:
         if accept != accept_token:
             raise RemoteProtocolError("Bad accept token", event_hint=RejectConnection())
         if subprotocol is not None:
-            subprotocol = subprotocol.decode("ascii")
             if subprotocol not in self._initiating_request.subprotocols:
                 raise RemoteProtocolError(
                     f"unrecognized subprotocol {subprotocol}",

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import cast, List, Optional
 
 import h11
 import pytest
@@ -27,7 +27,7 @@ def _make_connection_request(request: Request) -> h11.Request:
     client = WSConnection(CLIENT)
     server = h11.Connection(h11.SERVER)
     server.receive_data(client.send(request))
-    return server.next_event()
+    return cast(h11.Request, server.next_event())
 
 
 def test_connection_request() -> None:
@@ -114,7 +114,7 @@ def test_connection_send_state() -> None:
             )
         )
     )
-    headers = normed_header_dict(server.next_event().headers)
+    headers = normed_header_dict(cast(h11.Request, server.next_event()).headers)
     response = h11.InformationalResponse(
         status_code=101,
         headers=[
@@ -158,7 +158,7 @@ def _make_handshake(
             )
         )
     )
-    request = server.next_event()
+    request = cast(h11.Request, server.next_event())
     if auto_accept_key:
         full_request_headers = normed_header_dict(request.headers)
         response_headers.append(
