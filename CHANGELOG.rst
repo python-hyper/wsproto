@@ -5,6 +5,8 @@ Unreleased
 ----------
 
 - Added support for Python 3.10.
+- Drop support for Python 3.6, meaning the minimum supported version
+  is Python 3.7.0.
 
 
 1.0.0 (2020-11-22)
