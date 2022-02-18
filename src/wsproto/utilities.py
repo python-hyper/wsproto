@@ -7,7 +7,9 @@ Utility functions that do not belong in a separate module.
 import base64
 import hashlib
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
+
+from h11._headers import Headers as H11Headers
 
 from .events import Event
 from .typing import Headers
@@ -51,7 +53,7 @@ class RemoteProtocolError(ProtocolError):
 
 
 # Some convenience utilities for working with HTTP headers
-def normed_header_dict(h11_headers: Headers) -> Dict[bytes, bytes]:
+def normed_header_dict(h11_headers: Union[Headers, H11Headers]) -> Dict[bytes, bytes]:
     # This mangles Set-Cookie headers. But it happens that we don't care about
     # any of those, so it's OK. For every other HTTP header, if there are
     # multiple instances then you're allowed to join them together with

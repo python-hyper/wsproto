@@ -5,13 +5,7 @@ import pytest
 
 from wsproto import WSConnection
 from wsproto.connection import SERVER
-from wsproto.events import (
-    AcceptConnection,
-    Event,
-    RejectConnection,
-    RejectData,
-    Request,
-)
+from wsproto.events import AcceptConnection, RejectConnection, RejectData, Request
 from wsproto.extensions import Extension
 from wsproto.typing import Headers
 from wsproto.utilities import (
@@ -199,7 +193,7 @@ def _make_handshake(
         )
     )
     event = client.next_event()
-    return event, nonce
+    return cast(h11.InformationalResponse, event), nonce
 
 
 def test_handshake() -> None:
@@ -292,7 +286,7 @@ def test_protocol_error() -> None:
 
 def _make_handshake_rejection(
     status_code: int, body: Optional[bytes] = None
-) -> List[Event]:
+) -> List[h11.Event]:
     client = h11.Connection(h11.CLIENT)
     server = WSConnection(SERVER)
     nonce = generate_nonce()
@@ -327,7 +321,7 @@ def _make_handshake_rejection(
     events = []
     while True:
         event = client.next_event()
-        events.append(event)
+        events.append(cast(h11.Event, event))
         if isinstance(event, h11.EndOfMessage):
             return events
 
