@@ -1,12 +1,13 @@
 Release History
 ===============
 
-Unreleased
-----------
+1.1.0 (2022-02-27)
+------------------
 
 - Added support for Python 3.10.
 - Drop support for Python 3.6, meaning the minimum supported version
   is Python 3.7.0.
+- Various type checking and code linting improvements.
 
 
 1.0.0 (2020-11-22)

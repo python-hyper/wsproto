@@ -1133,13 +1133,13 @@ class TestFrameProtocolSend:
 
     def test_message_length_max_two_byte(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = b"x" * (2 ** 16 - 1)
+        payload = b"x" * (2**16 - 1)
         data = proto.send_data(payload, fin=True)
         assert data == b"\x82\x7e" + struct.pack("!H", len(payload)) + payload
 
     def test_message_length_min_eight_byte(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
-        payload = b"x" * (2 ** 16)
+        payload = b"x" * (2**16)
         data = proto.send_data(payload, fin=True)
         assert data == b"\x82\x7f" + struct.pack("!Q", len(payload)) + payload
 

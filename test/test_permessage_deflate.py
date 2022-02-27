@@ -14,7 +14,6 @@ if TYPE_CHECKING:
         server_no_context_takeover: bool
         server_max_window_bits: Optional[int]
 
-
 else:
     Params = dict
 
