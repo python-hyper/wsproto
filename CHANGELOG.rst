@@ -1,6 +1,12 @@
 Release History
 ===============
 
+Unreleased
+----------
+
+- <ToDo: add new entries here>
+
+
 1.1.0 (2022-02-27)
 ------------------
 
