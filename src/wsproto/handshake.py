@@ -69,7 +69,9 @@ class H11Handshake:
         """
         return self._connection
 
-    def initiate_upgrade_connection(self, headers: Headers, path: str) -> None:
+    def initiate_upgrade_connection(
+        self, headers: Headers, path: Union[bytes, str]
+    ) -> None:
         """Initiate an upgrade connection.
 
         This should be used if the request has already be received and

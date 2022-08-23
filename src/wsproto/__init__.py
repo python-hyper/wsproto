@@ -4,7 +4,7 @@ wsproto
 
 A WebSocket implementation.
 """
-from typing import Generator, Optional
+from typing import Generator, Optional, Union
 
 from .connection import Connection, ConnectionState, ConnectionType
 from .events import Event
@@ -40,7 +40,9 @@ class WSConnection:
             return self.handshake.state
         return self.connection.state
 
-    def initiate_upgrade_connection(self, headers: Headers, path: str) -> None:
+    def initiate_upgrade_connection(
+        self, headers: Headers, path: Union[bytes, str]
+    ) -> None:
         self.handshake.initiate_upgrade_connection(headers, path)
 
     def send(self, event: Event) -> bytes:
