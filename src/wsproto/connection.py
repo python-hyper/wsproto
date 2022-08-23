@@ -88,24 +88,25 @@ class Connection:
 
     def send(self, event: Event) -> bytes:
         data = b""
-        if isinstance(event, Message):
+        if isinstance(event, Message) and self.state == ConnectionState.OPEN:
             data += self._proto.send_data(event.data, event.message_finished)
-        elif isinstance(event, Ping):
+        elif isinstance(event, Ping) and self.state == ConnectionState.OPEN:
             data += self._proto.ping(event.payload)
-        elif isinstance(event, Pong):
+        elif isinstance(event, Pong) and self.state == ConnectionState.OPEN:
             data += self._proto.pong(event.payload)
-        elif isinstance(event, CloseConnection):
-            if self.state not in {ConnectionState.OPEN, ConnectionState.REMOTE_CLOSING}:
-                raise LocalProtocolError(
-                    "Connection cannot be closed in state %s" % self.state
-                )
+        elif isinstance(event, CloseConnection) and self.state in {
+            ConnectionState.OPEN,
+            ConnectionState.REMOTE_CLOSING,
+        }:
             data += self._proto.close(event.code, event.reason)
             if self.state == ConnectionState.REMOTE_CLOSING:
                 self._state = ConnectionState.CLOSED
             else:
                 self._state = ConnectionState.LOCAL_CLOSING
         else:
-            raise LocalProtocolError(f"Event {event} cannot be sent.")
+            raise LocalProtocolError(
+                f"Event {event} cannot be sent in state {self.state}."
+            )
         return data
 
     def receive_data(self, data: Optional[bytes]) -> None:

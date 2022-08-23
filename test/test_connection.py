@@ -88,6 +88,13 @@ def test_close_whilst_closing() -> None:
         client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
 
 
+def test_send_after_close() -> None:
+    client = Connection(CLIENT)
+    client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
+    with pytest.raises(LocalProtocolError):
+        client.send(TextMessage(data="", message_finished=True))
+
+
 @pytest.mark.parametrize("client_sends", [True, False])
 def test_ping_pong(client_sends: bool) -> None:
     client = Connection(CLIENT)
