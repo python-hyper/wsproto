@@ -23,6 +23,17 @@ def test_successful_handshake() -> None:
     assert repr(server) == "H11Handshake(client=False, state=ConnectionState.OPEN)"
 
 
+def test_host_encoding() -> None:
+    client = H11Handshake(CLIENT)
+    server = H11Handshake(SERVER)
+    data = client.send(Request(host="芝士汉堡", target="/"))
+    assert b"Host: xn--7ks3rz39bh7u" in data
+    server.receive_data(data)
+    request = next(server.events())
+    assert isinstance(request, Request)
+    assert request.host == "芝士汉堡"
+
+
 @pytest.mark.parametrize("http", [b"HTTP/1.0", b"HTTP/1.1"])
 def test_rejected_handshake(http: bytes) -> None:
     server = H11Handshake(SERVER)
