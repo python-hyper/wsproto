@@ -20,7 +20,6 @@ Unreleased
   initiate_upgrade_connection.
 - Check the state when sending events, raising if the event cannot be
   sent in the current state.
-- Send an empty payload for NO_STATUS_RCVD.
 
 
 1.1.0 (2022-02-27)
