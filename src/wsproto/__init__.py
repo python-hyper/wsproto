@@ -11,7 +11,7 @@ from .events import Event
 from .handshake import H11Handshake
 from .typing import Headers
 
-__version__ = "1.1.0+dev"
+__version__ = "1.2.0"
 
 
 class WSConnection:

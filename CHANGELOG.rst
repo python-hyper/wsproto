@@ -1,12 +1,20 @@
 Release History
 ===============
 
-Unreleased
-----------
+1.2.0 (2022-08-23)
+------------------
 
 - Bugfix: When a close frame with status NO_STATUS_RCVD is sent, send
   and empty payload.
-- <ToDo: add new entries here>
+- Bugfix: Changing both encoding and decoding of the Host, from ascii
+  to idna.
+- Bugfix: Support multiple Sec-WebSocket-Extensions and
+  Sec-WebSocket-Protocol headers.
+- Accept bytes alongside string as path argument in
+  initiate_upgrade_connection.
+- Check the state when sending events, raising if the event cannot be
+  sent in the current state.
+- Send an empty payload for NO_STATUS_RCVD.
 
 
 1.1.0 (2022-02-27)
