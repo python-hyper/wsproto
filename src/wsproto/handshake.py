@@ -201,12 +201,12 @@ class H11Handshake:
                 host = value.decode("idna")
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-extensions":
-                extensions = split_comma_header(value)
+                extensions.extend(split_comma_header(value))
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-key":
                 key = value
             elif name == b"sec-websocket-protocol":
-                subprotocols = split_comma_header(value)
+                subprotocols.extend(split_comma_header(value))
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-version":
                 version = value

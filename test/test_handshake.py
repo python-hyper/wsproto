@@ -58,3 +58,45 @@ def test_send_invalid_event() -> None:
     client = H11Handshake(CLIENT)
     with pytest.raises(LocalProtocolError):
         client.send(Ping())
+
+
+def test_h11_multiple_headers_handshake() -> None:
+    server = H11Handshake(SERVER)
+    data = (
+        b"GET wss://api.website.xyz/ws HTTP/1.1\r\n"
+        b"Host: api.website.xyz\r\n"
+        b"Connection: Upgrade\r\n"
+        b"Pragma: no-cache\r\n"
+        b"Cache-Control: no-cache\r\n"
+        b"User-Agent: Mozilla/5.0 (X11; Linux x86_64) "
+        b"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36\r\n"
+        b"Upgrade: websocket\r\n"
+        b"Origin: https://website.xyz\r\n"
+        b"Sec-WebSocket-Version: 13\r\n"
+        b"Accept-Encoding: gzip, deflate, br\r\n"
+        b"Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7\r\n"
+        b"Sec-WebSocket-Key: tOzeAzi9xK7ADxxEdTzmaA==\r\n"
+        b"Sec-WebSocket-Extensions: this-extension; isnt-seen, even-tho, it-should-be\r\n"
+        b"Sec-WebSocket-Protocol: there-protocols\r\n"
+        b"Sec-WebSocket-Protocol: arent-seen\r\n"
+        b"Sec-WebSocket-Extensions: this-extension; were-gonna-see, and-another-extension; were-also; gonna-see=100; percent\r\n"  # noqa: E501
+        b"Sec-WebSocket-Protocol: only-these-protocols, are-seen, from-the-request-object\r\n"
+        b"\r\n"
+    )
+    server.receive_data(data)
+    request = next(server.events())
+    assert isinstance(request, Request)
+    assert request.subprotocols == [
+        "there-protocols",
+        "arent-seen",
+        "only-these-protocols",
+        "are-seen",
+        "from-the-request-object",
+    ]
+    assert request.extensions == [
+        "this-extension; isnt-seen",
+        "even-tho",
+        "it-should-be",
+        "this-extension; were-gonna-see",
+        "and-another-extension; were-also; gonna-see=100; percent",
+    ]
