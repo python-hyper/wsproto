@@ -121,7 +121,7 @@ the data currently in the ``wsproto`` internal buffer and then exit. Therefore,
 you should iterate over this generator after receiving new network data.
 
 For a more complete example, see `synchronous_client.py
-<https://github.com/python-hyper/wsproto/blob/master/example/synchronous_client.py>`_.
+<https://github.com/python-hyper/wsproto/blob/main/example/synchronous_client.py>`_.
 
 WebSocket Servers
 -----------------
@@ -150,7 +150,7 @@ Alternatively a server can explicitly reject the connection by sending
 receiving a ``Request`` event.
 
 For a more complete example, see `synchronous_server.py
-<https://github.com/python-hyper/wsproto/blob/master/example/synchronous_server.py>`_.
+<https://github.com/python-hyper/wsproto/blob/main/example/synchronous_server.py>`_.
 
 Protocol Errors
 ---------------
