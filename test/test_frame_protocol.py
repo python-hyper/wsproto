@@ -1043,8 +1043,8 @@ class TestFrameProtocolSend:
 
     def test_local_only_close_reason(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
-        data = proto.close(code=fp.CloseReason.ABNORMAL_CLOSURE)
-        assert data == b"\x88\x02\x03\xe8"
+        with pytest.raises(ValueError):
+            proto.close(code=fp.CloseReason.ABNORMAL_CLOSURE)
 
     def test_ping_without_payload(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
