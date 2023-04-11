@@ -1,8 +1,9 @@
 from wsproto import extensions as wpext, frame_protocol as fp
+from typing import Union
 
 
 class ConcreteExtension(wpext.Extension):
-    def offer(self):
+    def offer(self) -> Union[bool, str]:
         return "myext"
 
 
