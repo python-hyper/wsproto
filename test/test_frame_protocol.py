@@ -692,6 +692,9 @@ class TestFrameDecoderExtensions:
         def enabled(self) -> bool:
             return True
 
+        def offer(self) -> Union[bool, str]:
+            return "fake"
+
         def frame_inbound_header(
             self,
             proto: Union[fp.FrameDecoder, fp.FrameProtocol],
