@@ -1,13 +1,8 @@
 graft src/wsproto
-graft compliance
 graft example
 graft docs
 graft test
 graft bench
 prune docs/build
-prune compliance/reports
-prune compliance/auto-tests-server-config.json
-prune compliance/auto-tests-client-config.json
-prune compliance/autobahntestsuite-venv
 include README.rst LICENSE CHANGELOG.rst tox.ini
 global-exclude *.pyc *.pyo *.swo *.swp *.map *.yml *.DS_Store .coverage

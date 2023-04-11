@@ -91,37 +91,6 @@ And wsproto will issue events if the data contains any WebSocket messages or sta
 Take a look at our docs for a `full list of events
 <https://wsproto.readthedocs.io/en/latest/api.html#events>`!
 
-Testing
-=======
-
-It passes the autobahn test suite completely and strictly in both client and
-server modes and using permessage-deflate.
-
-If you want to run the compliance tests, go into the compliance directory and
-then to test client mode, in one shell run the Autobahn test server:
-
-.. code-block:: console
-
-    $ wstest -m fuzzingserver -s ws-fuzzingserver.json
-
-And in another shell run the test client:
-
-.. code-block:: console
-
-    $ python test_client.py
-
-And to test server mode, run the test server:
-
-.. code-block:: console
-
-    $ python test_server.py
-
-And in another shell run the Autobahn test client:
-
-.. code-block:: console
-
-    $ wstest -m fuzzingclient -s ws-fuzzingclient.json
-
 
 Documentation
 =============
