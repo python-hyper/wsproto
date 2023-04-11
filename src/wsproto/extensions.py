@@ -5,8 +5,8 @@ wsproto/extensions
 WebSocket extensions.
 """
 
-from abc import ABC, abstractmethod
 import zlib
+from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union
 
 from .frame_protocol import CloseReason, FrameDecoder, FrameProtocol, Opcode, RsvBits
