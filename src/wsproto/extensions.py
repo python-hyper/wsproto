@@ -5,18 +5,20 @@ wsproto/extensions
 WebSocket extensions.
 """
 
+from abc import ABC, abstractmethod
 import zlib
 from typing import Optional, Tuple, Union
 
 from .frame_protocol import CloseReason, FrameDecoder, FrameProtocol, Opcode, RsvBits
 
 
-class Extension:
+class Extension(ABC):
     name: str
 
     def enabled(self) -> bool:
         return False
 
+    @abstractmethod
     def offer(self) -> Union[bool, str]:
         pass
 
