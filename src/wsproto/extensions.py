@@ -6,17 +6,19 @@ WebSocket extensions.
 """
 
 import zlib
+from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Union
 
 from .frame_protocol import CloseReason, FrameDecoder, FrameProtocol, Opcode, RsvBits
 
 
-class Extension:
+class Extension(ABC):
     name: str
 
     def enabled(self) -> bool:
         return False
 
+    @abstractmethod
     def offer(self) -> Union[bool, str]:
         pass
 
