@@ -33,7 +33,7 @@ def test_connection_request() -> None:
         [
             (b"Host", b"localhost"),
             (b"Connection", b"Keep-Alive, Upgrade"),
-            (b"Upgrade", b"WebSocket"),
+            (b"Upgrade", b"websocket"),
             (b"Sec-WebSocket-Version", b"13"),
             (b"Sec-WebSocket-Key", generate_nonce()),
             (b"X-Foo", b"bar"),
@@ -50,7 +50,7 @@ def test_connection_request() -> None:
     assert b"sec-websocket-protocol" not in headers
     assert headers[b"connection"] == b"Keep-Alive, Upgrade"
     assert headers[b"sec-websocket-version"] == b"13"
-    assert headers[b"upgrade"] == b"WebSocket"
+    assert headers[b"upgrade"] == b"websocket"
     assert headers[b"x-foo"] == b"bar"
 
 
@@ -60,7 +60,7 @@ def test_connection_request_bad_method() -> None:
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, Upgrade"),
-                (b"Upgrade", b"WebSocket"),
+                (b"Upgrade", b"websocket"),
                 (b"Sec-WebSocket-Version", b"13"),
                 (b"Sec-WebSocket-Key", generate_nonce()),
             ],
@@ -75,7 +75,7 @@ def test_connection_request_bad_connection_header() -> None:
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, No-Upgrade"),
-                (b"Upgrade", b"WebSocket"),
+                (b"Upgrade", b"websocket"),
                 (b"Sec-WebSocket-Version", b"13"),
                 (b"Sec-WebSocket-Key", generate_nonce()),
             ]
@@ -94,7 +94,7 @@ def test_connection_request_bad_upgrade_header() -> None:
                 (b"Sec-WebSocket-Key", generate_nonce()),
             ]
         )
-    assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
+    assert str(excinfo.value) == "Missing header, 'Upgrade: websocket'"
 
 
 @pytest.mark.parametrize("version", [b"12", b"not-a-digit"])
@@ -104,7 +104,7 @@ def test_connection_request_bad_version_header(version: bytes) -> None:
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, Upgrade"),
-                (b"Upgrade", b"WebSocket"),
+                (b"Upgrade", b"websocket"),
                 (b"Sec-WebSocket-Version", version),
                 (b"Sec-WebSocket-Key", generate_nonce()),
             ]
@@ -121,7 +121,7 @@ def test_connection_request_key_header() -> None:
             [
                 (b"Host", b"localhost"),
                 (b"Connection", b"Keep-Alive, Upgrade"),
-                (b"Upgrade", b"WebSocket"),
+                (b"Upgrade", b"websocket"),
                 (b"Sec-WebSocket-Version", b"13"),
             ]
         )
@@ -134,7 +134,7 @@ def test_upgrade_request() -> None:
         [
             (b"Host", b"localhost"),
             (b"Connection", b"Keep-Alive, Upgrade"),
-            (b"Upgrade", b"WebSocket"),
+            (b"Upgrade", b"websocket"),
             (b"Sec-WebSocket-Version", b"13"),
             (b"Sec-WebSocket-Key", generate_nonce()),
             (b"X-Foo", b"bar"),
@@ -154,7 +154,7 @@ def test_upgrade_request() -> None:
     assert b"sec-websocket-protocol" not in headers
     assert headers[b"connection"] == b"Keep-Alive, Upgrade"
     assert headers[b"sec-websocket-version"] == b"13"
-    assert headers[b"upgrade"] == b"WebSocket"
+    assert headers[b"upgrade"] == b"websocket"
     assert headers[b"x-foo"] == b"bar"
 
 
@@ -175,7 +175,7 @@ def _make_handshake(
                 headers=[
                     (b"Host", b"localhost"),
                     (b"Connection", b"Keep-Alive, Upgrade"),
-                    (b"Upgrade", b"WebSocket"),
+                    (b"Upgrade", b"websocket"),
                     (b"Sec-WebSocket-Version", b"13"),
                     (b"Sec-WebSocket-Key", nonce),
                 ]
@@ -203,7 +203,7 @@ def test_handshake() -> None:
     assert sorted(response.headers) == [
         (b"connection", b"Upgrade"),
         (b"sec-websocket-accept", generate_accept_token(nonce)),
-        (b"upgrade", b"WebSocket"),
+        (b"upgrade", b"websocket"),
     ]
 
 
@@ -214,7 +214,7 @@ def test_handshake_extra_headers() -> None:
     assert sorted(response.headers) == [
         (b"connection", b"Upgrade"),
         (b"sec-websocket-accept", generate_accept_token(nonce)),
-        (b"upgrade", b"WebSocket"),
+        (b"upgrade", b"websocket"),
         (b"x-foo", b"bar"),
     ]
 
@@ -298,7 +298,7 @@ def _make_handshake_rejection(
                 headers=[
                     (b"Host", b"localhost"),
                     (b"Connection", b"Keep-Alive, Upgrade"),
-                    (b"Upgrade", b"WebSocket"),
+                    (b"Upgrade", b"websocket"),
                     (b"Sec-WebSocket-Version", b"13"),
                     (b"Sec-WebSocket-Key", nonce),
                 ],

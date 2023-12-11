@@ -40,7 +40,7 @@ def test_rejected_handshake(http: bytes) -> None:
     with pytest.raises(RemoteProtocolError):
         server.receive_data(
             b"GET / " + http + b"\r\n"
-            b"Upgrade: WebSocket\r\n"
+            b"Upgrade: websocket\r\n"
             b"Connection: Upgrade\r\n"
             b"Sec-WebSocket-Key: VQr8cvwwZ1fEk62PDq8J3A==\r\n"
             b"Sec-WebSocket-Version: 13\r\n"
