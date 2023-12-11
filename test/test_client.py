@@ -40,7 +40,7 @@ def test_connection_request() -> None:
     assert headers[b"connection"] == b"Upgrade"
     assert headers[b"host"] == b"localhost"
     assert headers[b"sec-websocket-version"] == b"13"
-    assert headers[b"upgrade"] == b"WebSocket"
+    assert headers[b"upgrade"] == b"websocket"
     assert b"sec-websocket-key" in headers
 
 
@@ -119,7 +119,7 @@ def test_connection_send_state() -> None:
         status_code=101,
         headers=[
             (b"connection", b"Upgrade"),
-            (b"upgrade", b"WebSocket"),
+            (b"upgrade", b"websocket"),
             (
                 b"Sec-WebSocket-Accept",
                 generate_accept_token(headers[b"sec-websocket-key"]),
@@ -178,14 +178,14 @@ def _make_handshake(
 
 def test_handshake() -> None:
     events = _make_handshake(
-        101, [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")]
+        101, [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")]
     )
     assert events == [AcceptConnection()]
 
 
 def test_broken_handshake() -> None:
     events = _make_handshake(
-        102, [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")]
+        102, [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")]
     )
     assert isinstance(events[0], RejectConnection)
     assert events[0].status_code == 102
@@ -194,7 +194,7 @@ def test_broken_handshake() -> None:
 def test_handshake_extra_accept_headers() -> None:
     events = _make_handshake(
         101,
-        [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket"), (b"X-Foo", b"bar")],
+        [(b"connection", b"Upgrade"), (b"upgrade", b"websocket"), (b"X-Foo", b"bar")],
     )
     assert events == [AcceptConnection(extra_headers=[(b"x-foo", b"bar")])]
 
@@ -202,7 +202,7 @@ def test_handshake_extra_accept_headers() -> None:
 @pytest.mark.parametrize("extra_headers", [[], [(b"connection", b"Keep-Alive")]])
 def test_handshake_response_broken_connection_header(extra_headers: Headers) -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        _make_handshake(101, [(b"upgrade", b"WebSocket")] + extra_headers)
+        _make_handshake(101, [(b"upgrade", b"websocket")] + extra_headers)
     assert str(excinfo.value) == "Missing header, 'Connection: Upgrade'"
 
 
@@ -210,14 +210,14 @@ def test_handshake_response_broken_connection_header(extra_headers: Headers) -> 
 def test_handshake_response_broken_upgrade_header(extra_headers: Headers) -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
         _make_handshake(101, [(b"connection", b"Upgrade")] + extra_headers)
-    assert str(excinfo.value) == "Missing header, 'Upgrade: WebSocket'"
+    assert str(excinfo.value) == "Missing header, 'Upgrade: websocket'"
 
 
 def test_handshake_response_missing_websocket_key_header() -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
         _make_handshake(
             101,
-            [(b"connection", b"Upgrade"), (b"upgrade", b"WebSocket")],
+            [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")],
             auto_accept_key=False,
         )
     assert str(excinfo.value) == "Bad accept token"
@@ -228,7 +228,7 @@ def test_handshake_with_subprotocol() -> None:
         101,
         [
             (b"connection", b"Upgrade"),
-            (b"upgrade", b"WebSocket"),
+            (b"upgrade", b"websocket"),
             (b"sec-websocket-protocol", b"one"),
         ],
         subprotocols=["one", "two"],
@@ -242,7 +242,7 @@ def test_handshake_bad_subprotocol() -> None:
             101,
             [
                 (b"connection", b"Upgrade"),
-                (b"upgrade", b"WebSocket"),
+                (b"upgrade", b"websocket"),
                 (b"sec-websocket-protocol", b"new"),
             ],
         )
@@ -255,7 +255,7 @@ def test_handshake_with_extension() -> None:
         101,
         [
             (b"connection", b"Upgrade"),
-            (b"upgrade", b"WebSocket"),
+            (b"upgrade", b"websocket"),
             (b"sec-websocket-extensions", b"fake"),
         ],
         extensions=[extension],
@@ -269,7 +269,7 @@ def test_handshake_bad_extension() -> None:
             101,
             [
                 (b"connection", b"Upgrade"),
-                (b"upgrade", b"WebSocket"),
+                (b"upgrade", b"websocket"),
                 (b"sec-websocket-extensions", b"bad, foo"),
             ],
         )
