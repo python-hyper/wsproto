@@ -35,6 +35,9 @@ from .utilities import (
 # RFC6455, Section 4.2.1/6 - Reading the Client's Opening Handshake
 WEBSOCKET_VERSION = b"13"
 
+# RFC6455, Section 4.2.1/3 - Value of the Upgrade header
+WEBSOCKET_UPGRADE = b"websocket"
+
 
 class H11Handshake:
     """A Handshake implementation for HTTP/1.1 connections."""
@@ -233,9 +236,9 @@ class H11Handshake:
             raise RemoteProtocolError(
                 "Missing header, 'Sec-WebSocket-Key'", event_hint=RejectConnection()
             )
-        if upgrade.lower() != b"websocket":
+        if upgrade.lower() != WEBSOCKET_UPGRADE:
             raise RemoteProtocolError(
-                "Missing header, 'Upgrade: websocket'", event_hint=RejectConnection()
+                f"Missing header, 'Upgrade: {WEBSOCKET_UPGRADE.decode()}'", event_hint=RejectConnection()
             )
         if host is None:
             raise RemoteProtocolError(
@@ -260,7 +263,7 @@ class H11Handshake:
         accept_token = generate_accept_token(nonce)
 
         headers = [
-            (b"Upgrade", b"websocket"),
+            (b"Upgrade", WEBSOCKET_UPGRADE),
             (b"Connection", b"Upgrade"),
             (b"Sec-WebSocket-Accept", accept_token),
         ]
@@ -327,7 +330,7 @@ class H11Handshake:
 
         headers = [
             (b"Host", request.host.encode("idna")),
-            (b"Upgrade", b"websocket"),
+            (b"Upgrade", WEBSOCKET_UPGRADE),
             (b"Connection", b"Upgrade"),
             (b"Sec-WebSocket-Key", self._nonce),
             (b"Sec-WebSocket-Version", WEBSOCKET_VERSION),
@@ -402,9 +405,9 @@ class H11Handshake:
             raise RemoteProtocolError(
                 "Missing header, 'Connection: Upgrade'", event_hint=RejectConnection()
             )
-        if upgrade.lower() != b"websocket":
+        if upgrade.lower() != WEBSOCKET_UPGRADE:
             raise RemoteProtocolError(
-                "Missing header, 'Upgrade: websocket'", event_hint=RejectConnection()
+                f"Missing header, 'Upgrade: {WEBSOCKET_UPGRADE.decode()}'", event_hint=RejectConnection()
             )
         accept_token = generate_accept_token(self._nonce)
         if accept != accept_token:
