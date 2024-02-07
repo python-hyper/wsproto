@@ -63,11 +63,6 @@ class Connection:
     This wraps two other protocol objects, an HTTP/1.1 protocol object used
     to do the initial HTTP upgrade handshake and a WebSocket frame protocol
     object used to exchange messages and other control frames.
-
-    :param conn_type: Whether this object is on the client- or server-side of
-        a connection. To initialise as a client pass ``CLIENT`` otherwise
-        pass ``SERVER``.
-    :type conn_type: ``ConnectionType``
     """
 
     def __init__(
@@ -76,6 +71,16 @@ class Connection:
         extensions: Optional[List[Extension]] = None,
         trailing_data: bytes = b"",
     ) -> None:
+        """
+        Constructor
+
+        :param wsproto.connection.ConnectionType connection_type: Whether this
+            object is on the client- or server-side of a connection.
+            To initialise as a client pass ``CLIENT`` otherwise pass ``SERVER``.
+        :param list extensions: The proposed extensions.
+        :param bytes trailing_data: Data that has been received, but not yet
+            processed.
+        """
         self.client = connection_type is ConnectionType.CLIENT
         self._events: Deque[Event] = deque()
         self._proto = FrameProtocol(self.client, extensions or [])
