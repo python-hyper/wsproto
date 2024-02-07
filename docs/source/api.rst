@@ -19,6 +19,10 @@ Connection
    :special-members: __init__
    :members:
 
+.. autoclass:: wsproto.Connection
+   :special-members: __init__
+   :members:
+
 .. autoclass:: wsproto.ConnectionType
    :members:
 
