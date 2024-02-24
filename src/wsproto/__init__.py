@@ -4,6 +4,7 @@ wsproto
 
 A WebSocket implementation.
 """
+
 from typing import Generator, Optional, Union
 
 from .connection import Connection, ConnectionState, ConnectionType

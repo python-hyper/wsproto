@@ -4,6 +4,7 @@ wsproto/utilities
 
 Utility functions that do not belong in a separate module.
 """
+
 import base64
 import hashlib
 import os

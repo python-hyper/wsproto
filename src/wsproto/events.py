@@ -4,6 +4,7 @@ wsproto/events
 
 Events that result from processing data on a WebSocket connection.
 """
+
 from abc import ABC
 from dataclasses import dataclass, field
 from typing import Generic, List, Optional, Sequence, TypeVar, Union
@@ -156,7 +157,6 @@ class RejectData(Event):
 
 @dataclass(frozen=True)
 class CloseConnection(Event):
-
     """The end of a Websocket connection, represents a closure frame.
 
     **wsproto does not automatically send a response to a close event.** To
