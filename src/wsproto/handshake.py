@@ -4,6 +4,7 @@ wsproto/handshake
 
 An implementation of WebSocket handshakes.
 """
+
 from collections import deque
 from typing import (
     cast,
