@@ -55,9 +55,7 @@ class Request(Event):
 
     host: str
     target: str
-    extensions: Union[Sequence[Extension], Sequence[str]] = field(  # type: ignore[assignment]
-        default_factory=list
-    )
+    extensions: Union[Sequence[Extension], Sequence[str]] = field(default_factory=list)
     extra_headers: Headers = field(default_factory=list)
     subprotocols: List[str] = field(default_factory=list)
 
