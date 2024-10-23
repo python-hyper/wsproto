@@ -286,7 +286,7 @@ class H11Handshake:
                 headers.append((b"Sec-WebSocket-Extensions", accepts))
 
         response = h11.InformationalResponse(
-            status_code=101, headers=headers + event.extra_headers
+            status_code=101, headers=headers + event.extra_headers, reason=b"Switching Protocols"
         )
         self._connection = Connection(
             ConnectionType.CLIENT if self.client else ConnectionType.SERVER,
