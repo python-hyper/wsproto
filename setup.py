@@ -47,6 +47,6 @@ setup(
         'Programming Language :: Python :: Implementation :: PyPy',
     ],
     install_requires=[
-        'h11>=0.13.0,<1',
+        'h11>=0.16.0,<1',
     ],
 )
