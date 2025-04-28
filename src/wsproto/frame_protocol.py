@@ -574,7 +574,7 @@ class FrameProtocol:
         if code is None and reason:
             raise TypeError("cannot specify a reason without a code")
         if code in LOCAL_ONLY_CLOSE_REASONS:
-            code = CloseReason.NORMAL_CLOSURE
+            raise ValueError(f"cannot specify a local-only close code, got {code}")
         if code is not None:
             payload += bytearray(struct.pack("!H", code))
             if reason is not None:
