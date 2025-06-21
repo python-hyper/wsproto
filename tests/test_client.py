@@ -1,4 +1,6 @@
-from typing import cast, List, Optional
+from __future__ import annotations
+
+from typing import List, Optional, cast
 
 import h11
 import pytest
@@ -15,11 +17,12 @@ from wsproto.events import (
 from wsproto.extensions import Extension
 from wsproto.typing import Headers
 from wsproto.utilities import (
-    generate_accept_token,
     LocalProtocolError,
-    normed_header_dict,
     RemoteProtocolError,
+    generate_accept_token,
+    normed_header_dict,
 )
+
 from .helpers import FakeExtension
 
 
@@ -27,7 +30,7 @@ def _make_connection_request(request: Request) -> h11.Request:
     client = WSConnection(CLIENT)
     server = h11.Connection(h11.SERVER)
     server.receive_data(client.send(request))
-    return cast(h11.Request, server.next_event())
+    return cast("h11.Request", server.next_event())
 
 
 def test_connection_request() -> None:
@@ -50,7 +53,7 @@ def test_connection_request_additional_headers() -> None:
             host="localhost",
             target="/",
             extra_headers=[(b"X-Foo", b"Bar"), (b"X-Bar", b"Foo")],
-        )
+        ),
     )
 
     headers = normed_header_dict(request.headers)
@@ -61,7 +64,7 @@ def test_connection_request_additional_headers() -> None:
 def test_connection_request_simple_extension() -> None:
     extension = FakeExtension(offer_response=True)
     request = _make_connection_request(
-        Request(host="localhost", target="/", extensions=[extension])
+        Request(host="localhost", target="/", extensions=[extension]),
     )
 
     headers = normed_header_dict(request.headers)
@@ -71,7 +74,7 @@ def test_connection_request_simple_extension() -> None:
 def test_connection_request_simple_extension_no_offer() -> None:
     extension = FakeExtension(offer_response=False)
     request = _make_connection_request(
-        Request(host="localhost", target="/", extensions=[extension])
+        Request(host="localhost", target="/", extensions=[extension]),
     )
 
     headers = normed_header_dict(request.headers)
@@ -82,7 +85,7 @@ def test_connection_request_parametrised_extension() -> None:
     offer_response = "parameter1=value1; parameter2=value2"
     extension = FakeExtension(offer_response=offer_response)
     request = _make_connection_request(
-        Request(host="localhost", target="/", extensions=[extension])
+        Request(host="localhost", target="/", extensions=[extension]),
     )
 
     headers = normed_header_dict(request.headers)
@@ -94,7 +97,7 @@ def test_connection_request_parametrised_extension() -> None:
 
 def test_connection_request_subprotocols() -> None:
     request = _make_connection_request(
-        Request(host="localhost", target="/", subprotocols=["one", "two"])
+        Request(host="localhost", target="/", subprotocols=["one", "two"]),
     )
 
     headers = normed_header_dict(request.headers)
@@ -111,10 +114,10 @@ def test_connection_send_state() -> None:
             Request(
                 host="localhost",
                 target="/",
-            )
-        )
+            ),
+        ),
     )
-    headers = normed_header_dict(cast(h11.Request, server.next_event()).headers)
+    headers = normed_header_dict(cast("h11.Request", server.next_event()).headers)
     response = h11.InformationalResponse(
         status_code=101,
         headers=[
@@ -155,20 +158,20 @@ def _make_handshake(
                 target="/",
                 subprotocols=subprotocols or [],
                 extensions=extensions or [],
-            )
-        )
+            ),
+        ),
     )
-    request = cast(h11.Request, server.next_event())
+    request = cast("h11.Request", server.next_event())
     if auto_accept_key:
         full_request_headers = normed_header_dict(request.headers)
         response_headers.append(
             (
                 b"Sec-WebSocket-Accept",
                 generate_accept_token(full_request_headers[b"sec-websocket-key"]),
-            )
+            ),
         )
     response = h11.InformationalResponse(
-        status_code=response_status, headers=response_headers
+        status_code=response_status, headers=response_headers,
     )
     client.receive_data(server.send(response))
     assert client.state is not ConnectionState.CONNECTING
@@ -178,14 +181,14 @@ def _make_handshake(
 
 def test_handshake() -> None:
     events = _make_handshake(
-        101, [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")]
+        101, [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")],
     )
     assert events == [AcceptConnection()]
 
 
 def test_broken_handshake() -> None:
     events = _make_handshake(
-        102, [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")]
+        102, [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")],
     )
     assert isinstance(events[0], RejectConnection)
     assert events[0].status_code == 102
@@ -285,7 +288,7 @@ def test_protocol_error() -> None:
 
 
 def _make_handshake_rejection(
-    status_code: int, body: Optional[bytes] = None
+    status_code: int, body: Optional[bytes] = None,
 ) -> List[Event]:
     client = WSConnection(CLIENT)
     server = h11.Connection(h11.SERVER)
@@ -294,7 +297,7 @@ def _make_handshake_rejection(
     if body is not None:
         headers.append(("Content-Length", str(len(body))))
     client.receive_data(
-        server.send(h11.Response(status_code=status_code, headers=headers))
+        server.send(h11.Response(status_code=status_code, headers=headers)),
     )
     if body is not None:
         client.receive_data(server.send(h11.Data(data=body)))
@@ -307,7 +310,7 @@ def test_handshake_rejection() -> None:
     events = _make_handshake_rejection(400)
     assert events == [
         RejectConnection(
-            headers=[(b"connection", b"close")], has_body=True, status_code=400
+            headers=[(b"connection", b"close")], has_body=True, status_code=400,
         ),
         RejectData(body_finished=True, data=b""),
     ]
@@ -317,7 +320,7 @@ def test_handshake_rejection_with_body() -> None:
     events = _make_handshake_rejection(400, b"Hello")
     assert events == [
         RejectConnection(
-            headers=[(b"content-length", b"5")], has_body=True, status_code=400
+            headers=[(b"content-length", b"5")], has_body=True, status_code=400,
         ),
         RejectData(body_finished=False, data=b"Hello"),
         RejectData(body_finished=True, data=b""),

@@ -3,6 +3,7 @@ The client reads a line from stdin, sends it to the server, then prints the
 response. This is a poor implementation of a client. It is only intended to
 demonstrate how to use wsproto.
 """
+from __future__ import annotations
 
 import socket
 import sys
@@ -28,7 +29,7 @@ def main() -> None:
         host = sys.argv[1]
         port = int(sys.argv[2])
     except (IndexError, ValueError):
-        print("Usage: {} <HOST> <PORT>".format(sys.argv[0]))
+        print(f"Usage: {sys.argv[0]} <HOST> <PORT>")
         sys.exit(1)
 
     try:
@@ -47,7 +48,6 @@ def wsproto_demo(host: str, port: int) -> None:
     3) Send ping and display pong
     4) Negotiate WebSocket closing handshake
     """
-
     # 0) Open TCP connection
     print(f"Connecting to {host}:{port}")
     conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -89,7 +89,7 @@ def wsproto_demo(host: str, port: int) -> None:
 
 def net_send(out_data: bytes, conn: socket.socket) -> None:
     """Write pending data from websocket to network."""
-    print("Sending {} bytes".format(len(out_data)))
+    print(f"Sending {len(out_data)} bytes")
     conn.send(out_data)
 
 
@@ -102,7 +102,7 @@ def net_recv(ws: WSConnection, conn: socket.socket) -> None:
         print("Received 0 bytes (connection closed)")
         ws.receive_data(None)
     else:
-        print("Received {} bytes".format(len(in_data)))
+        print(f"Received {len(in_data)} bytes")
         ws.receive_data(in_data)
 
 
