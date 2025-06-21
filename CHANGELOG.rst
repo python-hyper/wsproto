@@ -1,11 +1,16 @@
 Release History
 ===============
 
-Unreleased
-----------
+1.3.0 (2025-06-XX)
+------------------
 
-- <ToDo: add new entries here>
-
+- Require h11>=0.16 dependency.
+- Fix "Upgrade" header value to match RFC.
+- Add reason "Switching Protocols" to handshake response.
+- Add docs for `wsproto.Connection`
+- Add support for Python 3.12 and 3.13.
+- Drop support for Python 3.7 and 3.8.
+- Various linting, styling, and packaging improvements.
 
 1.2.0 (2022-08-23)
 ------------------
