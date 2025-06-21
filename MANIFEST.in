@@ -1,8 +1,12 @@
 graft src/wsproto
 graft example
 graft docs
-graft test
+graft tests
 graft bench
+
 prune docs/build
-include README.rst LICENSE CHANGELOG.rst tox.ini .readthedocs.yaml
+
+include README.rst LICENSE CHANGELOG.rst pyproject.toml
+
 global-exclude *.pyc *.pyo *.swo *.swp *.map *.yml *.DS_Store .coverage
+exclude .readthedocs.yaml
