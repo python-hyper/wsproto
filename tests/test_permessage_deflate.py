@@ -1,12 +1,16 @@
+from __future__ import annotations
+
 import zlib
-from typing import cast, Optional, Sequence, TYPE_CHECKING
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Optional, cast
 
 import pytest
 
-from wsproto import extensions as wpext, frame_protocol as fp
+from wsproto import extensions as wpext
+from wsproto import frame_protocol as fp
 
 if TYPE_CHECKING:
-    from mypy_extensions import TypedDict
+    from typing import TypedDict
 
     class Params(TypedDict, total=False):
         client_no_context_takeover: bool
@@ -58,14 +62,14 @@ class TestPerMessageDeflate:
                 offer.append("client_max_window_bits")
             else:
                 offer.append(
-                    "client_max_window_bits=%d" % params["client_max_window_bits"]
+                    "client_max_window_bits=%d" % params["client_max_window_bits"],
                 )
         if "server_max_window_bits" in params:
             if params["server_max_window_bits"] is None:
                 offer.append("server_max_window_bits")
             else:
                 offer.append(
-                    "server_max_window_bits=%d" % params["server_max_window_bits"]
+                    "server_max_window_bits=%d" % params["server_max_window_bits"],
                 )
         if params.get("client_no_context_takeover", False):
             offer.append("client_no_context_takeover")
@@ -75,7 +79,7 @@ class TestPerMessageDeflate:
         return "; ".join(offer)
 
     def compare_params_to_string(
-        self, params: Params, ext: wpext.PerMessageDeflate, param_string: str
+        self, params: Params, ext: wpext.PerMessageDeflate, param_string: str,
     ) -> None:
         if "client_max_window_bits" in params:
             if params["client_max_window_bits"] is None:
@@ -98,7 +102,7 @@ class TestPerMessageDeflate:
     def test_offer(self, params: Params) -> None:
         ext = wpext.PerMessageDeflate(**params)
         offer = ext.offer()
-        offer = cast(str, offer)
+        offer = cast("str", offer)
 
         self.compare_params_to_string(params, ext, offer)
 
@@ -121,10 +125,10 @@ class TestPerMessageDeflate:
         if params.get("server_max_window_bits", None):
             assert ext.server_max_window_bits == params["server_max_window_bits"]
         assert ext.client_no_context_takeover is params.get(
-            "client_no_context_takeover", False
+            "client_no_context_takeover", False,
         )
         assert ext.server_no_context_takeover is params.get(
-            "server_no_context_takeover", False
+            "server_no_context_takeover", False,
         )
 
         assert ext.enabled()
@@ -144,7 +148,7 @@ class TestPerMessageDeflate:
 
         offer = self.make_offer_string(params)
         response = ext.accept(offer)
-        response = cast(str, response)
+        response = cast("str", response)
 
         if ext.client_no_context_takeover:
             assert "client_no_context_takeover" in response
@@ -181,7 +185,7 @@ class TestPerMessageDeflate:
         proto = fp.FrameProtocol(client=True, extensions=[ext])
 
         result = ext.frame_inbound_header(
-            proto, fp.Opcode.PING, fp.RsvBits(False, False, False), len(payload)
+            proto, fp.Opcode.PING, fp.RsvBits(False, False, False), len(payload),
         )
         assert isinstance(result, fp.RsvBits)
         assert result.rsv1
@@ -199,7 +203,7 @@ class TestPerMessageDeflate:
         proto = fp.FrameProtocol(client=True, extensions=[ext])
 
         result = ext.frame_inbound_header(
-            proto, fp.Opcode.PING, fp.RsvBits(True, False, False), len(payload)
+            proto, fp.Opcode.PING, fp.RsvBits(True, False, False), len(payload),
         )
         assert result == fp.CloseReason.PROTOCOL_ERROR
 
@@ -211,7 +215,7 @@ class TestPerMessageDeflate:
         proto = fp.FrameProtocol(client=True, extensions=[ext])
 
         result = ext.frame_inbound_header(
-            proto, fp.Opcode.CONTINUATION, fp.RsvBits(True, False, False), len(payload)
+            proto, fp.Opcode.CONTINUATION, fp.RsvBits(True, False, False), len(payload),
         )
         assert result == fp.CloseReason.PROTOCOL_ERROR
 
@@ -223,7 +227,7 @@ class TestPerMessageDeflate:
         proto = fp.FrameProtocol(client=True, extensions=[ext])
 
         result = ext.frame_inbound_header(
-            proto, fp.Opcode.BINARY, fp.RsvBits(False, False, False), len(payload)
+            proto, fp.Opcode.BINARY, fp.RsvBits(False, False, False), len(payload),
         )
         assert isinstance(result, fp.RsvBits)
         assert result.rsv1
@@ -269,7 +273,7 @@ class TestPerMessageDeflate:
         proto = fp.FrameProtocol(client=client, extensions=[ext])
 
         result = ext.frame_inbound_header(
-            proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), split
+            proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), split,
         )
         assert isinstance(result, fp.RsvBits)
         assert result.rsv1
@@ -304,7 +308,7 @@ class TestPerMessageDeflate:
 
         # A PING frame
         ext.frame_inbound_header(
-            proto, fp.Opcode.PING, fp.RsvBits(False, False, False), 0
+            proto, fp.Opcode.PING, fp.RsvBits(False, False, False), 0,
         )
         result2 = ext.frame_inbound_payload_data(proto, b"")
         assert not isinstance(result2, fp.CloseReason)
@@ -388,7 +392,7 @@ class TestPerMessageDeflate:
         proto = fp.FrameProtocol(client=client, extensions=[ext])
 
         result = ext.frame_inbound_header(
-            proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), 0
+            proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), 0,
         )
         assert isinstance(result, fp.RsvBits)
         assert result.rsv1
@@ -404,7 +408,7 @@ class TestPerMessageDeflate:
             assert ext._decompressor is not None
 
         result3 = ext.frame_inbound_header(
-            proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), 0
+            proto, fp.Opcode.BINARY, fp.RsvBits(True, False, False), 0,
         )
         assert isinstance(result3, fp.RsvBits)
         assert result3.rsv1
@@ -451,13 +455,13 @@ class TestPerMessageDeflate:
         compressed_payload = b"\xaa\xa8\xc0\n\x00\x00"
 
         rsv, data = ext.frame_outbound(
-            proto, fp.Opcode.BINARY, rsv, payload[:split], False
+            proto, fp.Opcode.BINARY, rsv, payload[:split], False,
         )
         assert rsv.rsv1 is True
 
         rsv = fp.RsvBits(False, False, False)
         rsv, more_data = ext.frame_outbound(
-            proto, fp.Opcode.CONTINUATION, rsv, payload[split:], True
+            proto, fp.Opcode.CONTINUATION, rsv, payload[split:], True,
         )
         assert rsv.rsv1 is False
         assert data + more_data == compressed_payload

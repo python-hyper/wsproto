@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from typing import Union
 
-from wsproto import extensions as wpext, frame_protocol as fp
+from wsproto import extensions as wpext
+from wsproto import frame_protocol as fp
 
 
 class ConcreteExtension(wpext.Extension):

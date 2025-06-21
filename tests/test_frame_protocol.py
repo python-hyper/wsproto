@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import itertools
 import struct
 from binascii import unhexlify
@@ -6,7 +8,8 @@ from typing import Dict, Optional, Tuple, Union
 
 import pytest
 
-from wsproto import extensions as wpext, frame_protocol as fp
+from wsproto import extensions as wpext
+from wsproto import frame_protocol as fp
 
 
 class TestBuffer:
@@ -392,7 +395,7 @@ class TestFrameDecoder:
         assert frame.message_finished is True
 
     def _parse_failure_test(
-        self, client: bool, frame_bytes: bytes, close_reason: fp.CloseReason
+        self, client: bool, frame_bytes: bytes, close_reason: fp.CloseReason,
     ) -> None:
         decoder = fp.FrameDecoder(client=client)
         with pytest.raises(fp.ParseFailed) as excinfo:
@@ -709,19 +712,19 @@ class TestFrameDecoderExtensions:
             return fp.RsvBits(False, False, True)
 
         def frame_inbound_payload_data(
-            self, proto: Union[fp.FrameDecoder, fp.FrameProtocol], data: bytes
+            self, proto: Union[fp.FrameDecoder, fp.FrameProtocol], data: bytes,
         ) -> Union[bytes, fp.CloseReason]:
             self._inbound_payload_data_called = True
             if data == b"party time":
                 return fp.CloseReason.POLICY_VIOLATION
-            elif data == b"ragequit":
+            if data == b"ragequit":
                 self._fail_inbound_complete = True
             if self._inbound_rsv_bit_set:
                 data = data.decode("utf-8").upper().encode("utf-8")
             return data
 
         def frame_inbound_complete(
-            self, proto: Union[fp.FrameDecoder, fp.FrameProtocol], fin: bool
+            self, proto: Union[fp.FrameDecoder, fp.FrameProtocol], fin: bool,
         ) -> Union[bytes, fp.CloseReason, None]:
             self._inbound_complete_called = True
             if self._fail_inbound_complete:
@@ -1021,7 +1024,7 @@ class TestFrameProtocolSend:
         proto = fp.FrameProtocol(client=False, extensions=[])
         reason = r"¯\_(ツ)_/¯"
         expected_payload = struct.pack(
-            "!H", fp.CloseReason.NORMAL_CLOSURE
+            "!H", fp.CloseReason.NORMAL_CLOSURE,
         ) + reason.encode("utf8")
         data = proto.close(code=fp.CloseReason.NORMAL_CLOSURE, reason=reason)
         assert data == b"\x88" + bytearray([len(expected_payload)]) + expected_payload

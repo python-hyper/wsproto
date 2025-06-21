@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import pytest
 
-from wsproto.connection import CLIENT, Connection, ConnectionState, SERVER
+from wsproto.connection import CLIENT, SERVER, Connection, ConnectionState
 from wsproto.events import (
     BytesMessage,
     CloseConnection,
@@ -137,7 +139,7 @@ def test_data(split_message: bool) -> None:
 
     data = "ƒñö®∂😎"
     server.receive_data(
-        client.send(TextMessage(data=data, message_finished=not split_message))
+        client.send(TextMessage(data=data, message_finished=not split_message)),
     )
     event = next(server.events())
     assert isinstance(event, TextMessage)

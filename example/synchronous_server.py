@@ -4,6 +4,7 @@ response message. It can only handle one client at a time. This is a very bad
 implementation of a server! It is only intended to demonstrate how to use
 wsproto.
 """
+from __future__ import annotations
 
 import socket
 import sys
@@ -28,7 +29,7 @@ def main() -> None:
         ip = sys.argv[1]
         port = int(sys.argv[2])
     except (IndexError, ValueError):
-        print("Usage: {} <BIND_IP> <PORT>".format(sys.argv[0]))
+        print(f"Usage: {sys.argv[0]} <BIND_IP> <PORT>")
         sys.exit(1)
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -40,7 +41,7 @@ def main() -> None:
         while True:
             print("Waiting for connection...")
             (stream, addr) = server.accept()
-            print("Client connected: {}:{}".format(addr[0], addr[1]))
+            print(f"Client connected: {addr[0]}:{addr[1]}")
             handle_connection(stream)
             stream.shutdown(socket.SHUT_WR)
             stream.close()
@@ -67,7 +68,7 @@ def handle_connection(stream: socket.socket) -> None:
     while running:
         # 1) Read data from network
         in_data = stream.recv(RECEIVE_BYTES)
-        print("Received {} bytes".format(len(in_data)))
+        print(f"Received {len(in_data)} bytes")
         ws.receive_data(in_data)
 
         # 2) Get new events and handle them
@@ -80,9 +81,7 @@ def handle_connection(stream: socket.socket) -> None:
             elif isinstance(event, CloseConnection):
                 # Print log message and break out
                 print(
-                    "Connection closed: code={} reason={}".format(
-                        event.code, event.reason
-                    )
+                    f"Connection closed: code={event.code} reason={event.reason}",
                 )
                 out_data += ws.send(event.response())
                 running = False
@@ -100,7 +99,7 @@ def handle_connection(stream: socket.socket) -> None:
                 print(f"Unknown event: {event!r}")
 
         # 4) Send data from wsproto to network
-        print("Sending {} bytes".format(len(out_data)))
+        print(f"Sending {len(out_data)} bytes")
         stream.send(out_data)
 
 

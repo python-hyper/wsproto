@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import pytest
 
-from wsproto.connection import CLIENT, ConnectionState, SERVER
+from wsproto.connection import CLIENT, SERVER, ConnectionState
 from wsproto.events import AcceptConnection, Ping, Request
 from wsproto.handshake import H11Handshake
 from wsproto.utilities import LocalProtocolError, RemoteProtocolError
@@ -44,7 +46,7 @@ def test_rejected_handshake(http: bytes) -> None:
             b"Connection: Upgrade\r\n"
             b"Sec-WebSocket-Key: VQr8cvwwZ1fEk62PDq8J3A==\r\n"
             b"Sec-WebSocket-Version: 13\r\n"
-            b"\r\n"
+            b"\r\n",
         )
 
 
@@ -79,7 +81,7 @@ def test_h11_multiple_headers_handshake() -> None:
         b"Sec-WebSocket-Extensions: this-extension; isnt-seen, even-tho, it-should-be\r\n"
         b"Sec-WebSocket-Protocol: there-protocols\r\n"
         b"Sec-WebSocket-Protocol: arent-seen\r\n"
-        b"Sec-WebSocket-Extensions: this-extension; were-gonna-see, and-another-extension; were-also; gonna-see=100; percent\r\n"  # noqa: E501
+        b"Sec-WebSocket-Extensions: this-extension; were-gonna-see, and-another-extension; were-also; gonna-see=100; percent\r\n"
         b"Sec-WebSocket-Protocol: only-these-protocols, are-seen, from-the-request-object\r\n"
         b"\r\n"
     )
