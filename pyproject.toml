@@ -1,0 +1,229 @@
+# https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+# https://packaging.python.org/en/latest/specifications/pyproject-toml/
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wsproto"
+description = "Pure-Python WebSocket protocol implementation"
+readme = { file = "README.rst", content-type = "text/x-rst" }
+license-files = [ "LICENSE" ]
+
+authors = [
+  { name = "Benno Rice", email = "benno@jeamland.net" }
+]
+maintainers = [
+  { name = "Thomas Kriechbaumer", email = "thomas@kriechbaumer.name" },
+]
+
+requires-python = ">=3.9"
+dependencies = [
+  "h11>=0.16.0,<1",
+]
+dynamic = ["version"]
+
+# For a list of valid classifiers, see https://pypi.org/classifiers/
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/python-hyper/wsproto/"
+"Bug Reports" = "https://github.com/python-hyper/wsproto/issues"
+"Source" = "https://github.com/python-hyper/wsproto/"
+"Documentation" = "https://python-hyper.org/"
+
+[dependency-groups]
+dev = [
+  { include-group = "testing" },
+  { include-group = "linting" },
+  { include-group = "packaging" },
+  { include-group = "docs" },
+]
+
+testing = [
+  "pytest>=8.3.3,<9",
+  "pytest-cov>=6.0.0,<7",
+  "pytest-xdist>=3.6.1,<4",
+  "hypothesis>=6.119.4,<7",
+]
+
+linting = [
+  "ruff>=0.8.0,<1",
+  "mypy>=1.13.0,<2",
+  "typing_extensions>=4.12.2",
+]
+
+packaging = [
+  "check-manifest==0.50",
+  "readme-renderer==44.0",
+  "build>=1.2.2,<2",
+  "twine>=6.1.0,<7",
+  "wheel>=0.45.0,<1",
+]
+
+docs = [
+  "sphinx>=7.4.7,<9",
+]
+
+[tool.setuptools.packages.find]
+where = [ "src" ]
+
+[tool.setuptools.package-data]
+wsproto = [ "py.typed" ]
+
+[tool.setuptools.dynamic]
+version = { attr = "wsproto.__version__" }
+
+[tool.ruff]
+line-length = 150
+target-version = "py39"
+format.preview = true
+format.docstring-code-line-length = 100
+format.docstring-code-format = true
+lint.select = [
+  "ALL",
+]
+lint.ignore = [
+  "PYI034",  # PEP 673 not yet available in Python 3.9 - only in 3.11+
+  "ANN001",  # args with typing.Any
+  "ANN002",  # args with typing.Any
+  "ANN003",  # kwargs with typing.Any
+  "ANN401",  # kwargs with typing.Any
+  "SLF001",  # implementation detail
+  "CPY",     # not required
+  "D101",    # docs readability
+  "D102",    # docs readability
+  "D105",    # docs readability
+  "D107",    # docs readability
+  "D200",    # docs readability
+  "D205",    # docs readability
+  "D205",    # docs readability
+  "D203",    # docs readability
+  "D212",    # docs readability
+  "D400",    # docs readability
+  "D401",    # docs readability
+  "D415",    # docs readability
+  "PLR2004", # readability
+  "SIM108",  # readability
+  "RUF012",  # readability
+  "FBT001",  # readability
+  "FBT002",  # readability
+  "PGH003",  # readability
+  "PGH004",  # readability
+  "FIX001",  # readability
+  "FIX002",  # readability
+  "TD001",  # readability
+  "TD002",  # readability
+  "TD003",  # readability
+  "S101",  # readability
+  "PD901",  # readability
+  "ERA001",  # readability
+  "ARG001",  # readability
+  "ARG002",  # readability
+  "PLR0913",  # readability
+]
+lint.isort.required-imports = [ "from __future__ import annotations" ]
+
+[tool.mypy]
+warn_unused_configs = true
+show_error_codes = true
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = [ "tests" ]
+
+[tool.coverage.run]
+branch = true
+source = [ "wsproto" ]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError()",
+  'assert False, "Should not be reachable"',
+  # .*:.* # Python \d.*
+  # .*:.* # Platform-specific:
+]
+
+[tool.coverage.paths]
+source = [
+  "src/",
+  ".tox/**/site-packages/",
+]
+
+[tool.tox]
+min_version = "4.23.2"
+env_list = [ "py39", "py310", "py311", "py312", "py313", "pypy3", "lint", "docs", "packaging" ]
+
+[tool.tox.gh-actions]
+python = """
+  3.9: py39, lint, docs, packaging
+  3.10: py310
+  3.11: py311
+  3.12: py312
+  3.13: py313
+  pypy3: pypy3
+"""
+
+[tool.tox.env_run_base]
+dependency_groups = ["testing"]
+commands = [
+  ["python", "-bb", "-m", "pytest", "--cov-report=xml", "--cov-report=term", "--cov=wsproto", { replace = "posargs", extend = true }]
+]
+
+[tool.tox.env.pypy3]
+# temporarily disable coverage testing on PyPy due to performance problems
+commands = [
+  ["pytest", { replace = "posargs", extend = true }]
+]
+
+[tool.tox.env.lint]
+dependency_groups = ["linting"]
+commands = [
+  ["ruff", "check", "src/"],
+  ["mypy", "src/"],
+]
+
+[tool.tox.env.docs]
+dependency_groups = ["docs"]
+allowlist_externals = ["make"]
+changedir = "{toxinidir}/docs"
+commands = [
+  ["make", "clean"],
+  ["make", "html"],
+]
+
+[tool.tox.env.packaging]
+base_python = ["python39"]
+dependency_groups = ["packaging"]
+allowlist_externals = ["rm"]
+commands = [
+  ["rm", "-rf", "dist/"],
+  ["check-manifest"],
+  ["python", "-m", "build", "--outdir", "dist/"],
+  ["twine", "check", "dist/*"],
+]
+
+[tool.tox.env.publish]
+base_python = ["python39"]
+dependency_groups = ["packaging"]
+commands = [
+    ["python", "-m", "build", "--outdir", "dist/"],
+    ["twine", "check", "dist/*"],
+    ["twine", "upload", "dist/*"],
+]
