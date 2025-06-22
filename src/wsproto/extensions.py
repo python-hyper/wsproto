@@ -271,7 +271,7 @@ class PerMessageDeflate(Extension):
             return (rsv, data)
 
         if opcode is not Opcode.CONTINUATION:
-            rsv = RsvBits(True, *rsv[1:])
+            rsv = RsvBits(True, rsv[1], rsv[2])
 
         if self._compressor is None:
             assert opcode is not Opcode.CONTINUATION
