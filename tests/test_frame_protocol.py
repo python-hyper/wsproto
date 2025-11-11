@@ -1197,7 +1197,7 @@ class TestFrameProtocolSend:
         proto = fp.FrameProtocol(client=False, extensions=[])
         payload: Dict[str, str] = dict()
 
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             # Intentionally passing illegal type.
             proto.send_data(payload)  # type: ignore
 

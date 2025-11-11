@@ -23,12 +23,13 @@ _XOR_TABLE = [bytes(a ^ b for a in range(256)) for b in range(256)]
 
 
 class XorMaskerSimple:
-    def __init__(self, masking_key: bytes) -> None:
+    def __init__(self, masking_key: bytearray | bytes) -> None:
         self._masking_key = masking_key
 
-    def process(self, data: bytes) -> bytes:
+    def process(self, data: bytearray) -> bytearray:
+        data = bytearray(data)
         if data:
-            data_array = bytearray(data)
+            data_array = data
             a, b, c, d = (_XOR_TABLE[n] for n in self._masking_key)
             data_array[::4] = data_array[::4].translate(a)
             data_array[1::4] = data_array[1::4].translate(b)
@@ -42,12 +43,12 @@ class XorMaskerSimple:
                 self._masking_key[key_rotation:] + self._masking_key[:key_rotation]
             )
 
-            return bytes(data_array)
+            return data_array
         return data
 
 
 class XorMaskerNull:
-    def process(self, data: bytes) -> bytes:
+    def process(self, data: bytearray) -> bytearray:
         return data
 
 
@@ -271,7 +272,7 @@ class Buffer:
         self.bytes_used += len(data)
         return data
 
-    def consume_exactly(self, nbytes: int) -> bytes | None:
+    def consume_exactly(self, nbytes: int) -> bytearray | None:
         if len(self.buffer) - self.bytes_used < nbytes:
             return None
 
@@ -370,11 +371,11 @@ class FrameDecoder:
         payload = self.masker.process(payload)
 
         for extension in self.extensions:
-            payload_ = extension.frame_inbound_payload_data(self, payload)
+            payload_ = extension.frame_inbound_payload_data(self, bytes(payload))
             if isinstance(payload_, CloseReason):
                 msg = "error in extension"
                 raise ParseFailed(msg, payload_)
-            payload = payload_
+            payload = bytearray(payload_)
 
         if finished:
             final = bytearray()
@@ -387,7 +388,7 @@ class FrameDecoder:
                     final += result
             payload += final
 
-        frame = Frame(self.effective_opcode, payload, finished, self.header.fin)
+        frame = Frame(self.effective_opcode, bytes(payload), finished, self.header.fin)
 
         if finished:
             self.header = None
@@ -585,7 +586,7 @@ class FrameProtocol:
             else:
                 yield event
 
-    def close(self, code: int | None = None, reason: str | None = None) -> bytes:
+    def close(self, code: int | None = None, reason: str | None = None) -> bytearray:
         payload = bytearray()
         if code is CloseReason.NO_STATUS_RCVD:
             code = None
@@ -603,15 +604,15 @@ class FrameProtocol:
 
         return self._serialize_frame(Opcode.CLOSE, payload)
 
-    def ping(self, payload: bytes = b"") -> bytes:
+    def ping(self, payload: bytes = b"") -> bytearray:
         return self._serialize_frame(Opcode.PING, payload)
 
-    def pong(self, payload: bytes = b"") -> bytes:
+    def pong(self, payload: bytes = b"") -> bytearray:
         return self._serialize_frame(Opcode.PONG, payload)
 
     def send_data(
         self, payload: bytes | bytearray | str = b"", fin: bool = True,
-    ) -> bytes:
+    ) -> bytearray:
         if isinstance(payload, (bytes, bytearray, memoryview)):
             opcode = Opcode.BINARY
         elif isinstance(payload, str):
@@ -619,7 +620,7 @@ class FrameProtocol:
             payload = payload.encode("utf-8")
         else:
             msg = "Must provide bytes or text"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         if self._outbound_opcode is None:
             self._outbound_opcode = opcode
@@ -642,11 +643,13 @@ class FrameProtocol:
         return fin_bits | rsv_bits | opcode_bits
 
     def _serialize_frame(
-        self, opcode: Opcode, payload: bytes = b"", fin: bool = True,
+        self, opcode: Opcode, payload: bytes | bytearray = b"", fin: bool = True,
     ) -> bytearray:
+        payload = bytearray(payload)
+
         rsv = RsvBits(False, False, False)
         for extension in reversed(self.extensions):
-            rsv, payload = extension.frame_outbound(self, opcode, rsv, payload, fin)
+            rsv, payload = extension.frame_outbound(self, opcode, rsv, bytes(payload), fin)
 
         fin_rsv_opcode = self._make_fin_rsv_opcode(fin, rsv, opcode)
 
@@ -688,8 +691,8 @@ class FrameProtocol:
             # authors of malicious applications from selecting the bytes that
             # appear on the wire."
             #   -- https://tools.ietf.org/html/rfc6455#section-5.3
-            masking_key = os.urandom(4)
+            masking_key = bytearray(os.urandom(4))
             masker = XorMaskerSimple(masking_key)
-            return bytearray(header + masking_key + masker.process(payload))
+            return bytearray(header + masking_key + masker.process(bytearray(payload)))
 
         return bytearray(header + payload)
