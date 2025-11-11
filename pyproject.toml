@@ -9,6 +9,7 @@ build-backend = "setuptools.build_meta"
 name = "wsproto"
 description = "Pure-Python WebSocket protocol implementation"
 readme = { file = "README.rst", content-type = "text/x-rst" }
+license = "MIT"
 license-files = [ "LICENSE" ]
 
 authors = [
