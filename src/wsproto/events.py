@@ -193,7 +193,7 @@ class CloseConnection(Event):
         return CloseConnection(code=self.code, reason=self.reason)
 
 
-T = TypeVar("T", bytes, str)
+T = TypeVar("T", bytes, bytearray, str)
 
 
 @dataclass(frozen=True)
@@ -231,7 +231,7 @@ class Message(Event, Generic[T]):
 @dataclass(frozen=True)
 class TextMessage(Message[str]):  # pylint: disable=unsubscriptable-object
     """
-    This event is fired when a data frame with TEXT payload is received.
+    Fired when a data frame with TEXT payload is received.
 
     Fields:
 
@@ -240,31 +240,27 @@ class TextMessage(Message[str]):  # pylint: disable=unsubscriptable-object
        The message data as string, This only represents a single chunk
        of data and not a full WebSocket message.  You need to buffer
        and reassemble these chunks to get the full message.
-
     """
 
-    # https://github.com/python/mypy/issues/5744
     data: str
 
 
 @dataclass(frozen=True)
-class BytesMessage(Message[bytes]):  # pylint: disable=unsubscriptable-object
+class BytesMessage(Message[bytearray]):  # pylint: disable=unsubscriptable-object
     """
-    This event is fired when a data frame with BINARY payload is
-    received.
+    Fired when a data frame with BINARY payload is received.
 
     Fields:
 
     .. attribute:: data
 
-       The message data as byte string, can be decoded as UTF-8 for
+       The message data as bytearray, can be decoded as UTF-8 for
        TEXT messages.  This only represents a single chunk of data and
        not a full WebSocket message.  You need to buffer and
        reassemble these chunks to get the full message.
     """
 
-    # https://github.com/python/mypy/issues/5744
-    data: bytes
+    data: bytearray
 
 
 @dataclass(frozen=True)
