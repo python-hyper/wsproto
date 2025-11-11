@@ -6,7 +6,7 @@ A WebSocket implementation.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 from .connection import Connection, ConnectionState, ConnectionType
 from .handshake import H11Handshake
