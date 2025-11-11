@@ -8,8 +8,8 @@ Release History
 - Fix "Upgrade" header value to match RFC.
 - Add reason "Switching Protocols" to handshake response.
 - Add docs for `wsproto.Connection`
-- Add support for Python 3.12 and 3.13.
-- Drop support for Python 3.7 and 3.8.
+- Add support for Python 3.12, 3.13, and 3.14.
+- Drop support for Python 3.7, 3.8, and 3.9.
 - Various linting, styling, and packaging improvements.
 
 1.2.0 (2022-08-23)

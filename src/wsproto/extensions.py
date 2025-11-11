@@ -122,8 +122,8 @@ class PerMessageDeflate(Extension):
 
     def offer(self) -> bool | str:
         parameters = [
-            "client_max_window_bits=%d" % self.client_max_window_bits,
-            "server_max_window_bits=%d" % self.server_max_window_bits,
+            f"client_max_window_bits={self.client_max_window_bits}",
+            f"server_max_window_bits={self.server_max_window_bits}",
         ]
 
         if self.client_no_context_takeover:
@@ -181,10 +181,10 @@ class PerMessageDeflate(Extension):
             parameters.append("server_no_context_takeover")
         try:
             if client_max_window_bits is not None:
-                parameters.append("client_max_window_bits=%d" % client_max_window_bits)
+                parameters.append(f"client_max_window_bits={client_max_window_bits}")
                 self.client_max_window_bits = client_max_window_bits
             if server_max_window_bits is not None:
-                parameters.append("server_max_window_bits=%d" % server_max_window_bits)
+                parameters.append(f"server_max_window_bits={server_max_window_bits}")
                 self.server_max_window_bits = server_max_window_bits
         except ValueError:
             return None
@@ -303,10 +303,10 @@ class PerMessageDeflate(Extension):
         return (rsv, data)
 
     def __repr__(self) -> str:
-        descr = ["client_max_window_bits=%d" % self.client_max_window_bits]
+        descr = [f"client_max_window_bits={self.client_max_window_bits}"]
         if self.client_no_context_takeover:
             descr.append("client_no_context_takeover")
-        descr.append("server_max_window_bits=%d" % self.server_max_window_bits)
+        descr.append(f"server_max_window_bits={self.server_max_window_bits}")
         if self.server_no_context_takeover:
             descr.append("server_no_context_takeover")
 
