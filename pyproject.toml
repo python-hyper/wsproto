@@ -181,11 +181,11 @@ env_list = [ "py310", "py311", "py312", "py313", "py314", "pypy311", "lint", "do
 
 [tool.tox.gh-actions]
 python = """
-  3.10: py310, lint, docs, packaging
+  3.10: py310, lint, packaging
   3.11: py311
   3.12: py312
   3.13: py313
-  3.14: py314
+  3.14: py314, docs
   pypy3.11: pypy311
 """
 
