@@ -1,6 +1,13 @@
 Release History
 ===============
 
+1.3.1 (2025-11-12)
+------------------
+
+- Add additional license identifier to pyproject.toml.
+- Use Python 3.13 to build the docs to match ReadTheDocs build environment.
+
+
 1.3.0 (2025-11-11)
 ------------------
 
