@@ -191,7 +191,7 @@ class Connection:
                 elif frame.opcode is Opcode.BINARY:
                     assert isinstance(frame.payload, (bytes, bytearray))
                     yield BytesMessage(
-                        data=bytearray(frame.payload),
+                        data=frame.payload,
                         frame_finished=frame.frame_finished,
                         message_finished=frame.message_finished,
                     )
