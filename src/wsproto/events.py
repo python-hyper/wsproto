@@ -4,6 +4,7 @@ wsproto/events
 
 Events that result from processing data on a WebSocket connection.
 """
+
 from __future__ import annotations
 
 from abc import ABC
@@ -193,7 +194,7 @@ class CloseConnection(Event):
         return CloseConnection(code=self.code, reason=self.reason)
 
 
-T = TypeVar("T", bytes, bytearray, str)
+T = TypeVar("T", bytes | bytearray, str)
 
 
 @dataclass(frozen=True)
@@ -242,11 +243,11 @@ class TextMessage(Message[str]):  # pylint: disable=unsubscriptable-object
        and reassemble these chunks to get the full message.
     """
 
-    data: str
-
 
 @dataclass(frozen=True)
-class BytesMessage(Message[bytearray]):  # pylint: disable=unsubscriptable-object
+class BytesMessage(
+    Message[bytearray | bytes]  # pylint: disable=unsubscriptable-object
+):
     """
     Fired when a data frame with BINARY payload is received.
 
@@ -254,13 +255,11 @@ class BytesMessage(Message[bytearray]):  # pylint: disable=unsubscriptable-objec
 
     .. attribute:: data
 
-       The message data as bytearray, can be decoded as UTF-8 for
+       The message data as bytes or a bytearray, can be decoded as UTF-8 for
        TEXT messages.  This only represents a single chunk of data and
        not a full WebSocket message.  You need to buffer and
        reassemble these chunks to get the full message.
     """
-
-    data: bytearray
 
 
 @dataclass(frozen=True)
