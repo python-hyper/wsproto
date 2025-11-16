@@ -1,6 +1,12 @@
 Release History
 ===============
 
+1.3.2 (2025-11-XX)
+------------------
+
+- Fix type hints to allow BytesMessage to accept bytes again, as well as
+  bytearray.
+
 1.3.1 (2025-11-12)
 ------------------
 
