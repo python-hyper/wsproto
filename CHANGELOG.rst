@@ -1,7 +1,7 @@
 Release History
 ===============
 
-1.3.2 (2025-11-XX)
+1.3.2 (2025-11-20)
 ------------------
 
 - Fix type hints to allow BytesMessage to accept bytes again, as well as

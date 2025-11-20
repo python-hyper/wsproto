@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .events import Event
     from .typing import Headers
 
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 
 
 class WSConnection:
