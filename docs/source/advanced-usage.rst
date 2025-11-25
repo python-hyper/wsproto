@@ -56,7 +56,7 @@ A WebSocket connection starts with a handshake, which is an agreement
 to use the WebSocket protocol, and on which sub-protocol and
 extensions to use. It can be advantageous to perform this handshake
 outside of `wsproto`, for example in a dual stack setup whereby the
-HTTP handling is completed seperately. In this case the
+HTTP handling is completed separately. In this case the
 :class:`Connection <wsproto.connection.Connection>` class can be used
 directly.
 

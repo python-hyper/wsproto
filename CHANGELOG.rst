@@ -143,7 +143,7 @@ Release History
     if isinstance(event, Ping):
         bytes_to_send = connection.send(event.response())
 - Separate the handshake from the active connection handling. This
-  allows the handshake and connection to be seperately used. By
+  allows the handshake and connection to be separately used. By
   default though WSConnection does both.
 - ``receive_bytes`` is renamed to ``receive_data`` and
   ``WSConnection`` should be imported from ``wsproto`` rather than
@@ -155,7 +155,7 @@ Release History
 - Support h11 ~0.8.1.
 - Support Python 3.7.
 - Make the close-handshake more explicit, by sending a close frame on
-  reciept of a close frame.
+  receipt of a close frame.
 - Bugfix fix deflate after a non-compressable message.
 - Bugfix connection header acceptance, by accepting Connection header
   values that are comma separated lists.
