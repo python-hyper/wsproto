@@ -12,6 +12,6 @@ from `our GitHub repository`_ and run:
 
 .. code-block:: console
 
-    $ python setup.py install
+    $ pip install --editable .
 
 .. _our GitHub repository: https://github.com/python-hyper/wsproto
