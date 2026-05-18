@@ -50,9 +50,11 @@ class RemoteProtocolError(ProtocolError):
        This is the suggested wsproto Event to send to the client based
        on the error.
 
+    .. versionchanged:: 1.4.0
+       Made ``event_hint`` a required argument.
+
     """
 
-    # API-breaking change for the next minor release: event_hint is required.
     def __init__(self, message: str, event_hint: Event) -> None:
         self.event_hint = event_hint
         super().__init__(message)
