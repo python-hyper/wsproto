@@ -52,6 +52,7 @@ class RemoteProtocolError(ProtocolError):
 
     """
 
+    # API-breaking change for the next minor release: event_hint is required.
     def __init__(self, message: str, event_hint: Event) -> None:
         self.event_hint = event_hint
         super().__init__(message)

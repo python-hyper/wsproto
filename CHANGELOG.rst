@@ -1,6 +1,12 @@
 Release History
 ===============
 
+1.4.0 (unreleased)
+------------------
+
+- Require ``event_hint`` when constructing ``RemoteProtocolError``.
+  This is an API-breaking change.
+
 1.3.2 (2025-11-20)
 ------------------
 
