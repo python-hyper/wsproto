@@ -47,12 +47,12 @@ class RemoteProtocolError(ProtocolError):
 
     .. attribute:: event_hint
 
-       This is a suggested wsproto Event to send to the client based
-       on the error. It could be None if no hint is available.
+       This is the suggested wsproto Event to send to the client based
+       on the error.
 
     """
 
-    def __init__(self, message: str, event_hint: Event | None = None) -> None:
+    def __init__(self, message: str, event_hint: Event) -> None:
         self.event_hint = event_hint
         super().__init__(message)
 
