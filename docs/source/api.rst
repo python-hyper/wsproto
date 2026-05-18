@@ -23,6 +23,12 @@ Connection
    :special-members: __init__
    :members:
 
+Incoming bytes are parsed by ``receive_data()``, but state changes caused by
+received events are applied while ``events()`` is consumed. For example, when
+the remote peer sends a close frame, the connection enters
+``REMOTE_CLOSING`` when the corresponding ``CloseConnection`` event is yielded,
+not when the bytes are first passed to ``receive_data()``.
+
 .. autoclass:: wsproto.ConnectionType
    :members:
 
