@@ -126,6 +126,11 @@ class Connection:
 
         A list of events that the remote peer triggered by sending this data can
         be retrieved with :meth:`~wsproto.connection.Connection.events`.
+        Passing bytes here does not itself apply every state transition caused
+        by those events. For example, a remote close frame changes the
+        connection state when its corresponding
+        :class:`~wsproto.events.CloseConnection` event is yielded from
+        :meth:`~wsproto.connection.Connection.events`.
 
         :param data: The data received from the remote peer on the network.
         :type data: ``bytes``
@@ -151,6 +156,12 @@ class Connection:
         """
         Return a generator that provides any events that have been generated
         by protocol activity.
+
+        Iterating this generator can advance the connection state while
+        received frames are converted into events. For example, yielding a
+        remote :class:`~wsproto.events.CloseConnection` event moves the
+        connection into
+        :attr:`~wsproto.connection.ConnectionState.REMOTE_CLOSING`.
 
         :returns: generator of :class:`Event <wsproto.events.Event>` subclasses
         """
