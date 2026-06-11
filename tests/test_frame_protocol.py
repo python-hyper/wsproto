@@ -10,6 +10,7 @@ import pytest
 
 from wsproto import extensions as wpext
 from wsproto import frame_protocol as fp
+from wsproto.utilities import LocalProtocolError
 
 
 class TestBuffer:
@@ -1047,10 +1048,14 @@ class TestFrameProtocolSend:
         data = proto.close(code=fp.CloseReason.NO_STATUS_RCVD)
         assert data == b"\x88\x00"
 
-    def test_local_only_close_reason(self) -> None:
+    @pytest.mark.parametrize(
+        "code",
+        [fp.CloseReason.ABNORMAL_CLOSURE, fp.CloseReason.TLS_HANDSHAKE_FAILED],
+    )
+    def test_local_only_close_reason(self, code: fp.CloseReason) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])
-        data = proto.close(code=fp.CloseReason.ABNORMAL_CLOSURE)
-        assert data == b"\x88\x02\x03\xe8"
+        with pytest.raises(LocalProtocolError):
+            proto.close(code=code)
 
     def test_ping_without_payload(self) -> None:
         proto = fp.FrameProtocol(client=False, extensions=[])

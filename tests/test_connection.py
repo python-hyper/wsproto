@@ -90,6 +90,12 @@ def test_close_whilst_closing() -> None:
         client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))
 
 
+def test_local_only_close_reason_rejected() -> None:
+    client = Connection(CLIENT)
+    with pytest.raises(LocalProtocolError):
+        client.send(CloseConnection(code=1006))
+
+
 def test_send_after_close() -> None:
     client = Connection(CLIENT)
     client.send(CloseConnection(code=CloseReason.NORMAL_CLOSURE))

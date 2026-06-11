@@ -13,6 +13,8 @@ from codecs import IncrementalDecoder, getincrementaldecoder
 from enum import IntEnum
 from typing import TYPE_CHECKING, NamedTuple
 
+from .utilities import LocalProtocolError
+
 if TYPE_CHECKING:
     from collections.abc import Generator
 
@@ -588,13 +590,14 @@ class FrameProtocol:
 
     def close(self, code: int | None = None, reason: str | None = None) -> bytearray:
         payload = bytearray()
-        if code is CloseReason.NO_STATUS_RCVD:
+        if code == CloseReason.NO_STATUS_RCVD:
             code = None
         if code is None and reason:
             msg = "cannot specify a reason without a code"
             raise TypeError(msg)
         if code in LOCAL_ONLY_CLOSE_REASONS:
-            code = CloseReason.NORMAL_CLOSURE
+            msg = f"cannot send a close frame with local-only code {code}"
+            raise LocalProtocolError(msg)
         if code is not None:
             payload += bytearray(struct.pack("!H", code))
             if reason is not None:
