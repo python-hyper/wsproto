@@ -256,8 +256,8 @@ def _truncate_utf8(data: bytes, nbytes: int) -> bytes:
 
 class Buffer:
     def __init__(self, initial_bytes: bytes | None = None) -> None:
-        self.buffer = bytearray()
-        self.bytes_used = 0
+        self.buffer: bytearray = bytearray()
+        self.bytes_used: int = 0
         if initial_bytes:
             self.feed(initial_bytes)
 
@@ -335,15 +335,15 @@ class FrameDecoder:
         self, client: bool, extensions: list[Extension] | None = None,
     ) -> None:
         self.client = client
-        self.extensions = extensions or []
+        self.extensions: list[Extension] = extensions or []
 
-        self.buffer = Buffer()
+        self.buffer: Buffer = Buffer()
 
         self.header: Header | None = None
         self.effective_opcode: Opcode | None = None
         self.masker: None | XorMaskerNull | XorMaskerSimple = None
-        self.payload_required = 0
-        self.payload_consumed = 0
+        self.payload_required: int = 0
+        self.payload_consumed: int = 0
 
     def receive_bytes(self, data: bytes) -> None:
         self.buffer.feed(data)
@@ -511,7 +511,7 @@ class FrameDecoder:
 class FrameProtocol:
     def __init__(self, client: bool, extensions: list[Extension]) -> None:
         self.client = client
-        self.extensions = [ext for ext in extensions if ext.enabled()]
+        self.extensions: list[Extension] = [ext for ext in extensions if ext.enabled()]
 
         # Global state
         self._frame_decoder = FrameDecoder(self.client, self.extensions)
