@@ -72,8 +72,8 @@ class PerMessageDeflate(Extension):
         server_no_context_takeover: bool = False,
         server_max_window_bits: int | None = None,
     ) -> None:
-        self.client_no_context_takeover: bool = client_no_context_takeover
-        self.server_no_context_takeover: bool = server_no_context_takeover
+        self.client_no_context_takeover = client_no_context_takeover
+        self.server_no_context_takeover = server_no_context_takeover
         self._client_max_window_bits = self.DEFAULT_CLIENT_MAX_WINDOW_BITS
         self._server_max_window_bits = self.DEFAULT_SERVER_MAX_WINDOW_BITS
         if client_max_window_bits is not None:

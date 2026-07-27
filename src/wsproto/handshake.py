@@ -42,7 +42,7 @@ class H11Handshake:
     """A Handshake implementation for HTTP/1.1 connections."""
 
     def __init__(self, connection_type: ConnectionType) -> None:
-        self.client: bool = connection_type is ConnectionType.CLIENT
+        self.client = connection_type is ConnectionType.CLIENT
         self._state = ConnectionState.CONNECTING
 
         if self.client:

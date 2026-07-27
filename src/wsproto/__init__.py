@@ -32,8 +32,8 @@ class WSConnection:
         :param wsproto.connection.ConnectionType connection_type: Controls
             whether the library behaves as a client or as a server.
         """
-        self.client: bool = connection_type is ConnectionType.CLIENT
-        self.handshake: H11Handshake = H11Handshake(connection_type)
+        self.client = connection_type is ConnectionType.CLIENT
+        self.handshake = H11Handshake(connection_type)
         self.connection: Connection | None = None
 
     @property

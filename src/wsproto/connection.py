@@ -86,7 +86,7 @@ class Connection:
         :param bytes trailing_data: Data that has been received, but not yet
             processed.
         """
-        self.client: bool = connection_type is ConnectionType.CLIENT
+        self.client = connection_type is ConnectionType.CLIENT
         self._events: deque[Event] = deque()
         self._proto = FrameProtocol(self.client, extensions or [])
         self._state = ConnectionState.OPEN
