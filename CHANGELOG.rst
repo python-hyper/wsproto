@@ -4,6 +4,8 @@ Release History
 1.4.0 (unreleased)
 ------------------
 
+- Accept any sequence of ``(name, value)`` header pairs, matching ``h11``.
+
 - Require ``event_hint`` when constructing ``RemoteProtocolError``.
   This is an API-breaking change.
 
