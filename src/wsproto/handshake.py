@@ -81,7 +81,7 @@ class H11Handshake:
         This should be used if the request has already be received and
         parsed.
 
-        :param list headers: HTTP headers represented as a list of 2-tuples.
+        :param headers: HTTP headers as a sequence of ``(name, value)`` pairs.
         :param str path: A URL path.
         """
         if self.client:
