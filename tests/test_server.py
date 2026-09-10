@@ -131,9 +131,9 @@ def test_connection_request_key_header() -> None:
     assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Key'"
 
 
-def test_upgrade_request() -> None:
-    server = WSConnection(SERVER)
-    server.initiate_upgrade_connection(
+@pytest.mark.parametrize(
+    "headers",
+    [
         [
             (b"Host", b"localhost"),
             (b"Connection", b"Keep-Alive, Upgrade"),
@@ -142,8 +142,21 @@ def test_upgrade_request() -> None:
             (b"Sec-WebSocket-Key", generate_nonce()),
             (b"X-Foo", b"bar"),
         ],
-        "/",
-    )
+        # Sequence that is not a list (the point of Headers = Sequence[...]).
+        (
+            (b"Host", b"localhost"),
+            (b"Connection", b"Keep-Alive, Upgrade"),
+            (b"Upgrade", b"websocket"),
+            (b"Sec-WebSocket-Version", b"13"),
+            (b"Sec-WebSocket-Key", generate_nonce()),
+            (b"X-Foo", b"bar"),
+        ),
+    ],
+    ids=["list", "tuple"],
+)
+def test_upgrade_request(headers: Headers) -> None:
+    server = WSConnection(SERVER)
+    server.initiate_upgrade_connection(headers, "/")
     event = next(server.events())
     event = cast("Request", event)
 
@@ -212,6 +225,18 @@ def test_handshake() -> None:
 
 def test_handshake_extra_headers() -> None:
     response, nonce = _make_handshake([], accept_headers=[(b"X-Foo", b"bar")])
+
+    assert response.status_code == 101
+    assert sorted(response.headers) == [
+        (b"connection", b"Upgrade"),
+        (b"sec-websocket-accept", generate_accept_token(nonce)),
+        (b"upgrade", b"websocket"),
+        (b"x-foo", b"bar"),
+    ]
+
+
+def test_handshake_tuple_extra_headers() -> None:
+    response, nonce = _make_handshake([], accept_headers=((b"X-Foo", b"bar"),))
 
     assert response.status_code == 101
     assert sorted(response.headers) == [

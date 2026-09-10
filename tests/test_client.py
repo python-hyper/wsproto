@@ -61,6 +61,21 @@ def test_connection_request_additional_headers() -> None:
     assert headers[b"x-bar"] == b"Foo"
 
 
+def test_connection_request_tuple_extra_headers() -> None:
+    # Headers accepts any sequence of pairs, not only list.
+    request = _make_connection_request(
+        Request(
+            host="localhost",
+            target="/",
+            extra_headers=((b"X-Foo", b"Bar"), (b"X-Bar", b"Foo")),
+        ),
+    )
+
+    headers = normed_header_dict(request.headers)
+    assert headers[b"x-foo"] == b"Bar"
+    assert headers[b"x-bar"] == b"Foo"
+
+
 def test_connection_request_simple_extension() -> None:
     extension = FakeExtension(offer_response=True)
     request = _make_connection_request(
