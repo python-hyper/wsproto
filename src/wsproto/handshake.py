@@ -206,7 +206,7 @@ class H11Handshake:
         subprotocols: list[str] = []
         upgrade = b""
         version = None
-        headers: list[tuple[bytes, bytes]] = []
+        collected: list[tuple[bytes, bytes]] = []
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
@@ -226,7 +226,8 @@ class H11Handshake:
                 version = value
             elif name == b"upgrade":
                 upgrade = value
-            headers.append((name, value))
+            collected.append((name, value))
+        headers: Headers = collected
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
@@ -399,7 +400,7 @@ class H11Handshake:
         accepts: list[str] = []
         subprotocol = None
         upgrade = b""
-        headers: list[tuple[bytes, bytes]] = []
+        collected: list[tuple[bytes, bytes]] = []
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
@@ -417,7 +418,8 @@ class H11Handshake:
             if name == b"upgrade":
                 upgrade = value
                 continue  # Skip appending to headers
-            headers.append((name, value))
+            collected.append((name, value))
+        headers: Headers = collected
 
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
