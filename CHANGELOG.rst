@@ -6,6 +6,8 @@ Release History
 
 - Require ``event_hint`` when constructing ``RemoteProtocolError``.
   This is an API-breaking change.
+- Preserve decompression state when PING or PONG frames arrive between
+  compressed message fragments.
 
 1.3.2 (2025-11-20)
 ------------------

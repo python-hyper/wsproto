@@ -206,7 +206,7 @@ class PerMessageDeflate(Extension):
 
         self._inbound_is_compressible = self._compressible_opcode(opcode)
 
-        if self._inbound_compressed is None:
+        if self._inbound_is_compressible and self._inbound_compressed is None:
             self._inbound_compressed = rsv.rsv1
             if self._inbound_compressed:
                 assert self._inbound_is_compressible
@@ -237,7 +237,6 @@ class PerMessageDeflate(Extension):
         if not fin:
             return None
         if not self._inbound_is_compressible:
-            self._inbound_compressed = None
             return None
         if not self._inbound_compressed:
             self._inbound_compressed = None
