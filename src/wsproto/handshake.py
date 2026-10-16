@@ -149,15 +149,8 @@ class H11Handshake:
                 if isinstance(event, h11.InformationalResponse):
                     if event.status_code == 101:
                         self._events.append(self._establish_client_connection(event))
-                    else:
-                        self._events.append(
-                            RejectConnection(
-                                headers=list(event.headers),
-                                status_code=event.status_code,
-                                has_body=False,
-                            ),
-                        )
-                        self._state = ConnectionState.CLOSED
+                    # Other 1xx responses are interim: keep waiting for the
+                    # upgrade or a final HTTP response (RFC 9110, Section 15.2).
                 elif isinstance(event, h11.Response):
                     self._state = ConnectionState.REJECTING
                     self._events.append(

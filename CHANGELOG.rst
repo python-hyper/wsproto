@@ -6,6 +6,8 @@ Release History
 
 - Require ``event_hint`` when constructing ``RemoteProtocolError``.
   This is an API-breaking change.
+- Keep the client handshake pending after interim HTTP responses such as
+  103 Early Hints, rather than reporting them as connection rejections.
 
 1.3.2 (2025-11-20)
 ------------------

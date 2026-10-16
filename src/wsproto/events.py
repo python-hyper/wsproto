@@ -105,12 +105,11 @@ class RejectConnection(Event):
     a response body, the caller should set the ``Content-Length``,
     ``Content-Type``, and/or ``Transfer-Encoding`` headers as appropriate.
 
-    When receiving a ``RejectConnection`` event, the ``has_body`` attribute will
-    in almost all cases be ``True`` (even if the server set it to ``False``) and
-    will be followed by at least one ``RejectData`` events, even though the data
-    itself might be just ``b""``. (The only scenario in which the caller
-    receives a ``RejectConnection`` with ``has_body == False`` is if the peer
-    violates sends an informational status code (1xx) other than 101.)
+    When receiving a ``RejectConnection`` event, the ``has_body`` attribute is
+    ``True`` (even if the server set it to ``False``) and the event is followed
+    by at least one ``RejectData`` event, even though the data itself might be
+    just ``b""``. Interim informational responses (1xx other than 101) are
+    ignored while waiting for the upgrade or a final HTTP response.
 
     The ``has_body`` attribute should only be used when receiving the event. (It
     has ) is False the headers must include a
