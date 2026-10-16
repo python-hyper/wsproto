@@ -186,12 +186,52 @@ def test_handshake() -> None:
     assert events == [AcceptConnection()]
 
 
-def test_broken_handshake() -> None:
-    events = _make_handshake(
-        102, [(b"connection", b"Upgrade"), (b"upgrade", b"websocket")],
-    )
-    assert isinstance(events[0], RejectConnection)
-    assert events[0].status_code == 102
+@pytest.mark.parametrize("informational_status", [100, 102, 103, 199])
+@pytest.mark.parametrize("final_status", [101, 403])
+@pytest.mark.parametrize("coalesced", [False, True])
+def test_handshake_informational_responses(
+    informational_status: int,
+    final_status: int,
+    coalesced: bool,
+) -> None:
+    client = WSConnection(CLIENT)
+    server = h11.Connection(h11.SERVER)
+    server.receive_data(client.send(Request(host="localhost", target="/")))
+    request = cast("h11.Request", server.next_event())
+
+    # More than one interim response may precede the final response.
+    interim_data = server.send(h11.InformationalResponse(status_code=informational_status, headers=[]))
+    interim_data += server.send(h11.InformationalResponse(status_code=103, headers=[]))
+    if not coalesced:
+        client.receive_data(interim_data)
+        assert list(client.events()) == []
+        assert client.state is ConnectionState.CONNECTING
+
+    if final_status == 101:
+        headers = normed_header_dict(request.headers)
+        response = h11.InformationalResponse(
+            status_code=101,
+            headers=[
+                (b"connection", b"Upgrade"),
+                (b"upgrade", b"websocket"),
+                (b"sec-websocket-accept", generate_accept_token(headers[b"sec-websocket-key"])),
+            ],
+        )
+        final_data = server.send(response)
+    else:
+        final_data = server.send(h11.Response(status_code=403, headers=[(b"content-length", b"0")]))
+        final_data += server.send(h11.EndOfMessage())
+
+    client.receive_data((interim_data if coalesced else b"") + final_data)
+    if final_status == 101:
+        assert list(client.events()) == [AcceptConnection()]
+        assert client.state is ConnectionState.OPEN
+    else:
+        assert list(client.events()) == [
+            RejectConnection(status_code=403, headers=[(b"content-length", b"0")], has_body=True),
+            RejectData(data=b"", body_finished=True),
+        ]
+        assert client.state is ConnectionState.CLOSED
 
 
 def test_handshake_extra_accept_headers() -> None:
