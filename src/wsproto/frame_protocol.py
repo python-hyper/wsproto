@@ -526,6 +526,57 @@ class FrameProtocol:
 
         self._outbound_opcode: Opcode | None = None
 
+    def _parse_complete_data_frame(self) -> Frame | None:
+        """
+        Decode a complete ordinary message, or leave it to the staged parser.
+
+        The caller has checked that the buffer starts with a FIN text or binary
+        header without reserved bits, that its payload length fits in 7 bits,
+        and that the whole frame is buffered.
+        """
+        decoder = self._frame_decoder
+        message = self._message_decoder
+        if (
+            type(decoder) is not FrameDecoder
+            or type(message) is not MessageDecoder
+            or decoder.header is not None
+            or message.opcode is not None
+            or message.decoder is not None
+            or type(decoder.extensions) is not list
+            or decoder.extensions
+            or type(decoder.client) is not bool
+            or type(decoder.buffer) is not Buffer
+            or decoder.buffer.bytes_used
+        ):
+            return None
+        data = decoder.buffer.buffer
+        masked = bool(data[1] & MASK_MASK)
+        if masked == decoder.client:
+            return None
+        length = data[1] & PAYLOAD_LEN_MASK
+        start = 2
+        payload_start = start + (4 if masked else 0)
+        end = payload_start + length
+        payload = data[payload_start:end]
+        if masked:
+            payload = XorMaskerSimple(data[start:payload_start]).process(payload)
+        opcode = Opcode.TEXT if data[0] == 0x81 else Opcode.BINARY
+        content: bytes | str
+        if opcode is Opcode.TEXT:
+            try:
+                content = payload.decode("utf-8")
+            except UnicodeDecodeError:
+                # Let the staged decoder report the error and retain its state.
+                return None
+        else:
+            content = bytes(payload)
+        del data[:end]
+        decoder.payload_required = 0
+        decoder.payload_consumed = length
+        decoder.effective_opcode = None
+        decoder.masker = None
+        return Frame(opcode, content, True, True)
+
     def _process_close(self, frame: Frame) -> Frame:
         data = frame.payload
         assert isinstance(data, (bytes, bytearray))
@@ -569,8 +620,32 @@ class FrameProtocol:
         # disabled extensions in the first place...
         self.extensions = [ext for ext in self.extensions if ext.enabled()]
         closed = False
+        fast_path = (
+            type(self._frame_decoder) is FrameDecoder
+            and type(self._message_decoder) is MessageDecoder
+            and type(self._frame_decoder.extensions) is list
+            and not self._frame_decoder.extensions
+            and type(self._frame_decoder.client) is bool
+        )
 
         while not closed:
+            if (
+                fast_path
+                and self._frame_decoder.header is None
+                and self._message_decoder.opcode is None
+                and len(self._frame_decoder.buffer) >= 2
+                and self._frame_decoder.buffer.buffer[0] in (0x81, 0x82)
+            ):
+                buffered = self._frame_decoder.buffer.buffer
+                payload_len_short = buffered[1] & PAYLOAD_LEN_MASK
+                minimum_size = 2 + payload_len_short
+                if buffered[1] & MASK_MASK:
+                    minimum_size += 4
+                if payload_len_short <= MAX_PAYLOAD_NORMAL and len(buffered) >= minimum_size:
+                    complete = self._parse_complete_data_frame()
+                    if complete is not None:
+                        yield complete
+                        continue
             frame = self._frame_decoder.process_buffer()
 
             if frame is not None:

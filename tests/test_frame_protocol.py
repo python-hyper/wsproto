@@ -1284,3 +1284,42 @@ def test_bad_complete_text_preserves_parser_failure(client: bool) -> None:
         list(receiver.received_frames())
     assert error.value.code is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
     assert list(receiver.received_frames()) == []
+
+
+@pytest.mark.parametrize("client", [True, 1, 2, "client", [1]])
+def test_client_role_preserves_mask_validation(client) -> None:
+    sender = fp.FrameProtocol(client=True, extensions=[])
+    receiver = fp.FrameProtocol(client=client, extensions=[])
+    receiver.receive_bytes(sender.send_data("hello"))
+    with pytest.raises(fp.ParseFailed, match="client received unexpected masked frame"):
+        list(receiver.received_frames())
+
+
+def test_extensions_added_between_frames_are_observed() -> None:
+    calls = []
+
+    class Observe(wpext.Extension):
+        def offer(self) -> bool:
+            return True
+
+        def frame_inbound_header(self, proto, opcode, rsv, payload_length):
+            calls.append("header")
+            return fp.RsvBits(False, False, False)
+
+        def frame_inbound_payload_data(self, proto, data):
+            calls.append("payload")
+            return data
+
+        def frame_inbound_complete(self, proto, fin):
+            calls.append("complete")
+            return None
+
+    sender = fp.FrameProtocol(client=False, extensions=[])
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    receiver.receive_bytes(sender.send_data("first") + sender.send_data("second"))
+    frames = receiver.received_frames()
+    assert next(frames).payload == "first"
+    receiver._frame_decoder.extensions.append(Observe())
+    assert next(frames).payload == "second"
+    assert calls == ["header", "payload", "complete"]
+    assert list(frames) == []
