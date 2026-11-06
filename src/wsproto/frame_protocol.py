@@ -101,6 +101,10 @@ class Opcode(IntEnum):
         return bool(self & 0x08)
 
 
+# Invalid opcodes still go through the ordinary parser and its error handling.
+_OPCODES = tuple(next((op for op in Opcode if op.value == n), None) for n in range(16))
+
+
 class CloseReason(IntEnum):
     """
     RFC 6455, Section 7.4.1 - Defined Status Codes
@@ -222,6 +226,18 @@ class RsvBits(NamedTuple):
     rsv1: bool
     rsv2: bool
     rsv3: bool
+
+
+# All possible first header bytes. These immutable fields do not depend on the
+# connection, extensions, payload, or how the input was split into chunks.
+_HEADER_FIELDS = tuple(
+    (
+        bool(first & FIN_MASK),
+        RsvBits(bool(first & RSV1_MASK), bool(first & RSV2_MASK), bool(first & RSV3_MASK)),
+        first & OPCODE_MASK,
+    )
+    for first in range(256)
+)
 
 
 class Header(NamedTuple):
@@ -400,18 +416,46 @@ class FrameDecoder:
         return frame
 
     def parse_header(self) -> bool:
+        # Decode complete ordinary short headers without temporary header slices.
+        # The original path handles extensions, partial headers and every error.
+        if (
+            type(self.buffer) is Buffer
+            and not self.buffer.bytes_used
+            and type(self.buffer.buffer) is bytearray
+            and len(self.buffer.buffer) >= 2
+            and (self.buffer.buffer[1] & PAYLOAD_LEN_MASK) <= MAX_PAYLOAD_NORMAL
+            and type(self) is FrameDecoder
+            and type(self.extensions) is list
+            and not self.extensions
+            and type(self.client) is bool
+        ):
+            buffered = self.buffer.buffer
+            first, second = buffered[0], buffered[1]
+            short_opcode = _OPCODES[first & OPCODE_MASK]
+            masked = bool(second & MASK_MASK)
+            size = 6 if masked else 2
+            length = second & PAYLOAD_LEN_MASK
+            if (
+                short_opcode is not None
+                and not first & (RSV1_MASK | RSV2_MASK | RSV3_MASK)
+                and (first & FIN_MASK or not short_opcode.iscontrol())
+                and masked != self.client
+                and len(buffered) >= size
+            ):
+                fin, rsv, _ = _HEADER_FIELDS[first]
+                self.masker = XorMaskerSimple(buffered[2:6]) if masked else XorMaskerNull()
+                del buffered[:size]
+                self.header = Header(fin, rsv, short_opcode, length, None)
+                self.effective_opcode = short_opcode
+                self.payload_required = length if short_opcode.iscontrol() else 0
+                self.payload_consumed = 0
+                return True
         data = self.buffer.consume_exactly(2)
         if data is None:
             self.buffer.rollback()
             return False
 
-        fin = bool(data[0] & FIN_MASK)
-        rsv = RsvBits(
-            bool(data[0] & RSV1_MASK),
-            bool(data[0] & RSV2_MASK),
-            bool(data[0] & RSV3_MASK),
-        )
-        opcode = data[0] & OPCODE_MASK
+        fin, rsv, opcode = _HEADER_FIELDS[data[0]]
         try:
             opcode = Opcode(opcode)
         except ValueError:
@@ -520,6 +564,57 @@ class FrameProtocol:
 
         self._outbound_opcode: Opcode | None = None
 
+    def _parse_complete_data_frame(self) -> Frame | None:
+        """
+        Decode a complete ordinary message, or leave it to the staged parser.
+
+        The caller has checked that the buffer starts with a FIN text or binary
+        header without reserved bits, that its payload length fits in 7 bits,
+        and that the whole frame is buffered.
+        """
+        decoder = self._frame_decoder
+        message = self._message_decoder
+        if (
+            type(decoder) is not FrameDecoder
+            or type(message) is not MessageDecoder
+            or decoder.header is not None
+            or message.opcode is not None
+            or message.decoder is not None
+            or type(decoder.extensions) is not list
+            or decoder.extensions
+            or type(decoder.client) is not bool
+            or type(decoder.buffer) is not Buffer
+            or decoder.buffer.bytes_used
+        ):
+            return None
+        data = decoder.buffer.buffer
+        masked = bool(data[1] & MASK_MASK)
+        if masked == decoder.client:
+            return None
+        length = data[1] & PAYLOAD_LEN_MASK
+        start = 2
+        payload_start = start + (4 if masked else 0)
+        end = payload_start + length
+        payload = data[payload_start:end]
+        if masked:
+            payload = XorMaskerSimple(data[start:payload_start]).process(payload)
+        opcode = Opcode.TEXT if data[0] == 0x81 else Opcode.BINARY
+        content: bytes | str
+        if opcode is Opcode.TEXT:
+            try:
+                content = payload.decode("utf-8")
+            except UnicodeDecodeError:
+                # Let the staged decoder report the error and retain its state.
+                return None
+        else:
+            content = bytes(payload)
+        del data[:end]
+        decoder.payload_required = 0
+        decoder.payload_consumed = length
+        decoder.effective_opcode = None
+        decoder.masker = None
+        return Frame(opcode, content, True, True)
+
     def _process_close(self, frame: Frame) -> Frame:
         data = frame.payload
         assert isinstance(data, (bytes, bytearray))
@@ -563,8 +658,45 @@ class FrameProtocol:
         # disabled extensions in the first place...
         self.extensions = [ext for ext in self.extensions if ext.enabled()]
         closed = False
+        fast_path = (
+            type(self._frame_decoder) is FrameDecoder
+            and type(self._message_decoder) is MessageDecoder
+            and type(self._frame_decoder.extensions) is list
+            and not self._frame_decoder.extensions
+            and type(self._frame_decoder.client) is bool
+        )
 
         while not closed:
+            # There is no header or payload to process in an empty ordinary buffer.
+            if (
+                fast_path
+                and type(self._frame_decoder) is FrameDecoder
+                and self._frame_decoder.header is None
+                and type(self._frame_decoder.buffer) is Buffer
+                and not self._frame_decoder.buffer.buffer
+            ):
+                self._frame_decoder.buffer.rollback()
+                # Match the staged path's release of the previous payload.
+                frame = None
+                yield None
+                continue
+            if (
+                fast_path
+                and self._frame_decoder.header is None
+                and self._message_decoder.opcode is None
+                and len(self._frame_decoder.buffer) >= 2
+                and self._frame_decoder.buffer.buffer[0] in (0x81, 0x82)
+            ):
+                buffered = self._frame_decoder.buffer.buffer
+                payload_len_short = buffered[1] & PAYLOAD_LEN_MASK
+                minimum_size = 2 + payload_len_short
+                if buffered[1] & MASK_MASK:
+                    minimum_size += 4
+                if payload_len_short <= MAX_PAYLOAD_NORMAL and len(buffered) >= minimum_size:
+                    complete = self._parse_complete_data_frame()
+                    if complete is not None:
+                        yield complete
+                        continue
             frame = self._frame_decoder.process_buffer()
 
             if frame is not None:
@@ -693,6 +825,13 @@ class FrameProtocol:
             #   -- https://tools.ietf.org/html/rfc6455#section-5.3
             masking_key = bytearray(os.urandom(4))
             masker = XorMaskerSimple(masking_key)
-            return bytearray(header + masking_key + masker.process(bytearray(payload)))
+            if payload_length > MAX_PAYLOAD_NORMAL:
+                return bytearray(header + masking_key + masker.process(bytearray(payload)))
+            header += masking_key
+            header += masker.process(bytearray(payload))
+            return header
 
+        if payload_length <= MAX_PAYLOAD_NORMAL and type(payload) in (bytes, bytearray):
+            header += payload
+            return header
         return bytearray(header + payload)

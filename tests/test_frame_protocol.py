@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import gc
 import itertools
 import struct
+import weakref
 from binascii import unhexlify
 from codecs import getincrementaldecoder
 from typing import Dict, Optional, Tuple, Union
@@ -1208,3 +1210,192 @@ def test_xor_mask_simple() -> None:
     assert masker.process(b"some very long data for masking by websocket") == (
         b"B]^Q\x11DVFH\x12_[_U\x13PPFR\x14W]A\x14\\S@_X\\T\x14SK\x13CTP@[RYV@"
     )
+
+
+@pytest.mark.parametrize("first", range(256))
+def test_first_header_byte_fields(first: int) -> None:
+    class ObserveHeader(wpext.Extension):
+        def offer(self) -> bool:
+            return True
+
+        def frame_inbound_header(
+            self, proto: fp.FrameDecoder | fp.FrameProtocol, opcode: fp.Opcode,
+            rsv: fp.RsvBits, payload_length: int,
+        ) -> fp.RsvBits:
+            assert type(rsv) is fp.RsvBits
+            assert rsv == fp.RsvBits(bool(first & 64), bool(first & 32), bool(first & 16))
+            return fp.RsvBits(True, True, True)
+
+    decoder = fp.FrameDecoder(client=True, extensions=[ObserveHeader()])
+    decoder.receive_bytes(bytes([first, 0]))
+    if first & 15 not in [0, 1, 2, 8, 9, 10]:
+        with pytest.raises(fp.ParseFailed, match="Invalid opcode"):
+            decoder.parse_header()
+    elif first & 8 and not first & 128:
+        with pytest.raises(fp.ParseFailed, match="Invalid attempt to fragment control frame"):
+            decoder.parse_header()
+    else:
+        assert decoder.parse_header()
+        assert decoder.header.fin is bool(first & 128)
+        assert decoder.header.opcode is fp.Opcode(first & 15)
+
+
+@pytest.mark.parametrize("client", [False, True])
+@pytest.mark.parametrize("size", [0, 1, 125, 126, 65535, 65536])
+def test_serialized_frame_does_not_share_payload(client: bool, size: int) -> None:
+    payload = bytearray(b"x" * size)
+    sender = fp.FrameProtocol(client=client, extensions=[])
+    wire = sender.send_data(payload)
+    assert type(wire) is bytearray
+    payload[:] = b"y" * size
+    receiver = fp.FrameProtocol(client=not client, extensions=[])
+    receiver.receive_bytes(wire)
+    frames = list(receiver.received_frames())
+    assert frames[0].payload == b"x" * size
+    assert type(frames[0].payload) is bytes
+
+
+@pytest.mark.parametrize("client", [False, True])
+def test_coalesced_complete_fragmented_and_control_frames(client: bool) -> None:
+    sender = fp.FrameProtocol(client=not client, extensions=[])
+    wire = (
+        sender.send_data("first")
+        + sender.send_data("é", fin=False)
+        + sender.ping(b"heartbeat")
+        + sender.send_data("last")
+        + sender.close(1000, "done")
+    )
+    receiver = fp.FrameProtocol(client=client, extensions=[])
+    receiver.receive_bytes(wire)
+    assert list(receiver.received_frames()) == [
+        fp.Frame(fp.Opcode.TEXT, "first", True, True),
+        fp.Frame(fp.Opcode.TEXT, "é", True, False),
+        fp.Frame(fp.Opcode.PING, b"heartbeat", True, True),
+        fp.Frame(fp.Opcode.TEXT, "last", True, True),
+        fp.Frame(fp.Opcode.CLOSE, (fp.CloseReason.NORMAL_CLOSURE, "done"), True, True),
+    ]
+
+
+@pytest.mark.parametrize("client", [False, True])
+def test_bad_complete_text_preserves_parser_failure(client: bool) -> None:
+    sender = fp.FrameProtocol(client=not client, extensions=[])
+    wire = sender._serialize_frame(fp.Opcode.TEXT, b"\xff") + sender.send_data("later")
+    receiver = fp.FrameProtocol(client=client, extensions=[])
+    receiver.receive_bytes(wire)
+    with pytest.raises(fp.ParseFailed) as error:
+        list(receiver.received_frames())
+    assert error.value.code is fp.CloseReason.INVALID_FRAME_PAYLOAD_DATA
+    assert list(receiver.received_frames()) == []
+
+
+@pytest.mark.parametrize("client", [True, 1, 2, "client", [1]])
+def test_client_role_preserves_mask_validation(client) -> None:
+    sender = fp.FrameProtocol(client=True, extensions=[])
+    receiver = fp.FrameProtocol(client=client, extensions=[])
+    receiver.receive_bytes(sender.send_data("hello"))
+    with pytest.raises(fp.ParseFailed, match="client received unexpected masked frame"):
+        list(receiver.received_frames())
+
+
+def test_extensions_added_between_frames_are_observed() -> None:
+    calls = []
+
+    class Observe(wpext.Extension):
+        def offer(self) -> bool:
+            return True
+
+        def frame_inbound_header(self, proto, opcode, rsv, payload_length):
+            calls.append("header")
+            return fp.RsvBits(False, False, False)
+
+        def frame_inbound_payload_data(self, proto, data):
+            calls.append("payload")
+            return data
+
+        def frame_inbound_complete(self, proto, fin):
+            calls.append("complete")
+            return None
+
+    sender = fp.FrameProtocol(client=False, extensions=[])
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    receiver.receive_bytes(sender.send_data("first") + sender.send_data("second"))
+    frames = receiver.received_frames()
+    assert next(frames).payload == "first"
+    receiver._frame_decoder.extensions.append(Observe())
+    assert next(frames).payload == "second"
+    assert calls == ["header", "payload", "complete"]
+    assert list(frames) == []
+
+
+@pytest.mark.parametrize("client", [False, True])
+def test_control_frame_waits_for_every_payload_byte(client: bool) -> None:
+    sender = fp.FrameProtocol(client=not client, extensions=[])
+    receiver = fp.FrameProtocol(client=client, extensions=[])
+    wire = sender.ping(b"heartbeat")
+    for part in wire[:-1]:
+        receiver.receive_bytes(bytes([part]))
+        assert list(receiver.received_frames()) == []
+    receiver.receive_bytes(wire[-1:])
+    assert list(receiver.received_frames()) == [
+        fp.Frame(fp.Opcode.PING, b"heartbeat", True, True),
+    ]
+    assert list(receiver.received_frames()) == []
+    receiver.receive_bytes(sender.pong())
+    assert list(receiver.received_frames()) == [
+        fp.Frame(fp.Opcode.PONG, b"", True, True),
+    ]
+
+
+def test_replaced_frame_decoder_is_called_with_empty_input() -> None:
+    calls: list[bool] = []
+
+    class Observe(fp.FrameDecoder):
+        def process_buffer(self) -> fp.Frame | None:
+            calls.append(True)
+            return super().process_buffer()
+
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    receiver.receive_bytes(b"\x81\x01x")
+    frames = receiver.received_frames()
+    assert next(frames).payload == "x"
+    receiver._frame_decoder = Observe(client=True)
+    assert list(frames) == []
+    assert calls == [True]
+
+
+def test_buffer_subclass_is_used_when_empty() -> None:
+    calls: list[int] = []
+
+    class Observe(fp.Buffer):
+        def consume_exactly(self, nbytes: int) -> bytearray | None:
+            calls.append(nbytes)
+            return super().consume_exactly(nbytes)
+
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    receiver._frame_decoder.buffer = Observe()
+    assert list(receiver.received_frames()) == []
+    assert calls == [2]
+
+
+def test_empty_buffer_releases_staged_payload() -> None:
+    class Payload(str):
+        pass
+
+    refs: list[weakref.ReferenceType[Payload]] = []
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    original = receiver._message_decoder.process_frame
+
+    def observe(frame: fp.Frame) -> fp.Frame:
+        result = original(frame)
+        payload = Payload(result.payload)
+        refs.append(weakref.ref(payload))
+        return result._replace(payload=payload)
+
+    receiver._message_decoder.process_frame = observe
+    sender = fp.FrameProtocol(client=False, extensions=[])
+    receiver.receive_bytes(sender.send_data("x" * 126))
+    frames = list(receiver.received_frames())
+    assert frames[0].payload == "x" * 126
+    del frames
+    gc.collect()
+    assert refs[0]() is None
