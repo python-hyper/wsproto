@@ -101,6 +101,10 @@ class Opcode(IntEnum):
         return bool(self & 0x08)
 
 
+# Invalid opcodes still go through the ordinary parser and its error handling.
+_OPCODES = tuple(next((op for op in Opcode if op.value == n), None) for n in range(16))
+
+
 class CloseReason(IntEnum):
     """
     RFC 6455, Section 7.4.1 - Defined Status Codes
@@ -412,6 +416,40 @@ class FrameDecoder:
         return frame
 
     def parse_header(self) -> bool:
+        # Decode complete ordinary short headers without temporary header slices.
+        # The original path handles extensions, partial headers and every error.
+        if (
+            type(self.buffer) is Buffer
+            and not self.buffer.bytes_used
+            and type(self.buffer.buffer) is bytearray
+            and len(self.buffer.buffer) >= 2
+            and (self.buffer.buffer[1] & PAYLOAD_LEN_MASK) <= MAX_PAYLOAD_NORMAL
+            and type(self) is FrameDecoder
+            and type(self.extensions) is list
+            and not self.extensions
+            and type(self.client) is bool
+        ):
+            buffered = self.buffer.buffer
+            first, second = buffered[0], buffered[1]
+            short_opcode = _OPCODES[first & OPCODE_MASK]
+            masked = bool(second & MASK_MASK)
+            size = 6 if masked else 2
+            length = second & PAYLOAD_LEN_MASK
+            if (
+                short_opcode is not None
+                and not first & (RSV1_MASK | RSV2_MASK | RSV3_MASK)
+                and (first & FIN_MASK or not short_opcode.iscontrol())
+                and masked != self.client
+                and len(buffered) >= size
+            ):
+                fin, rsv, _ = _HEADER_FIELDS[first]
+                self.masker = XorMaskerSimple(buffered[2:6]) if masked else XorMaskerNull()
+                del buffered[:size]
+                self.header = Header(fin, rsv, short_opcode, length, None)
+                self.effective_opcode = short_opcode
+                self.payload_required = length if short_opcode.iscontrol() else 0
+                self.payload_consumed = 0
+                return True
         data = self.buffer.consume_exactly(2)
         if data is None:
             self.buffer.rollback()
@@ -629,6 +667,19 @@ class FrameProtocol:
         )
 
         while not closed:
+            # There is no header or payload to process in an empty ordinary buffer.
+            if (
+                fast_path
+                and type(self._frame_decoder) is FrameDecoder
+                and self._frame_decoder.header is None
+                and type(self._frame_decoder.buffer) is Buffer
+                and not self._frame_decoder.buffer.buffer
+            ):
+                self._frame_decoder.buffer.rollback()
+                # Match the staged path's release of the previous payload.
+                frame = None
+                yield None
+                continue
             if (
                 fast_path
                 and self._frame_decoder.header is None

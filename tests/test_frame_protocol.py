@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import gc
 import itertools
 import struct
+import weakref
 from binascii import unhexlify
 from codecs import getincrementaldecoder
 from typing import Dict, Optional, Tuple, Union
@@ -1323,3 +1325,77 @@ def test_extensions_added_between_frames_are_observed() -> None:
     assert next(frames).payload == "second"
     assert calls == ["header", "payload", "complete"]
     assert list(frames) == []
+
+
+@pytest.mark.parametrize("client", [False, True])
+def test_control_frame_waits_for_every_payload_byte(client: bool) -> None:
+    sender = fp.FrameProtocol(client=not client, extensions=[])
+    receiver = fp.FrameProtocol(client=client, extensions=[])
+    wire = sender.ping(b"heartbeat")
+    for part in wire[:-1]:
+        receiver.receive_bytes(bytes([part]))
+        assert list(receiver.received_frames()) == []
+    receiver.receive_bytes(wire[-1:])
+    assert list(receiver.received_frames()) == [
+        fp.Frame(fp.Opcode.PING, b"heartbeat", True, True),
+    ]
+    assert list(receiver.received_frames()) == []
+    receiver.receive_bytes(sender.pong())
+    assert list(receiver.received_frames()) == [
+        fp.Frame(fp.Opcode.PONG, b"", True, True),
+    ]
+
+
+def test_replaced_frame_decoder_is_called_with_empty_input() -> None:
+    calls: list[bool] = []
+
+    class Observe(fp.FrameDecoder):
+        def process_buffer(self) -> fp.Frame | None:
+            calls.append(True)
+            return super().process_buffer()
+
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    receiver.receive_bytes(b"\x81\x01x")
+    frames = receiver.received_frames()
+    assert next(frames).payload == "x"
+    receiver._frame_decoder = Observe(client=True)
+    assert list(frames) == []
+    assert calls == [True]
+
+
+def test_buffer_subclass_is_used_when_empty() -> None:
+    calls: list[int] = []
+
+    class Observe(fp.Buffer):
+        def consume_exactly(self, nbytes: int) -> bytearray | None:
+            calls.append(nbytes)
+            return super().consume_exactly(nbytes)
+
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    receiver._frame_decoder.buffer = Observe()
+    assert list(receiver.received_frames()) == []
+    assert calls == [2]
+
+
+def test_empty_buffer_releases_staged_payload() -> None:
+    class Payload(str):
+        pass
+
+    refs: list[weakref.ReferenceType[Payload]] = []
+    receiver = fp.FrameProtocol(client=True, extensions=[])
+    original = receiver._message_decoder.process_frame
+
+    def observe(frame: fp.Frame) -> fp.Frame:
+        result = original(frame)
+        payload = Payload(result.payload)
+        refs.append(weakref.ref(payload))
+        return result._replace(payload=payload)
+
+    receiver._message_decoder.process_frame = observe
+    sender = fp.FrameProtocol(client=False, extensions=[])
+    receiver.receive_bytes(sender.send_data("x" * 126))
+    frames = list(receiver.received_frames())
+    assert frames[0].payload == "x" * 126
+    del frames
+    gc.collect()
+    assert refs[0]() is None
