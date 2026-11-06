@@ -6,6 +6,7 @@ Release History
 
 - Require ``event_hint`` when constructing ``RemoteProtocolError``.
   This is an API-breaking change.
+- Speed up parsing and serialization of short frames.
 
 1.3.2 (2025-11-20)
 ------------------

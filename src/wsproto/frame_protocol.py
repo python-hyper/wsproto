@@ -224,6 +224,18 @@ class RsvBits(NamedTuple):
     rsv3: bool
 
 
+# All possible first header bytes. These immutable fields do not depend on the
+# connection, extensions, payload, or how the input was split into chunks.
+_HEADER_FIELDS = tuple(
+    (
+        bool(first & FIN_MASK),
+        RsvBits(bool(first & RSV1_MASK), bool(first & RSV2_MASK), bool(first & RSV3_MASK)),
+        first & OPCODE_MASK,
+    )
+    for first in range(256)
+)
+
+
 class Header(NamedTuple):
     fin: bool
     rsv: RsvBits
@@ -405,13 +417,7 @@ class FrameDecoder:
             self.buffer.rollback()
             return False
 
-        fin = bool(data[0] & FIN_MASK)
-        rsv = RsvBits(
-            bool(data[0] & RSV1_MASK),
-            bool(data[0] & RSV2_MASK),
-            bool(data[0] & RSV3_MASK),
-        )
-        opcode = data[0] & OPCODE_MASK
+        fin, rsv, opcode = _HEADER_FIELDS[data[0]]
         try:
             opcode = Opcode(opcode)
         except ValueError:
@@ -693,6 +699,13 @@ class FrameProtocol:
             #   -- https://tools.ietf.org/html/rfc6455#section-5.3
             masking_key = bytearray(os.urandom(4))
             masker = XorMaskerSimple(masking_key)
-            return bytearray(header + masking_key + masker.process(bytearray(payload)))
+            if payload_length > MAX_PAYLOAD_NORMAL:
+                return bytearray(header + masking_key + masker.process(bytearray(payload)))
+            header += masking_key
+            header += masker.process(bytearray(payload))
+            return header
 
+        if payload_length <= MAX_PAYLOAD_NORMAL and type(payload) in (bytes, bytearray):
+            header += payload
+            return header
         return bytearray(header + payload)
