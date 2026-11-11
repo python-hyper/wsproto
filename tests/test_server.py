@@ -24,7 +24,7 @@ def _make_connection_request(request_headers: Headers, method: str = "GET") -> R
     client = h11.Connection(h11.CLIENT)
     server = WSConnection(SERVER)
     server.receive_data(
-        client.send(h11.Request(method=method, target="/", headers=request_headers)),
+        client.send(h11.Request(method=method, target="/", headers=list(request_headers))),
     )
     event = next(server.events())
     assert isinstance(event, Request)
@@ -47,14 +47,14 @@ def test_connection_request() -> None:
     assert event.host == "localhost"
     assert event.subprotocols == []
     assert event.target == "/"
-    headers = normed_header_dict(event.extra_headers)
-    assert b"host" not in headers
-    assert b"sec-websocket-extensions" not in headers
-    assert b"sec-websocket-protocol" not in headers
-    assert headers[b"connection"] == b"Keep-Alive, Upgrade"
-    assert headers[b"sec-websocket-version"] == b"13"
-    assert headers[b"upgrade"] == b"websocket"
-    assert headers[b"x-foo"] == b"bar"
+    header_dict = normed_header_dict(event.extra_headers)
+    assert b"host" not in header_dict
+    assert b"sec-websocket-extensions" not in header_dict
+    assert b"sec-websocket-protocol" not in header_dict
+    assert header_dict[b"connection"] == b"Keep-Alive, Upgrade"
+    assert header_dict[b"sec-websocket-version"] == b"13"
+    assert header_dict[b"upgrade"] == b"websocket"
+    assert header_dict[b"x-foo"] == b"bar"
 
 
 def test_connection_request_bad_method() -> None:
@@ -131,9 +131,9 @@ def test_connection_request_key_header() -> None:
     assert str(excinfo.value) == "Missing header, 'Sec-WebSocket-Key'"
 
 
-def test_upgrade_request() -> None:
-    server = WSConnection(SERVER)
-    server.initiate_upgrade_connection(
+@pytest.mark.parametrize(
+    "headers",
+    [
         [
             (b"Host", b"localhost"),
             (b"Connection", b"Keep-Alive, Upgrade"),
@@ -142,8 +142,21 @@ def test_upgrade_request() -> None:
             (b"Sec-WebSocket-Key", generate_nonce()),
             (b"X-Foo", b"bar"),
         ],
-        "/",
-    )
+        # Sequence that is not a list (the point of Headers = Sequence[...]).
+        (
+            (b"Host", b"localhost"),
+            (b"Connection", b"Keep-Alive, Upgrade"),
+            (b"Upgrade", b"websocket"),
+            (b"Sec-WebSocket-Version", b"13"),
+            (b"Sec-WebSocket-Key", generate_nonce()),
+            (b"X-Foo", b"bar"),
+        ),
+    ],
+    ids=["list", "tuple"],
+)
+def test_upgrade_request(headers: Headers) -> None:
+    server = WSConnection(SERVER)
+    server.initiate_upgrade_connection(headers, "/")
     event = next(server.events())
     event = cast("Request", event)
 
@@ -151,14 +164,14 @@ def test_upgrade_request() -> None:
     assert event.host == "localhost"
     assert event.subprotocols == []
     assert event.target == "/"
-    headers = normed_header_dict(event.extra_headers)
-    assert b"host" not in headers
-    assert b"sec-websocket-extensions" not in headers
-    assert b"sec-websocket-protocol" not in headers
-    assert headers[b"connection"] == b"Keep-Alive, Upgrade"
-    assert headers[b"sec-websocket-version"] == b"13"
-    assert headers[b"upgrade"] == b"websocket"
-    assert headers[b"x-foo"] == b"bar"
+    header_dict = normed_header_dict(event.extra_headers)
+    assert b"host" not in header_dict
+    assert b"sec-websocket-extensions" not in header_dict
+    assert b"sec-websocket-protocol" not in header_dict
+    assert header_dict[b"connection"] == b"Keep-Alive, Upgrade"
+    assert header_dict[b"sec-websocket-version"] == b"13"
+    assert header_dict[b"upgrade"] == b"websocket"
+    assert header_dict[b"x-foo"] == b"bar"
 
 
 def _make_handshake(
@@ -181,8 +194,8 @@ def _make_handshake(
                     (b"Upgrade", b"websocket"),
                     (b"Sec-WebSocket-Version", b"13"),
                     (b"Sec-WebSocket-Key", nonce),
+                    *request_headers,
                 ]
-                + request_headers,
             ),
         ),
     )
@@ -219,7 +232,19 @@ def test_handshake_extra_headers() -> None:
         (b"sec-websocket-accept", generate_accept_token(nonce)),
         (b"upgrade", b"websocket"),
         (b"x-foo", b"bar"),
-    ]
+    ]        
+
+
+def test_handshake_tuple_extra_headers() -> None:        
+    response, nonce = _make_handshake([], accept_headers=((b"X-Foo", b"bar"),))
+
+    assert response.status_code == 101
+    assert sorted(response.headers) == [
+        (b"connection", b"Upgrade"),
+        (b"sec-websocket-accept", generate_accept_token(nonce)),
+        (b"upgrade", b"websocket"),
+        (b"x-foo", b"bar"),
+    ]        
 
 
 @pytest.mark.parametrize("accept_subprotocol", ["one", "two"])
