@@ -1,3 +1,5 @@
 from __future__ import annotations
 
-Headers = list[tuple[bytes, bytes]]
+from collections.abc import Sequence
+
+Headers = Sequence[tuple[bytes, bytes]]

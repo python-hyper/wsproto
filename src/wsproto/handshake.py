@@ -81,7 +81,7 @@ class H11Handshake:
         This should be used if the request has already be received and
         parsed.
 
-        :param list headers: HTTP headers represented as a list of 2-tuples.
+        :param headers: HTTP headers as a sequence of ``(name, value)`` pairs.
         :param str path: A URL path.
         """
         if self.client:
@@ -89,7 +89,14 @@ class H11Handshake:
             raise LocalProtocolError(
                 msg,
             )
-        upgrade_request = h11.Request(method=b"GET", target=path, headers=headers)
+        # h11 walks any sequence of pairs at runtime, but its stubs only
+        # accept a list, so materialise the sequence here instead of
+        # silencing the type checker with a cast.
+        upgrade_request = h11.Request(
+            method=b"GET",
+            target=path,
+            headers=list(headers),
+        )
         h11_client = h11.Connection(h11.CLIENT)
         self.receive_data(h11_client.send(upgrade_request))
 
@@ -204,7 +211,7 @@ class H11Handshake:
         subprotocols: list[str] = []
         upgrade = b""
         version = None
-        headers: Headers = []
+        collected: list[tuple[bytes, bytes]] = []
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
@@ -224,7 +231,8 @@ class H11Handshake:
                 version = value
             elif name == b"upgrade":
                 upgrade = value
-            headers.append((name, value))
+            collected.append((name, value))
+            headers: Headers = collected
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
@@ -299,7 +307,7 @@ class H11Handshake:
 
         response = h11.InformationalResponse(
             status_code=101,
-            headers=headers + event.extra_headers,
+            headers=[*headers, *event.extra_headers],
             reason=b"Switching Protocols",
         )
         self._connection = Connection(
@@ -381,7 +389,7 @@ class H11Handshake:
         upgrade = h11.Request(
             method=b"GET",
             target=request.target.encode("ascii"),
-            headers=headers + request.extra_headers,
+            headers=[*headers, *request.extra_headers],
         )
         return self._h11_connection.send(upgrade) or b""
 
@@ -397,7 +405,7 @@ class H11Handshake:
         accepts: list[str] = []
         subprotocol = None
         upgrade = b""
-        headers: Headers = []
+        collected: list[tuple[bytes, bytes]] = []
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
@@ -415,7 +423,8 @@ class H11Handshake:
             if name == b"upgrade":
                 upgrade = value
                 continue  # Skip appending to headers
-            headers.append((name, value))
+            collected.append((name, value))
+            headers: Headers = collected
 
         if connection_tokens is None or not any(
             token.lower() == "upgrade" for token in connection_tokens
