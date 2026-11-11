@@ -59,7 +59,22 @@ def test_connection_request_additional_headers() -> None:
     headers = normed_header_dict(request.headers)
     assert headers[b"x-foo"] == b"Bar"
     assert headers[b"x-bar"] == b"Foo"
+    
+    
+    def test_connection_request_tuple_extra_headers() -> None:
+    # Headers accepts any sequence of pairs, not only list.
+    request = _make_connection_request(
+        Request(
+            host="localhost",
+            target="/",
+            extra_headers=((b"X-Foo", b"Bar"), (b"X-Bar", b"Foo")),
+        ),
+    )
 
+    headers = normed_header_dict(request.headers)
+    assert headers[b"x-foo"] == b"Bar"
+    assert headers[b"x-bar"] == b"Foo"    
+    
 
 def test_connection_request_simple_extension() -> None:
     extension = FakeExtension(offer_response=True)
@@ -142,7 +157,7 @@ def test_connection_send_state() -> None:
 
 def _make_handshake(
     response_status: int,
-    response_headers: Headers,
+    response_headers: list[tuple[bytes, bytes]],
     subprotocols: Optional[List[str]] = None,
     extensions: Optional[List[Extension]] = None,
     auto_accept_key: bool = True,
@@ -205,14 +220,14 @@ def test_handshake_extra_accept_headers() -> None:
 @pytest.mark.parametrize("extra_headers", [[], [(b"connection", b"Keep-Alive")]])
 def test_handshake_response_broken_connection_header(extra_headers: Headers) -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        _make_handshake(101, [(b"upgrade", b"websocket")] + extra_headers)
+        _make_handshake(101, [(b"upgrade", b"websocket"), *extra_headers])
     assert str(excinfo.value) == "Missing header, 'Connection: Upgrade'"
 
 
 @pytest.mark.parametrize("extra_headers", [[], [(b"upgrade", b"h2")]])
 def test_handshake_response_broken_upgrade_header(extra_headers: Headers) -> None:
     with pytest.raises(RemoteProtocolError) as excinfo:
-        _make_handshake(101, [(b"connection", b"Upgrade")] + extra_headers)
+        _make_handshake(101, [(b"connection", b"Upgrade"), *extra_headers])
     assert str(excinfo.value) == "Missing header, 'Upgrade: websocket'"
 
 
