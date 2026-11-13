@@ -469,6 +469,8 @@ def server_extensions_handshake(
     accepts: dict[str, bool | bytes] = {}
     for offer in requested:
         name = offer.split(";", 1)[0].strip()
+        if name in accepts:
+            continue
         for extension in supported:
             if extension.name == name:
                 accept = extension.accept(offer)
