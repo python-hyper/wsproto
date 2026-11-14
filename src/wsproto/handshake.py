@@ -197,7 +197,7 @@ class H11Handshake:
             raise RemoteProtocolError(
                 msg, event_hint=RejectConnection(),
             )
-        connection_tokens = None
+        connection_tokens: list[str] = []
         extensions: list[str] = []
         host = None
         key = None
@@ -208,7 +208,7 @@ class H11Handshake:
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
-                connection_tokens = split_comma_header(value)
+                connection_tokens.extend(split_comma_header(value))
             elif name == b"host":
                 host = value.decode("idna")
                 continue  # Skip appending to headers
@@ -225,7 +225,7 @@ class H11Handshake:
             elif name == b"upgrade":
                 upgrade = value
             headers.append((name, value))
-        if connection_tokens is None or not any(
+        if not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
             msg = "Missing header, 'Connection: Upgrade'"
@@ -393,7 +393,7 @@ class H11Handshake:
         assert self._nonce is not None
 
         accept = None
-        connection_tokens = None
+        connection_tokens: list[str] = []
         accepts: list[str] = []
         subprotocol = None
         upgrade = b""
@@ -401,7 +401,7 @@ class H11Handshake:
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
-                connection_tokens = split_comma_header(value)
+                connection_tokens.extend(split_comma_header(value))
                 continue  # Skip appending to headers
             if name == b"sec-websocket-extensions":
                 accepts = split_comma_header(value)
@@ -417,7 +417,7 @@ class H11Handshake:
                 continue  # Skip appending to headers
             headers.append((name, value))
 
-        if connection_tokens is None or not any(
+        if not any(
             token.lower() == "upgrade" for token in connection_tokens
         ):
             msg = "Missing header, 'Connection: Upgrade'"
