@@ -6,6 +6,8 @@ Release History
 
 - Require ``event_hint`` when constructing ``RemoteProtocolError``.
   This is an API-breaking change.
+- Combine tokens from repeated ``Connection`` header fields when validating
+  client and server handshakes.
 
 1.3.2 (2025-11-20)
 ------------------
