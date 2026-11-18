@@ -3,9 +3,9 @@ from __future__ import annotations
 import pytest
 
 from wsproto.connection import CLIENT, SERVER, ConnectionState
-from wsproto.events import AcceptConnection, Ping, Request
+from wsproto.events import AcceptConnection, Ping, RejectConnection, Request
 from wsproto.handshake import H11Handshake
-from wsproto.utilities import LocalProtocolError, RemoteProtocolError
+from wsproto.utilities import LocalProtocolError, RemoteProtocolError, generate_accept_token
 
 
 def test_successful_handshake() -> None:
@@ -102,3 +102,56 @@ def test_h11_multiple_headers_handshake() -> None:
         "this-extension; were-gonna-see",
         "and-another-extension; were-also; gonna-see=100; percent",
     ]
+
+
+def _assert_rejection(excinfo: pytest.ExceptionInfo[RemoteProtocolError]) -> None:
+    hint = excinfo.value.event_hint
+    assert isinstance(hint, RejectConnection)
+    assert hint.status_code == 400
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        b"Host: \xff\xfe",
+        b"Host: localhost\r\nConnection: Upgrade, \xff",
+        b"Host: localhost\r\nSec-WebSocket-Extensions: \xff",
+        b"Host: localhost\r\nSec-WebSocket-Protocol: \xff",
+    ],
+)
+def test_obs_text_header_rejected(header: bytes) -> None:
+    # obs-text (non-ASCII) bytes in these header values must be rejected
+    # with a RemoteProtocolError, not an uncaught UnicodeDecodeError.
+    server = H11Handshake(SERVER)
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        server.receive_data(
+            b"GET / HTTP/1.1\r\n" + header + b"\r\n"
+            b"Upgrade: websocket\r\n"
+            b"Connection: Upgrade\r\n"
+            b"Sec-WebSocket-Key: VQr8cvwwZ1fEk62PDq8J3A==\r\n"
+            b"Sec-WebSocket-Version: 13\r\n"
+            b"\r\n",
+        )
+    _assert_rejection(excinfo)
+
+
+def test_obs_text_response_header_rejected() -> None:
+    # obs-text in a handshake response header value must be rejected with a
+    # RemoteProtocolError, not an uncaught UnicodeDecodeError.
+    client = H11Handshake(CLIENT)
+    data = client.send(Request(host="localhost", target="/"))
+    key = b""
+    for line in data.split(b"\r\n"):
+        if line.lower().startswith(b"sec-websocket-key: "):
+            key = line.split(b": ", 1)[1]
+    accept = generate_accept_token(key)
+    with pytest.raises(RemoteProtocolError) as excinfo:
+        client.receive_data(
+            b"HTTP/1.1 101 Switching Protocols\r\n"
+            b"Upgrade: websocket\r\n"
+            b"Connection: Upgrade\r\n"
+            b"Sec-WebSocket-Accept: " + accept + b"\r\n"
+            b"Sec-WebSocket-Protocol: \xff\r\n"
+            b"\r\n",
+        )
+    _assert_rejection(excinfo)
