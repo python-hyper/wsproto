@@ -31,6 +31,31 @@ if TYPE_CHECKING:
 
     from .typing import Headers
 
+
+def _decode_host_header(value: bytes) -> str:
+    try:
+        return value.decode("idna")
+    except UnicodeDecodeError as exc:
+        msg = "Host header value is not valid IDNA"
+        raise RemoteProtocolError(msg, event_hint=RejectConnection()) from exc
+
+
+def _decode_ascii_header(value: bytes) -> str:
+    try:
+        return value.decode("ascii")
+    except UnicodeDecodeError as exc:
+        msg = "Header value is not valid ASCII"
+        raise RemoteProtocolError(msg, event_hint=RejectConnection()) from exc
+
+
+def _split_comma_header(value: bytes) -> list[str]:
+    try:
+        return split_comma_header(value)
+    except UnicodeDecodeError as exc:
+        msg = "Header value is not valid ASCII"
+        raise RemoteProtocolError(msg, event_hint=RejectConnection()) from exc
+
+
 # RFC6455, Section 4.2.1/6 - Reading the Client's Opening Handshake
 WEBSOCKET_VERSION = b"13"
 
@@ -208,17 +233,17 @@ class H11Handshake:
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
-                connection_tokens = split_comma_header(value)
+                connection_tokens = _split_comma_header(value)
             elif name == b"host":
-                host = value.decode("idna")
+                host = _decode_host_header(value)
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-extensions":
-                extensions.extend(split_comma_header(value))
+                extensions.extend(_split_comma_header(value))
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-key":
                 key = value
             elif name == b"sec-websocket-protocol":
-                subprotocols.extend(split_comma_header(value))
+                subprotocols.extend(_split_comma_header(value))
                 continue  # Skip appending to headers
             elif name == b"sec-websocket-version":
                 version = value
@@ -401,16 +426,16 @@ class H11Handshake:
         for name, value in event.headers:
             name = name.lower()
             if name == b"connection":
-                connection_tokens = split_comma_header(value)
+                connection_tokens = _split_comma_header(value)
                 continue  # Skip appending to headers
             if name == b"sec-websocket-extensions":
-                accepts = split_comma_header(value)
+                accepts = _split_comma_header(value)
                 continue  # Skip appending to headers
             if name == b"sec-websocket-accept":
                 accept = value
                 continue  # Skip appending to headers
             if name == b"sec-websocket-protocol":
-                subprotocol = value.decode("ascii")
+                subprotocol = _decode_ascii_header(value)
                 continue  # Skip appending to headers
             if name == b"upgrade":
                 upgrade = value
